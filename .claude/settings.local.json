@@ -35,7 +35,24 @@
       "Bash(npx tsc *)",
       "Bash(npx vite *)",
       "Bash(kill %1)",
-      "Bash(wait)"
+      "Bash(wait)",
+      "Bash(.venv/Scripts/python -c \"import pymysql; print\\('pymysql', pymysql.__version__\\)\")",
+      "Bash(.venv/Scripts/python -c \"import mysql.connector; print\\('mysql-connector', mysql.connector.__version__\\)\")",
+      "Bash(.venv/Scripts/python -c \"import MySQLdb; print\\('MySQLdb ok'\\)\")",
+      "Bash(.venv/Scripts/python -m pip install pymysql)",
+      "Bash(.venv/Scripts/python *)",
+      "Bash(curl -s http://localhost:8000/health)",
+      "Bash(curl *)",
+      "Bash(printf '{\"message\": \"2026\\\\\\\\u5e744\\\\\\\\u6708\\\\\\\\u534e\\\\\\\\u4e1c\\\\\\\\u9500\\\\\\\\u552e\\\\\\\\u989d\\\\\\\\u662f\\\\\\\\u591a\\\\\\\\u5c11\", \"history\": []}')",
+      "Bash(.venv/Scripts/uvicorn backend.main:app --host 0.0.0.0 --port 8000)",
+      "Bash(sleep 3 printf '{\"message\": \"\\\\\\\\u6709\\\\\\\\u4ec0\\\\\\\\u4e48\\\\\\\\u9500\\\\\\\\u552e\\\\\\\\u989d\", \"history\": []}')",
+      "Bash(kill %1 .venv/Scripts/uvicorn backend.main:app --host 0.0.0.0 --port 8000)",
+      "PowerShell(taskkill *)",
+      "PowerShell(netstat *)",
+      "Bash(.venv/Scripts/uvicorn backend.main:app --host 127.0.0.1 --port 8000)",
+      "Bash(printf '{\"message\": \"\\\\\\\\u6709\\\\\\\\u4ec0\\\\\\\\u4e48\\\\\\\\u9500\\\\\\\\u552e\\\\\\\\u989d\", \"history\": []}')",
+      "Bash(netstat -ano)",
+      "Bash(printf '{\"message\": \"2026\\\\\\\\u5e741-4\\\\\\\\u6708\\\\\\\\u5404\\\\\\\\u533a\\\\\\\\u57df\\\\\\\\u9500\\\\\\\\u552e\\\\\\\\u989d\\\\\\\\u6392\\\\\\\\u884c\", \"history\": []}')"
     ]
   }
 }

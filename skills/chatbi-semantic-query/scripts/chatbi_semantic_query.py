@@ -4,25 +4,24 @@ Lightweight ChatBI semantic query script.
 
 It maps a Chinese natural-language question to governed metric SQL using the
 metadata tables in the demo MySQL database, then executes the generated query.
-No Python MySQL package is required; the script uses the local `mysql` CLI.
 """
 
 from __future__ import annotations
 
 import argparse
-import csv
 import json
 import os
 import re
-import subprocess
 import sys
 from dataclasses import dataclass
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
+import pymysql
+
 
 DEFAULT_DB = {
     "host": os.getenv("CHATBI_DB_HOST", "127.0.0.1"),
-    "port": os.getenv("CHATBI_DB_PORT", "3307"),
+    "port": int(os.getenv("CHATBI_DB_PORT", "3307")),
     "user": os.getenv("CHATBI_DB_USER", "demo_user"),
     "password": os.getenv("CHATBI_DB_PASSWORD", "demo_pass"),
     "database": os.getenv("CHATBI_DB_NAME", "chatbi_demo"),
@@ -61,30 +60,33 @@ class SemanticPlan:
 class MysqlCli:
     def __init__(self, config: Dict[str, str]):
         self.config = config
-        self.mysql_cmd = os.getenv("CHATBI_MYSQL_CMD", "mysql")
 
     def query(self, sql: str) -> List[Dict[str, str]]:
-        cmd = [
-            self.mysql_cmd,
-            f"-h{self.config['host']}",
-            f"-P{self.config['port']}",
-            f"-u{self.config['user']}",
-            f"-p{self.config['password']}",
-            "--batch",
-            "--raw",
-            "--default-character-set=utf8mb4",
-            self.config["database"],
-            "-e",
-            sql,
-        ]
-        proc = subprocess.run(cmd, text=True, capture_output=True, check=False)
-        if proc.returncode != 0:
-            raise RuntimeError(proc.stderr.strip() or proc.stdout.strip())
-        lines = [line for line in proc.stdout.splitlines() if line.strip()]
-        if not lines:
-            return []
-        reader = csv.DictReader(lines, delimiter="\t")
-        return [dict(row) for row in reader]
+        conn = pymysql.connect(
+            host=self.config["host"],
+            port=self.config["port"],
+            user=self.config["user"],
+            password=self.config["password"],
+            database=self.config["database"],
+            charset="utf8mb4",
+        )
+        try:
+            with conn.cursor() as cur:
+                cur.execute(sql)
+                if not cur.description:
+                    return []
+                columns = [col[0] for col in cur.description]
+                rows = []
+                for row in cur.fetchall():
+                    rows.append(
+                        {
+                            col: str(val) if val is not None else ""
+                            for col, val in zip(columns, row)
+                        }
+                    )
+                return rows
+        finally:
+            conn.close()
 
 
 def quote_ident(identifier: str) -> str:
@@ -445,10 +447,12 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     args = parse_args(argv)
     config = {
         "host": args.host,
-        "port": str(args.port),
+        "port": int(args.port),
         "user": args.user,
         "password": args.password,
         "database": args.database,

@@ -36,6 +36,34 @@ Run commands from this skill directory, or pass the full path to the bundled scr
 - Time expressions include `2026年4月`, `2026年1月到4月`, `2026年1-4月`, and `2026年`.
 - Ranking expressions include `排行`, `排名`, `最高`, `最低`, `top N`, and `前 N`.
 
+## Visualization Guidance
+
+When returning structured results for a UI, include or recommend a chart plan alongside the business explanation. Pick the default chart from the user's intent and result shape, not from the skill name alone.
+
+- Use a bar chart for categorical comparisons, rankings, highest/lowest questions, and region/channel/product/department breakdowns.
+- Use a line chart for monthly or time trend questions, especially when the result has `月份`, `时间`, or `month`.
+- Use a pie chart for composition, share, proportion, or contribution questions where categories sum to a meaningful whole.
+- Use KPI cards for single-scope metric summaries, such as one region's sales, target achievement, gross margin, or retention.
+- Highlight the best or worst category when the user asks for `最高`, `最低`, `最好`, `最差`, ranking, or anomaly detection.
+- Prefer interactive ECharts options with tooltip, legend filtering, click highlight, and dataZoom for time series.
+
+Suggested chart plan shape for downstream renderers:
+
+```json
+{
+  "chart_type": "bar|line|pie|kpi_cards",
+  "dimension": "区域",
+  "metrics": ["销售额"],
+  "highlight": {"mode": "min|max", "field": "销售额"},
+  "interactions": {
+    "tooltip": true,
+    "legend_filter": true,
+    "data_zoom": false,
+    "click_highlight": true
+  }
+}
+```
+
 ## Database Defaults
 
 The bundled script defaults to:

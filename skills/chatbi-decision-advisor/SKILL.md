@@ -58,6 +58,17 @@ When the scope includes sales-only dimensions such as channel, product, or depar
 - Customer retention triggers retention and churn management advice.
 - Low gross margin triggers profitability repair advice.
 
+## Visualization Guidance
+
+Use this skill's structured JSON facts to produce an executive-style answer: decision text first, then KPI cards and focused supporting charts. Do not ask the LLM to invent chart data; charts must come from computed facts.
+
+- Use KPI cards for overview facts: sales, target achievement, gross margin, order count, customer count, and latest retention.
+- Use a line chart for monthly sales, monthly target achievement, monthly gross margin, or retention trends.
+- Use a bar chart for region, channel, or product category rankings.
+- Use semantic colors in KPI cards: `success` for strong target achievement, `warning` for moderate risks, `danger` for low achievement or low margin, and `neutral` for context metrics.
+- Keep advice text and charts linked: every chart should support one recommendation or evidence point in the advice.
+- Prefer tooltip, legend filtering, click highlight, and dataZoom for monthly trend charts.
+
 ## Database Defaults
 
 The bundled script defaults to:

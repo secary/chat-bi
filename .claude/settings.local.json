@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker info *)",
+      "Bash(docker exec chatbi-demo-mysql *)",
+      "Bash(python3 scripts/chatbi_semantic_query.py \"按区域看2026年1月到4月销售额排行\" --show-sql)",
+      "Bash(pacman -Q mingw-w64-x86_64-mariadb)",
+      "Bash(pacman -S mingw-w64-x86_64-mariadb-connector-c --noconfirm)",
+      "Bash(docker exec *)",
+      "Bash(chmod +x \"E:/01LingMo/01projects/chat-bi/chat-bi/.cli/mysql\")",
+      "Bash(python3 E:/01LingMo/01projects/chat-bi/chat-bi/skills/chatbi-semantic-query/scripts/chatbi_semantic_query.py 按区域看2026年1月到4月销售额排行 --show-sql)",
+      "Bash(E:/01LingMo/01projects/chat-bi/chat-bi/.cli/mysql *)",
+      "Bash(python3 -c ' *)",
+      "Bash(PATH=\"E:/01LingMo/01projects/chat-bi/chat-bi/.cli:$PATH\" python3 *)",
+      "Bash(python3 *)",
+      "Bash(/e/anaconda/envs/chatbi/bin/python3 --version)",
+      "Bash(/e/anaconda/envs/chatbi/bin/python3 -c \"import subprocess; r = subprocess.run\\(['echo','hello'], capture_output=True, text=True\\); print\\('rc:', r.returncode, 'out:', r.stdout\\)\")",
+      "Read(//e/anaconda/envs/chatbi//**)",
+      "Read(//e/anaconda/envs/chatbi/**)",
+      "Bash(/e/anaconda/envs/chatbi/python.exe -c \"import subprocess; r = subprocess.run\\(['echo','hello'], capture_output=True, text=True\\); print\\('rc:', r.returncode, 'out:', r.stdout\\)\")",
+      "Bash(PATH=\"E:/01LingMo/01projects/chat-bi/chat-bi/.cli:$PATH\" /e/anaconda/envs/chatbi/python.exe *)",
+      "Bash(winget install *)",
+      "Bash(CHATBI_MYSQL_CMD=\"E:/01LingMo/01projects/chat-bi/chat-bi/.cli/mysql.bat\" /e/anaconda/envs/chatbi/python.exe *)",
+      "Bash(CHATBI_MYSQL_CMD=\"E:\\\\\\\\01LingMo\\\\\\\\01projects\\\\\\\\chat-bi\\\\\\\\chat-bi\\\\\\\\.cli\\\\\\\\mysql.bat\" /e/anaconda/envs/chatbi/python.exe *)",
+      "Bash(/e/anaconda/envs/chatbi/python.exe *)",
+      "Bash(docker compose *)",
+      "Bash(mysql *)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('backend/config.py'\\).read\\(\\)\\); ast.parse\\(open\\('backend/agent/prompt_builder.py'\\).read\\(\\)\\); ast.parse\\(open\\('backend/agent/runner.py'\\).read\\(\\)\\); ast.parse\\(open\\('backend/renderers/chart.py'\\).read\\(\\)\\); ast.parse\\(open\\('backend/renderers/kpi.py'\\).read\\(\\)\\); ast.parse\\(open\\('backend/main.py'\\).read\\(\\)\\); print\\('All files parse OK'\\)\")",
+      "Bash(python -c \"import ast; import io; [ast.parse\\(open\\(f, encoding='utf-8'\\).read\\(\\)\\) or print\\(f'{f} OK'\\) for f in ['backend/config.py', 'backend/agent/prompt_builder.py', 'backend/agent/runner.py', 'backend/renderers/chart.py', 'backend/renderers/kpi.py', 'backend/main.py']]\")",
+      "Bash(python -c ' *)",
+      "Bash(timeout 8 python -c ' *)",
+      "Bash(npm --version)",
+      "Bash(npx create-vite@latest frontend --template react-ts)",
+      "Bash(npm install *)",
+      "Bash(npx tsc *)",
+      "Bash(npx vite *)",
+      "Bash(kill %1)",
+      "Bash(wait)"
+    ]
+  }
+}

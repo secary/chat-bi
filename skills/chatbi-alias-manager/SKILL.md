@@ -34,6 +34,15 @@ Prefer these current standard names:
 
 Use an existing standard name. Do not create a new metric or dimension with this skill.
 
+## Presentation Guidance
+
+This skill changes semantic metadata, so its own output should be a concise text status rather than a chart.
+
+- Return a text confirmation for inserted or existing aliases, such as `成交方式 -> 渠道 (维度)`.
+- If `--print-init-sql` is used, show the generated values tuple as a code block or developer detail.
+- Do not generate bar, line, pie, or KPI charts from alias insertion results.
+- If the user asks to verify the original data question after adding an alias, run or delegate to `chatbi-semantic-query`; that follow-up query may produce charts using its Visualization Guidance.
+
 ## Database Defaults
 
 The bundled script defaults to:

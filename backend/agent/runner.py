@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import subprocess
 import sys
@@ -46,7 +47,8 @@ async def stream_chat(
     # Step 2: Execute the skill script
     yield {"type": "thinking", "content": f"正在执行 {skill_name}..."}
     try:
-        script_result = _run_script(skill_doc, plan.get("skill_args", []))
+        skill_args = plan.get("skill_args") or []
+        script_result = _run_script(skill_doc, skill_args)
     except Exception as exc:
         yield {"type": "error", "content": f"脚本执行失败：{exc}"}
         yield {"type": "done", "content": None}
@@ -54,8 +56,8 @@ async def stream_chat(
 
     yield {"type": "thinking", "content": "正在整理查询结果..."}
 
-    # Step 3: Render results
-    text = plan.get("text", "") or _summarize_result(skill_name, script_result)
+    # Step 3: Render results — show actual data, fall back to LLM text
+    text = _summarize_result(skill_name, script_result) if script_result else plan.get("text", "")
     yield {"type": "text", "content": text}
 
     # Step 4: Chart plan
@@ -94,14 +96,16 @@ async def _call_llm_for_plan(
         resp = await acompletion(
             model=params["model"],
             messages=llm_messages,
+            api_key=settings.openai_api_key,
+            api_base=params.get("api_base"),
             response_format={"type": "json_object"},
             temperature=0.1,
         )
         content = resp.choices[0].message.content
         if content:
             return json.loads(content)
-    except Exception:
-        pass
+    except Exception as exc:
+        logging.getLogger(__name__).warning("LLM call failed: %s", exc)
 
     return None
 
@@ -138,20 +142,21 @@ def _run_script(skill: SkillDoc, args: List[str]) -> List[Dict[str, str]]:
         "PATH": f"{venv_bin}{os.pathsep}{os.environ.get('PATH', '')}",
     }
 
-    merged_env = {**os.environ, **env}
+    merged_env = {**os.environ, **env, "PYTHONIOENCODING": "utf-8"}
     proc = subprocess.run(
         cmd,
         cwd=str(skill.skill_dir),
         capture_output=True,
-        text=True,
         timeout=60,
         env=merged_env,
     )
 
     if proc.returncode != 0:
-        raise RuntimeError(proc.stderr.strip() or proc.stdout.strip())
+        err = proc.stderr.decode("utf-8", errors="replace").strip()
+        out = proc.stdout.decode("utf-8", errors="replace").strip()
+        raise RuntimeError(err or out)
 
-    output = proc.stdout.strip()
+    output = proc.stdout.decode("utf-8", errors="replace").strip()
     if not output:
         return []
 

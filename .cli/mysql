@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Wrapper: delegates mysql CLI calls to docker exec
+exec docker exec -i chatbi-demo-mysql mysql "$@"

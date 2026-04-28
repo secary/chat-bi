@@ -1,0 +1,261 @@
+<svg width="1600" height="900" viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .title { font: 700 38px "PingFang SC", "Microsoft YaHei", Arial, sans-serif; fill: #233238; }
+      .subtitle { font: 400 22px "PingFang SC", "Microsoft YaHei", Arial, sans-serif; fill: #5a6770; }
+      .caption { font: 700 22px "PingFang SC", "Microsoft YaHei", Arial, sans-serif; fill: #4e90cf; letter-spacing: 1px; }
+      .section { font: 700 21px "PingFang SC", "Microsoft YaHei", Arial, sans-serif; fill: #233238; }
+      .label { font: 500 17px "PingFang SC", "Microsoft YaHei", Arial, sans-serif; fill: #34434b; }
+      .small { font: 400 15px "PingFang SC", "Microsoft YaHei", Arial, sans-serif; fill: #53636b; }
+      .tiny { font: 400 13px "PingFang SC", "Microsoft YaHei", Arial, sans-serif; fill: #607079; }
+      .mini { font: 400 12px "PingFang SC", "Microsoft YaHei", Arial, sans-serif; fill: #607079; }
+      .chip-text { font: 500 15px "PingFang SC", "Microsoft YaHei", Arial, sans-serif; fill: #33444c; }
+      .white { font: 700 16px "PingFang SC", "Microsoft YaHei", Arial, sans-serif; fill: #fff; }
+      .blue-title { font: 700 17px "PingFang SC", "Microsoft YaHei", Arial, sans-serif; fill: #1b2e82; }
+      .axis { font: 700 17px "PingFang SC", "Microsoft YaHei", Arial, sans-serif; fill: #169ba0; writing-mode: tb; letter-spacing: 3px; }
+      .value { font: 700 26px "PingFang SC", "Microsoft YaHei", Arial, sans-serif; fill: #e9271b; }
+      .panel { fill: #ffffff; stroke: #d8e2e6; stroke-width: 1.5; }
+      .soft-blue { fill: #eaf6fb; stroke: #afddec; }
+      .soft-mint { fill: #eef9f6; stroke: #a6dcd4; }
+      .soft-gold { fill: #fff6df; stroke: #ebca73; }
+      .soft-pink { fill: #fdeeee; stroke: #edc7c4; }
+      .soft-gray { fill: #f6f8f8; stroke: #d8e2e6; }
+      .dash { stroke: #c6d2d7; stroke-width: 1; stroke-dasharray: 6 7; }
+      .arrow { stroke: #49b5bb; stroke-width: 3; fill: none; }
+      .blue-line { stroke: #2752d9; stroke-width: 2.2; fill: none; }
+      .gold-line { stroke: #efb640; stroke-width: 3; fill: none; }
+    </style>
+    <marker id="arrow-teal" markerWidth="13" markerHeight="13" refX="10" refY="6.5" orient="auto">
+      <path d="M2,2 L11,6.5 L2,11 Z" fill="#49b5bb"/>
+    </marker>
+    <marker id="arrow-blue" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#2752d9"/>
+    </marker>
+    <marker id="arrow-gold" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#efb640"/>
+    </marker>
+  </defs>
+
+  <rect width="1600" height="900" fill="#fff"/>
+
+  <!-- Subtle Headless BI background rhythm -->
+  <g opacity="0.28" fill="none" stroke="#b7ddff" stroke-width="1.1">
+    <path d="M0 145 C88 245 112 350 0 470"/>
+    <path d="M0 175 C105 270 132 374 0 500"/>
+    <path d="M0 205 C122 296 152 398 0 530"/>
+    <path d="M1600 145 C1512 245 1488 350 1600 470"/>
+    <path d="M1600 175 C1495 270 1468 374 1600 500"/>
+    <path d="M1600 205 C1478 296 1448 398 1600 530"/>
+    <path d="M420 855 L455 820 L490 855 L525 820 L560 855 L595 820 L630 855 L665 820 L700 855 L735 820 L770 855 L805 820 L840 855 L875 820 L910 855 L945 820 L980 855 L1015 820 L1050 855 L1085 820 L1120 855 L1155 820 L1190 855"/>
+  </g>
+
+  <!-- Header -->
+  <text x="800" y="70" text-anchor="middle" class="title">零眸智能 ChatBI 数据分析平台功能框架</text>
+  <text x="800" y="112" text-anchor="middle" class="subtitle">自然语言交互入口 + 企业 AI 决策大脑 + Headless BI 能力编排 + 企业数据治理底座</text>
+
+  <!-- Top logical flow -->
+  <g>
+    <rect x="245" y="145" width="165" height="44" rx="22" class="soft-blue"/>
+    <text x="327" y="174" text-anchor="middle" class="section">业务场景</text>
+    <line x1="425" y1="167" x2="510" y2="167" class="arrow" marker-end="url(#arrow-teal)"/>
+    <rect x="525" y="145" width="185" height="44" rx="22" class="soft-mint"/>
+    <text x="617" y="174" text-anchor="middle" class="section">自然语言入口</text>
+    <line x1="725" y1="167" x2="810" y2="167" class="arrow" marker-end="url(#arrow-teal)"/>
+    <rect x="825" y="145" width="205" height="44" rx="22" class="soft-gold"/>
+    <text x="928" y="174" text-anchor="middle" class="section">AI 分析中枢</text>
+    <line x1="1045" y1="167" x2="1130" y2="167" class="arrow" marker-end="url(#arrow-teal)"/>
+    <rect x="1145" y="145" width="190" height="44" rx="22" class="soft-pink"/>
+    <text x="1240" y="174" text-anchor="middle" class="section">多端展示输出</text>
+  </g>
+
+  <!-- Main grid guide -->
+  <line x1="125" y1="692" x2="1475" y2="692" class="dash"/>
+
+  <!-- Column 1: Business roles and scenarios -->
+  <rect x="130" y="225" width="310" height="450" rx="14" fill="#ffffff" stroke="#d8e2e6" stroke-width="1.2"/>
+  <text x="285" y="260" text-anchor="middle" class="section">业务角色与场景</text>
+  <line x1="154" y1="282" x2="416" y2="282" class="dash"/>
+
+  <g>
+    <rect x="145" y="305" width="280" height="54" rx="10" fill="#e2f5f1" stroke="#8bd6ce"/>
+    <circle cx="178" cy="332" r="11" fill="#63c3bd"/>
+    <text x="178" y="337" text-anchor="middle" class="white">1</text>
+    <text x="305" y="327" text-anchor="middle" class="label">企业管理层</text>
+    <text x="305" y="349" text-anchor="middle" class="small">战略指标、经营概览</text>
+
+    <rect x="145" y="374" width="280" height="58" rx="10" fill="#e7f7f4" stroke="#8bd6ce"/>
+    <circle cx="178" cy="403" r="11" fill="#63c3bd"/>
+    <text x="178" y="408" text-anchor="middle" class="white">2</text>
+    <text x="305" y="398" text-anchor="middle" class="label">部门负责人</text>
+    <text x="305" y="421" text-anchor="middle" class="small">业务决策、指标监控、归因分析</text>
+
+    <rect x="145" y="447" width="280" height="64" rx="10" fill="#ecfaf7" stroke="#8bd6ce"/>
+    <circle cx="178" cy="479" r="11" fill="#63c3bd"/>
+    <text x="178" y="484" text-anchor="middle" class="white">3</text>
+    <text x="305" y="472" text-anchor="middle" class="label">专题分析 owner</text>
+    <text x="305" y="496" text-anchor="middle" class="small">数据分析师、专题协作方</text>
+
+    <rect x="145" y="526" width="280" height="58" rx="10" fill="#f2fcfa" stroke="#8bd6ce"/>
+    <circle cx="178" cy="555" r="11" fill="#63c3bd"/>
+    <text x="178" y="560" text-anchor="middle" class="white">4</text>
+    <text x="305" y="550" text-anchor="middle" class="label">业务与数据一线人员</text>
+    <text x="305" y="573" text-anchor="middle" class="small">自助取数、运营监控、业务分析</text>
+
+    <rect x="145" y="599" width="280" height="50" rx="10" fill="#f8fdfc" stroke="#8bd6ce"/>
+    <circle cx="178" cy="624" r="11" fill="#63c3bd"/>
+    <text x="178" y="629" text-anchor="middle" class="white">5</text>
+    <text x="305" y="629" text-anchor="middle" class="label">企业级智能自助分析数据底座</text>
+  </g>
+
+  <!-- Column 2: Natural language entry -->
+  <rect x="485" y="225" width="240" height="450" rx="14" fill="#f2fbf9" stroke="#d8eee9"/>
+  <text x="605" y="260" text-anchor="middle" class="section">自然语言交互入口</text>
+  <text x="605" y="288" text-anchor="middle" class="small">问数、追问、解释、行动建议</text>
+
+  <rect x="510" y="320" width="190" height="205" rx="12" fill="#ffffff" stroke="#d8e2e6"/>
+  <text x="605" y="352" text-anchor="middle" class="blue-title">业务用户输入</text>
+  <rect x="530" y="372" width="150" height="44" rx="8" fill="#f8fbff" stroke="#1d2a73"/>
+  <text x="605" y="399" text-anchor="middle" class="tiny">自然语言问句</text>
+  <path d="M605 424 L605 444" class="blue-line" marker-end="url(#arrow-blue)"/>
+  <text x="605" y="469" text-anchor="middle" class="blue-title">系统反馈输出</text>
+  <rect x="530" y="486" width="150" height="28" rx="14" fill="#f8fbff" stroke="#d8e2e6"/>
+  <text x="605" y="504" text-anchor="middle" class="tiny">解释 / 建议 / 报告摘要</text>
+
+  <g>
+    <rect x="515" y="560" width="82" height="34" rx="17" fill="#ffffff" stroke="#d8e2e6"/>
+    <text x="556" y="582" text-anchor="middle" class="chip-text">权限问数</text>
+    <rect x="612" y="560" width="82" height="34" rx="17" fill="#ffffff" stroke="#d8e2e6"/>
+    <text x="653" y="582" text-anchor="middle" class="chip-text">多轮追问</text>
+    <rect x="515" y="608" width="82" height="34" rx="17" fill="#ffffff" stroke="#d8e2e6"/>
+    <text x="556" y="630" text-anchor="middle" class="chip-text">指标解释</text>
+    <rect x="612" y="608" width="82" height="34" rx="17" fill="#ffffff" stroke="#d8e2e6"/>
+    <text x="653" y="630" text-anchor="middle" class="chip-text">结果校验</text>
+  </g>
+
+  <line x1="725" y1="450" x2="775" y2="450" class="arrow" marker-end="url(#arrow-teal)"/>
+
+  <!-- Column 3: AI decision brain -->
+  <rect x="775" y="225" width="470" height="450" rx="14" fill="#f7f9fb" stroke="#d8e2e6"/>
+  <text x="1010" y="260" text-anchor="middle" class="section">企业 AI 决策大脑</text>
+  <text x="1010" y="288" text-anchor="middle" class="small">稳定准确的数据洞察 + 灵活可解释的业务建议</text>
+
+  <rect x="810" y="318" width="135" height="42" rx="7" fill="#4255ef"/>
+  <text x="878" y="345" text-anchor="middle" class="white">数据语言模型</text>
+  <rect x="810" y="374" width="135" height="42" rx="7" fill="#4255ef"/>
+  <text x="878" y="401" text-anchor="middle" class="white">自动分析引擎</text>
+  <rect x="810" y="430" width="135" height="42" rx="7" fill="#4255ef"/>
+  <text x="878" y="457" text-anchor="middle" class="white">智能可视化</text>
+  <text x="878" y="506" text-anchor="middle" class="blue-title">左脑：分析 / 准确</text>
+
+  <rect x="1075" y="318" width="135" height="42" rx="7" fill="#50bced"/>
+  <text x="1142" y="345" text-anchor="middle" class="white">通用知识</text>
+  <rect x="1075" y="374" width="135" height="42" rx="7" fill="#50bced"/>
+  <text x="1142" y="401" text-anchor="middle" class="white">行业知识</text>
+  <rect x="1075" y="430" width="135" height="42" rx="7" fill="#50bced"/>
+  <text x="1142" y="457" text-anchor="middle" class="white">企业知识</text>
+  <text x="1142" y="506" text-anchor="middle" class="blue-title">右脑：语言 / 创意</text>
+
+  <rect x="963" y="350" width="94" height="142" rx="12" fill="#ffffff" stroke="#d8e2e6"/>
+  <text x="1010" y="382" text-anchor="middle" class="blue-title">能力协同</text>
+  <line x1="982" y1="402" x2="1038" y2="402" class="dash"/>
+  <text x="1010" y="430" text-anchor="middle" class="tiny">业务事实</text>
+  <text x="1010" y="456" text-anchor="middle" class="tiny">业务知识</text>
+  <text x="1010" y="482" text-anchor="middle" class="tiny">模型推理</text>
+  <text x="1010" y="534" text-anchor="middle" class="blue-title">数据分析 × 语言理解</text>
+
+  <text x="1010" y="558" text-anchor="middle" class="blue-title">智能分析能力</text>
+  <rect x="810" y="570" width="84" height="26" rx="13" fill="#ffffff" stroke="#d8e2e6"/>
+  <text x="852" y="587" text-anchor="middle" class="mini">NL2SQL</text>
+  <rect x="904" y="570" width="84" height="26" rx="13" fill="#ffffff" stroke="#d8e2e6"/>
+  <text x="946" y="587" text-anchor="middle" class="mini">多轮问答</text>
+  <rect x="998" y="570" width="84" height="26" rx="13" fill="#ffffff" stroke="#d8e2e6"/>
+  <text x="1040" y="587" text-anchor="middle" class="mini">图表推荐</text>
+  <rect x="1092" y="570" width="84" height="26" rx="13" fill="#ffffff" stroke="#d8e2e6"/>
+  <text x="1134" y="587" text-anchor="middle" class="mini">趋势预测</text>
+  <rect x="810" y="604" width="84" height="26" rx="13" fill="#ffffff" stroke="#d8e2e6"/>
+  <text x="852" y="621" text-anchor="middle" class="mini">异常检测</text>
+  <rect x="904" y="604" width="84" height="26" rx="13" fill="#ffffff" stroke="#d8e2e6"/>
+  <text x="946" y="621" text-anchor="middle" class="mini">归因分析</text>
+  <rect x="998" y="604" width="84" height="26" rx="13" fill="#ffffff" stroke="#d8e2e6"/>
+  <text x="1040" y="621" text-anchor="middle" class="mini">下钻分析</text>
+  <rect x="1092" y="604" width="84" height="26" rx="13" fill="#ffffff" stroke="#d8e2e6"/>
+  <text x="1134" y="621" text-anchor="middle" class="mini">结论生成</text>
+
+  <!-- PDCA placed as a separate lane, not over the brain -->
+  <rect x="815" y="642" width="390" height="24" rx="12" fill="#fffaf0" stroke="#f2d895"/>
+  <text x="1010" y="659" text-anchor="middle" class="tiny">PDCA 闭环：业务目标 → 数据行动 → 效果复盘 → 策略落地</text>
+
+  <line x1="1245" y1="450" x2="1295" y2="450" class="arrow" marker-end="url(#arrow-teal)"/>
+
+  <!-- Column 4: Output and data sources -->
+  <rect x="1295" y="225" width="180" height="450" rx="14" class="panel"/>
+  <text x="1385" y="260" text-anchor="middle" class="section">输出与数据源</text>
+  <line x1="1320" y1="282" x2="1450" y2="282" class="dash"/>
+
+  <text x="1385" y="317" text-anchor="middle" class="blue-title">智能应用层</text>
+  <rect x="1315" y="336" width="140" height="30" rx="15" fill="#fff6df" stroke="#ebca73"/>
+  <text x="1385" y="356" text-anchor="middle" class="mini">决策意见</text>
+  <rect x="1315" y="374" width="140" height="30" rx="15" fill="#fff6df" stroke="#ebca73"/>
+  <text x="1385" y="394" text-anchor="middle" class="mini">洞察报告</text>
+  <rect x="1315" y="412" width="140" height="30" rx="15" fill="#fff6df" stroke="#ebca73"/>
+  <text x="1385" y="432" text-anchor="middle" class="mini">定制化看板</text>
+  <rect x="1314" y="454" width="66" height="28" rx="14" fill="#ffffff" stroke="#d8e2e6"/>
+  <text x="1347" y="472" text-anchor="middle" class="mini">指标预警</text>
+  <rect x="1390" y="454" width="66" height="28" rx="14" fill="#ffffff" stroke="#d8e2e6"/>
+  <text x="1423" y="472" text-anchor="middle" class="mini">专题助手</text>
+  <rect x="1314" y="488" width="66" height="28" rx="14" fill="#ffffff" stroke="#d8e2e6"/>
+  <text x="1347" y="506" text-anchor="middle" class="mini">资产问答</text>
+  <rect x="1390" y="488" width="66" height="28" rx="14" fill="#ffffff" stroke="#d8e2e6"/>
+  <text x="1423" y="506" text-anchor="middle" class="mini">自助分析</text>
+
+  <text x="1385" y="548" text-anchor="middle" class="blue-title">数据接入层</text>
+  <rect x="1314" y="568" width="66" height="26" rx="13" fill="#ffffff" stroke="#d8e2e6"/>
+  <text x="1347" y="585" text-anchor="middle" class="mini">数仓/湖仓</text>
+  <rect x="1390" y="568" width="66" height="26" rx="13" fill="#ffffff" stroke="#d8e2e6"/>
+  <text x="1423" y="585" text-anchor="middle" class="mini">指标平台</text>
+  <rect x="1314" y="602" width="66" height="26" rx="13" fill="#ffffff" stroke="#d8e2e6"/>
+  <text x="1347" y="619" text-anchor="middle" class="mini">现有 BI</text>
+  <rect x="1390" y="602" width="66" height="26" rx="13" fill="#ffffff" stroke="#d8e2e6"/>
+  <text x="1423" y="619" text-anchor="middle" class="mini">业务系统</text>
+  <rect x="1314" y="636" width="66" height="26" rx="13" fill="#ffffff" stroke="#d8e2e6"/>
+  <text x="1347" y="653" text-anchor="middle" class="mini">API/文件</text>
+  <rect x="1390" y="636" width="66" height="26" rx="13" fill="#ffffff" stroke="#d8e2e6"/>
+  <text x="1423" y="653" text-anchor="middle" class="mini">实时/离线</text>
+
+  <!-- Governance foundation -->
+  <rect x="150" y="712" width="1300" height="145" rx="12" class="soft-gray"/>
+  <text x="800" y="742" text-anchor="middle" class="section">本地部署与数据治理底座</text>
+  <line x1="180" y1="760" x2="1420" y2="760" class="dash"/>
+
+  <text x="365" y="790" text-anchor="middle" class="blue-title">语义与指标治理</text>
+  <rect x="210" y="808" width="72" height="26" rx="13" fill="#ffffff" stroke="#d8e2e6"/>
+  <text x="246" y="825" text-anchor="middle" class="mini">业务语义层</text>
+  <rect x="292" y="808" width="72" height="26" rx="13" fill="#ffffff" stroke="#d8e2e6"/>
+  <text x="328" y="825" text-anchor="middle" class="mini">指标口径</text>
+  <rect x="374" y="808" width="72" height="26" rx="13" fill="#ffffff" stroke="#d8e2e6"/>
+  <text x="410" y="825" text-anchor="middle" class="mini">维度模型</text>
+  <rect x="456" y="808" width="72" height="26" rx="13" fill="#ffffff" stroke="#d8e2e6"/>
+  <text x="492" y="825" text-anchor="middle" class="mini">标签体系</text>
+  <text x="365" y="848" text-anchor="middle" class="tiny">数据血缘 / 影响分析 / 权限映射 / 分级分类</text>
+
+  <text x="800" y="790" text-anchor="middle" class="blue-title">数据接入与计算</text>
+  <rect x="686" y="808" width="72" height="26" rx="13" fill="#ffffff" stroke="#d8e2e6"/>
+  <text x="722" y="825" text-anchor="middle" class="mini">MySQL</text>
+  <rect x="768" y="808" width="72" height="26" rx="13" fill="#ffffff" stroke="#d8e2e6"/>
+  <text x="804" y="825" text-anchor="middle" class="mini">Hive</text>
+  <rect x="850" y="808" width="92" height="26" rx="13" fill="#ffffff" stroke="#d8e2e6"/>
+  <text x="896" y="825" text-anchor="middle" class="mini">ClickHouse</text>
+  <text x="800" y="848" text-anchor="middle" class="tiny">文件 / 接口 / 实时数据 / 离线数据 / SQL 执行 / 缓存与任务调度</text>
+
+  <text x="1235" y="790" text-anchor="middle" class="blue-title">安全合规与运维</text>
+  <rect x="1062" y="808" width="72" height="26" rx="13" fill="#ffffff" stroke="#d8e2e6"/>
+  <text x="1098" y="825" text-anchor="middle" class="mini">私有化</text>
+  <rect x="1144" y="808" width="72" height="26" rx="13" fill="#ffffff" stroke="#d8e2e6"/>
+  <text x="1180" y="825" text-anchor="middle" class="mini">统一认证</text>
+  <rect x="1226" y="808" width="72" height="26" rx="13" fill="#ffffff" stroke="#d8e2e6"/>
+  <text x="1262" y="825" text-anchor="middle" class="mini">行列权限</text>
+  <rect x="1308" y="808" width="72" height="26" rx="13" fill="#ffffff" stroke="#d8e2e6"/>
+  <text x="1344" y="825" text-anchor="middle" class="mini">数据脱敏</text>
+  <text x="1235" y="848" text-anchor="middle" class="tiny">操作审计 / 模型审计 / Prompt 安全 / 结果校验 / 监控告警</text>
+
+</svg>

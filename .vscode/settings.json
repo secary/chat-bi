@@ -1,0 +1,33 @@
+{
+    "sqltools.connections": [
+        {
+            "mysqlOptions": {
+                "authProtocol": "default",
+                "enableSsl": "Disabled"
+            },
+            "previewLimit": 50,
+            "server": "localhost",
+            "port": 3306,
+            "name": "mtdb",
+            "driver": "MySQL",
+            "database": "exchange",
+            "username": "root",
+            "password": "1519040104"
+        },
+        {
+            "mysqlOptions": {
+                "authProtocol": "default",
+                "enableSsl": "Disabled"
+            },
+            "ssh": "Disabled",
+            "previewLimit": 50,
+            "server": "127.0.0.1",
+            "port": 3307,
+            "driver": "MySQL",
+            "name": "chatbi-demo",
+            "database": "chatbi_demo",
+            "username": "demo_user",
+            "password": "demo_pass"
+        }
+    ]
+}

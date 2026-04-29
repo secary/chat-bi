@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ChatMessage } from '../types/message';
 import { streamChat } from '../api/client';
 
@@ -15,7 +15,10 @@ export function useChat(): UseChatReturn {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const messagesRef = useRef(messages);
-  messagesRef.current = messages;
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || loading) return;

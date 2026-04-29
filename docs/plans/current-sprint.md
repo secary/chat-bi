@@ -97,3 +97,5 @@
 | 20 | 同步数据库目录命名：将原 `init_db/init.sql` 引用更新为 `database/init.sql`，并将 compose 数据卷统一放入 `database/mysql-data*` | `database/mysql-data*` 是运行数据目录，已加入 Git/Docker ignore；修改初始化 SQL 后仍需重置对应数据目录才会重放 | 后续数据库相关文件统一放在 `database/` 下维护 |
 | 21 | 同步数据库运行数据目录命名：移除旧根目录 `mysql-data*` 忽略规则，保留并验证 `database/mysql-data*` 作为生产和开发数据卷目录 | 当前仅发现 `database/mysql-data/` 已存在，`database/mysql-data-dev/` 会在开发 compose 首次启动时创建 | 若之后改成更细的目录如 `database/data/prod`，需同步 compose、ignore 和 README |
 | 22 | 收敛环境配置：删除多余 `.env.dev.example`、`.env.test.example` 和 `docker-compose.test.yml`，开发只保留本地 `env.dev`，测试复用普通 `docker-compose.yml` | `env.dev` 已加入 Git/Docker ignore；测试不再有独立端口和数据卷 | 后续只维护 `.env` 与 `env.dev` 两套本地环境变量 |
+| 23 | 新增 `chatbi-file-ingestion` Skill：支持读取用户上传 CSV/XLSX，按 `sales_order` 与 `customer_profile` 表结构识别表头、校验类型并返回预览 JSON；补 CSV 单测 | 目前仅做文件读取与校验，不执行写库；前端尚未提供真实文件上传入口 | 下一步可补上传 API/前端控件，并设计显式导入到临时表或业务表的审批流程 |
+| 24 | 新增 `/upload` 后端接口和聊天框文件入口：支持点击选择或拖拽 CSV/XLSX/XLSM，上传后自动生成带后端文件路径的校验消息草稿 | 当前上传后仍需用户点击发送触发 Skill；上传 API 测试在本机缺 FastAPI 时跳过，需 Docker 环境完整验证 | 重建 backend/frontend 容器后在浏览器拖入 `data/chatbi_sales.csv` 做端到端验证 |

@@ -1,7 +1,8 @@
-import type { ChatRequest, SseEvent } from '../types/message';
+import type { ChatRequest, SseEvent, UploadedFile } from '../types/message';
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 const CHAT_URL = `${API_BASE_URL}/chat`;
+const UPLOAD_URL = `${API_BASE_URL}/upload`;
 
 export function parseSseLine(line: string): SseEvent | null {
   if (!line.startsWith('data: ')) return null;
@@ -53,4 +54,27 @@ export async function* streamChat(req: ChatRequest): AsyncGenerator<SseEvent> {
     const event = parseSseLine(buffer.trim());
     if (event) yield event;
   }
+}
+
+export async function uploadFile(file: File): Promise<UploadedFile> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(UPLOAD_URL, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    let detail = `上传失败: ${response.status}`;
+    try {
+      const body = (await response.json()) as { detail?: string };
+      if (body.detail) detail = body.detail;
+    } catch {
+      // Keep the status-based fallback.
+    }
+    throw new Error(detail);
+  }
+
+  return (await response.json()) as UploadedFile;
 }

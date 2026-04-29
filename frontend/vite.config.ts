@@ -12,6 +12,7 @@ export default defineConfig({
     proxy: {
       '/chat': proxyTarget,
       '/health': proxyTarget,
+      '/upload': proxyTarget,
     },
   },
 })

@@ -24,3 +24,9 @@ export interface ChatRequest {
   message: string;
   history: { role: string; content: string }[];
 }
+
+export interface UploadedFile {
+  filename: string;
+  server_path: string;
+  size: number;
+}

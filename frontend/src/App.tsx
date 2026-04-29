@@ -15,7 +15,7 @@ function App() {
     <div className="flex h-screen flex-col bg-gray-100">
       <header className="flex items-center justify-between border-b border-gray-200 bg-white px-6 py-3">
         <div>
-          <h1 className="text-lg font-semibold text-gray-900">ChatBI</h1>
+          <h1 className="text-lg font-semibold text-gray-900">零眸智能 ChatBI</h1>
           <p className="text-xs text-gray-500">对话式数据分析</p>
         </div>
         <button
@@ -32,7 +32,7 @@ function App() {
             <div className="flex flex-col items-center justify-center pt-20 text-gray-400">
               <p className="text-4xl mb-2">📊</p>
               <p className="text-sm">输入业务问题开始分析</p>
-              <p className="mt-1 text-xs">例如：2026年1-4月各区域销售额排行</p>
+              <p className="mt-1 text-xs">例如：1-4月销售额排行</p>
             </div>
           )}
           {messages.map((msg) => (

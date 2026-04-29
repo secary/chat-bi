@@ -46,8 +46,9 @@ async def stream_chat(
 
     # Step 2: Execute the skill script
     yield {"type": "thinking", "content": f"正在执行 {skill_name}..."}
+    skill_args = _skill_args_for_execution(skill_name, plan.get("skill_args", []), messages)
     try:
-        script_result = _run_script(skill_doc, plan.get("skill_args", []))
+        script_result = _run_script(skill_doc, skill_args)
     except Exception as exc:
         yield {"type": "error", "content": f"脚本执行失败：{exc}"}
         yield {"type": "done", "content": None}
@@ -56,12 +57,12 @@ async def stream_chat(
     yield {"type": "thinking", "content": "正在整理查询结果..."}
 
     # Step 3: Render results
-    text = plan.get("text", "") or _summarize_result(skill_name, script_result)
+    text = _response_text(skill_name, plan, script_result)
     yield {"type": "text", "content": text}
 
     # Step 4: Chart plan
     chart_plan = plan.get("chart_plan")
-    if chart_plan and script_result:
+    if chart_plan and _is_table_result(script_result):
         try:
             option = plan_to_option(chart_plan, script_result)
             yield {"type": "chart", "content": option}
@@ -70,7 +71,7 @@ async def stream_chat(
 
     # Step 5: KPI cards
     kpi_config = plan.get("kpi_cards")
-    if kpi_config:
+    if kpi_config and _is_table_result(script_result):
         try:
             cards = build_kpi_cards(kpi_config, script_result)
             yield {"type": "kpi_cards", "content": cards}
@@ -126,7 +127,28 @@ def _find_skill(skills: List[SkillDoc], name: str) -> Optional[SkillDoc]:
     return None
 
 
-def _run_script(skill: SkillDoc, args: List[str]) -> List[Dict[str, str]]:
+def _latest_user_content(messages: List[Dict[str, str]]) -> str:
+    for message in reversed(messages):
+        if message.get("role") == "user" and message.get("content"):
+            return message["content"]
+    return ""
+
+
+def _skill_args_for_execution(
+    skill_name: str, args: List[str], messages: List[Dict[str, str]]
+) -> List[str]:
+    if "chatbi-semantic-query" in skill_name:
+        latest_user = _latest_user_content(messages)
+        if latest_user:
+            return [latest_user]
+    if "chatbi-decision-advisor" in skill_name:
+        latest_user = _latest_user_content(messages)
+        if latest_user:
+            return [latest_user]
+    return args
+
+
+def _run_script(skill: SkillDoc, args: List[str]) -> Any:
     """Execute the skill script and parse JSON output."""
     script_dir = skill.skill_dir / "scripts"
     if not script_dir.is_dir():
@@ -172,12 +194,91 @@ def _run_script(skill: SkillDoc, args: List[str]) -> List[Dict[str, str]]:
         return []
 
 
-def _summarize_result(skill_name: str, result: List[Dict[str, str]]) -> str:
+def _response_text(skill_name: str, plan: Dict[str, Any], result: Any) -> str:
+    if "chatbi-semantic-query" in skill_name:
+        return _summarize_result(skill_name, result)
+    if "chatbi-decision-advisor" in skill_name:
+        return _format_decision_advice(result)
+    return plan.get("text", "") or _summarize_result(skill_name, result)
+
+
+def _is_table_result(result: Any) -> bool:
+    return isinstance(result, list) and all(isinstance(row, dict) for row in result)
+
+
+def _summarize_result(skill_name: str, result: Any) -> str:
     """Generate a simple text summary from skill results."""
     if not result:
         return f"「{skill_name}」执行完毕，未返回数据。"
+    if not _is_table_result(result):
+        return f"「{skill_name}」执行完毕。"
     if len(result) == 1:
         row = result[0]
         parts = [f"{k}: {v}" for k, v in row.items() if v]
         return f"查询完成：{'，'.join(parts)}"
     return f"查询完成，共返回 {len(result)} 条结果。"
+
+
+def _format_decision_advice(result: Any) -> str:
+    if not isinstance(result, dict):
+        return _summarize_result("chatbi-decision-advisor", result)
+
+    facts = result.get("facts", {})
+    advices = result.get("advices", [])
+    overview = facts.get("overview", {}) if isinstance(facts, dict) else {}
+    scope = facts.get("scope", {}) if isinstance(facts, dict) else {}
+    labels = scope.get("labels", []) if isinstance(scope, dict) else []
+    scope_text = "、".join(labels) if labels else "全量数据"
+
+    lines = [
+        "## 决策建议",
+        "",
+        f"- 分析范围：{scope_text}",
+    ]
+    if overview:
+        lines.extend(
+            [
+                f"- 销售额：{_money(overview.get('sales'))}",
+                f"- 目标完成率：{_percent(overview.get('target_achievement_rate'))}",
+                f"- 毛利率：{_percent(overview.get('gross_margin_rate'))}",
+                f"- 订单数：{overview.get('order_count', '--')}",
+                f"- 客户数：{overview.get('customer_count', '--')}",
+                "",
+            ]
+        )
+
+    if not isinstance(advices, list) or not advices:
+        lines.append("暂无可输出的规则建议。")
+        return "\n".join(lines)
+
+    lines.append("### 建议明细")
+    for index, advice in enumerate(advices, start=1):
+        if not isinstance(advice, dict):
+            continue
+        lines.extend(
+            [
+                "",
+                f"{index}. [{advice.get('priority', '中')}] {advice.get('theme', '经营建议')}",
+                f"   - 决策：{advice.get('decision', '')}",
+                f"   - 依据：{advice.get('reason', '')}",
+            ]
+        )
+        actions = advice.get("actions", [])
+        if isinstance(actions, list) and actions:
+            lines.append("   - 行动：")
+            lines.extend(f"     - {action}" for action in actions)
+    return "\n".join(lines)
+
+
+def _money(value: Any) -> str:
+    try:
+        return f"{float(value):,.2f}元"
+    except (TypeError, ValueError):
+        return "--"
+
+
+def _percent(value: Any) -> str:
+    try:
+        return f"{float(value) * 100:.2f}%"
+    except (TypeError, ValueError):
+        return "--"

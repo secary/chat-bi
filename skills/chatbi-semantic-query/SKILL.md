@@ -5,20 +5,24 @@ description: Use when Codex or another agent needs to answer Chinese natural-lan
 
 # ChatBI Semantic Query
 
-Use this skill to query the local ChatBI demo database from Chinese business language.
+Use this skill to query the local ChatBI demo database from Chinese business language, including short and incomplete natural-language metric requests.
 
 ## Workflow
 
 1. Use `scripts/chatbi_semantic_query.py` for natural-language metric questions.
 2. Prefer the script over manually writing SQL when the user asks about governed metrics, dimensions, aliases, trends, rankings, or filters.
-3. Run with `--show-sql` when the generated SQL should be inspected or explained.
-4. Run with `--json` when another script, report generator, dashboard builder, or agent needs structured output.
-5. Run with `--chart-html <path>` when the user wants a quick chart from the query result.
-6. Explain results in business language after execution. Include the important numbers and the metric meaning when useful.
+3. Trigger this skill for terse requests such as `1-4月销售额排行`, `各区域销售额`, `华东4月毛利率`, or `线上软件服务收入`.
+4. Pass the user's original natural-language question as the first script argument. Do not rewrite missing years or dimensions in the prompt.
+5. Run with `--show-sql` when the generated SQL should be inspected or explained.
+6. Run with `--json` when another script, report generator, dashboard builder, or agent needs structured output.
+7. Run with `--chart-html <path>` when the user wants a quick chart from the query result.
+8. Explain results in business language after execution. Include the important numbers and the metric meaning when useful.
 
 ## Common Commands
 
 ```bash
+python3 scripts/chatbi_semantic_query.py "1-4月销售额排行" --show-sql
+python3 scripts/chatbi_semantic_query.py "各区域销售额" --show-sql
 python3 scripts/chatbi_semantic_query.py "按区域看2026年1月到4月销售额排行" --show-sql
 python3 scripts/chatbi_semantic_query.py "2026年4月华东目标完成率是多少" --show-sql
 python3 scripts/chatbi_semantic_query.py "按月看客户留存率趋势" --json
@@ -36,8 +40,9 @@ Run commands from this skill directory, or pass the full path to the bundled scr
 - Dimensions include `区域`, `月份`, `时间`, `部门`, `产品类别`, `产品名称`, `渠道`, and `客户类型`; `时间` defaults to monthly grouping.
 - Dimension synonyms are supported for common business phrasing, such as `大区/地区/片区` to `区域`, `业务线/品类/产品类型` to `产品类别`, `成交来源/获客渠道/销售渠道` to `渠道`, and `客群/客户分层/客户类别` to `客户类型`.
 - Filters are inferred from enum values in the source table, such as `华东`, `线上`, `软件服务`, and `企业客户`.
-- Time expressions include `2026年4月`, `2026年1月到4月`, `2026年1-4月`, and `2026年`.
-- Ranking expressions include `排行`, `排名`, `最高`, `最低`, `top N`, and `前 N`.
+- Time expressions include `2026年4月`, `2026年1月到4月`, `2026年1-4月`, `1-4月`, `1月到4月`, and `2026年`.
+- Month ranges without a year use the latest year in the selected fact table; the demo data currently resolves `1-4月` to 2026年1-4月.
+- Ranking expressions include `排行`, `排名`, `最高`, `最低`, `top N`, and `前 N`; ranking without an explicit dimension defaults to `区域` when the metric supports it.
 - Chart output uses standalone HTML + SVG. Monthly results use a line chart; other grouped results use a bar chart.
 
 ## Visualization Guidance

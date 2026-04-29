@@ -81,3 +81,11 @@
 | 4 | 梳理 API Key 与数据库接入方式，并修复 `.env` 加载顺序、LiteLLM 参数透传、`.env.example` 示例 | 本机尚未创建 `.env`，实际 API Key 未配置 | 创建 `.env` 后启动后端并进行端到端联调 |
 | 5 | 验证 `.env` 已包含 LLM、API_BASE 和数据库变量，确认 MySQL 容器与演示数据可用 | 后端虚拟环境尚未安装依赖；联网安装依赖授权被拒；Codex 沙箱直连 127.0.0.1:3307 受限 | 安装 `backend/requirements.txt` 后启动 FastAPI 做端到端联调 |
 | 6 | 定位前端 `TypeError: Load failed`，补充 backend Docker 服务，修复容器内 MySQL SSL、MiniMax LiteLLM 模型配置和 fenced JSON 解析 | 端到端问数已在容器内跑通；仍需浏览器刷新后人工确认交互渲染 | 继续验证别名补充与经营决策建议场景 |
+| 7 | 完整恢复 `stash@{0}` 中 tracked、deleted 和 untracked 文件，包括 Dockerfile、nginx 配置、Compose 三服务定义和脚本修正 | 当前改动已恢复到工作区但尚未提交；本地 `main` 仍与 `origin/main` 分叉 | 复核恢复内容后提交，或继续执行完整 `docker compose up --build` 验证 |
+| 8 | 验证 MySQL、backend、frontend 容器均运行中；宿主机 MySQL CLI 可连 `chatbi_demo`；backend 容器内语义查询脚本可成功查询销售额排行 | 宿主机 Homebrew MySQL 9.6 不兼容脚本参数 `--ssl=0`，直接在宿主机跑语义脚本会失败 | 如需宿主机运行脚本，兼容 MySQL 9.x 的 SSL 参数；应用侧可继续用容器内脚本联调 |
+| 9 | 增强自然语言短句触发：`1-4月销售额排行` 可默认使用 2026 年并按区域排行；Agent 对语义查询使用用户原句入参；前端示例改为短问法 | 前端 lint 因本地 `eslint` 未安装无法执行；运行中的 Docker 镜像尚未包含本次代码改动 | 重建 backend/frontend 容器后在浏览器验证短问法 |
+| 10 | 修复语义查询脚本 MySQL SSL 参数兼容：优先尝试 `--ssl-mode=DISABLED`，再 fallback 到 MariaDB 客户端支持的 `--ssl=0` | 当前 backend 容器仍是旧镜像，容器内脚本仍会报 self-signed certificate，需重建后生效 | 执行 `docker compose up -d --build backend frontend` 后重新验证短问法 |
+| 11 | 前端顶部标题和浏览器标题改为 `零眸智能 ChatBI` | 前端 lint 仍因本地 `eslint` 未安装无法执行；`frontend/index.html` 当前不在 Git 跟踪中 | 重建 frontend 容器并在浏览器确认标题展示 |
+| 12 | 在 backend 容器内验证 3 个 Skill 脚本：语义查询短问法、决策建议 JSON、别名管理均执行成功；`营收` 已映射到 `销售额` 且可用于问数 | 别名验证新增了 `营收 -> 销售额` 到当前 MySQL 数据；如需重建后保留，应同步到初始化 SQL | 在前端分别验证问数、别名和决策建议完整交互 |
+| 13 | 修复决策技能前端卡住：runner 将 decision-advisor JSON 渲染为 Markdown 文本，跳过普通表格图表/KPI 渲染，并重建 backend；`/chat` SSE 已返回完整文本和 `done` | 决策技能当前只输出文本建议，尚未为嵌套 facts 定制图表/KPI 渲染 | 在浏览器刷新后复测 `2026年1-4月经营决策建议` |
+| 14 | 优化前端消息排版：新增轻量内容渲染，将 Markdown 标题、编号和列表转换为页面友好的层级文本；Docker 前端构建通过并重启容器 | 决策建议仍以文本为主，尚未拆成专门的建议卡片或趋势图 | 浏览器刷新后复测决策建议展示效果 |

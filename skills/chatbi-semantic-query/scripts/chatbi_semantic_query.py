@@ -29,6 +29,8 @@ DEFAULT_DB = {
     "database": os.getenv("CHATBI_DB_NAME", "chatbi_demo"),
 }
 
+DEFAULT_YEAR = int(os.getenv("CHATBI_DEFAULT_YEAR", "2026"))
+
 
 @dataclass(frozen=True)
 class Metric:
@@ -65,13 +67,14 @@ class MysqlCli:
         self.mysql_cmd = os.getenv("CHATBI_MYSQL_CMD", "mysql")
 
     def query(self, sql: str) -> List[Dict[str, str]]:
-        cmd = [
+        base_cmd = [
             self.mysql_cmd,
             f"-h{self.config['host']}",
             f"-P{self.config['port']}",
             f"-u{self.config['user']}",
             f"-p{self.config['password']}",
-            "--ssl=0",
+        ]
+        tail_cmd = [
             "--batch",
             "--raw",
             "--default-character-set=utf8mb4",
@@ -79,7 +82,7 @@ class MysqlCli:
             "-e",
             sql,
         ]
-        proc = subprocess.run(cmd, text=True, capture_output=True, check=False)
+        proc = self._run_with_ssl_fallback(base_cmd, tail_cmd)
         if proc.returncode != 0:
             raise RuntimeError(proc.stderr.strip() or proc.stdout.strip())
         lines = [line for line in proc.stdout.splitlines() if line.strip()]
@@ -87,6 +90,31 @@ class MysqlCli:
             return []
         reader = csv.DictReader(lines, delimiter="\t")
         return [dict(row) for row in reader]
+
+    def _run_with_ssl_fallback(
+        self, base_cmd: List[str], tail_cmd: List[str]
+    ) -> subprocess.CompletedProcess[str]:
+        attempts = [
+            ["--ssl-mode=DISABLED"],
+            ["--ssl=0"],
+            [],
+        ]
+        last_proc: Optional[subprocess.CompletedProcess[str]] = None
+        for ssl_args in attempts:
+            cmd = [*base_cmd, *ssl_args, *tail_cmd]
+            proc = subprocess.run(cmd, text=True, capture_output=True, check=False)
+            last_proc = proc
+            error = proc.stderr.strip()
+            if proc.returncode == 0:
+                return proc
+            if "unknown variable" in error and ("ssl-mode" in error or "ssl=0" in error):
+                continue
+            if "TLS/SSL error" in error or "self-signed certificate" in error:
+                continue
+            return proc
+        if last_proc is None:
+            raise RuntimeError("mysql command was not executed")
+        return last_proc
 
 
 def quote_ident(identifier: str) -> str:
@@ -335,7 +363,21 @@ def month_bounds(year: int, start_month: int, end_month: int) -> Tuple[str, str]
     return f"{year}-{start_month:02d}-01", end
 
 
-def parse_time_filter(question: str, table: str) -> Optional[Tuple[str, str]]:
+def default_year_for_table(db: MysqlCli, table: str) -> int:
+    date_field = "order_date" if table == "sales_order" else "stat_month"
+    sql = (
+        f"SELECT MAX(YEAR({quote_ident(date_field)})) AS default_year "
+        f"FROM {quote_ident(table)}"
+    )
+    rows = db.query(sql)
+    if rows and rows[0].get("default_year"):
+        return int(rows[0]["default_year"])
+    return DEFAULT_YEAR
+
+
+def parse_time_filter(
+    question: str, table: str, default_year: int = DEFAULT_YEAR
+) -> Optional[Tuple[str, str]]:
     date_field = "order_date" if table == "sales_order" else "stat_month"
     match = re.search(r"(20\d{2})\s*年\s*(\d{1,2})\s*月?\s*(?:-|到|至|~)\s*(\d{1,2})\s*月", question)
     if match:
@@ -353,6 +395,18 @@ def parse_time_filter(question: str, table: str) -> Optional[Tuple[str, str]]:
     if match:
         year = int(match.group(1))
         return date_field, f"{quote_ident(date_field)} >= {quote_literal(str(year) + '-01-01')} AND {quote_ident(date_field)} < {quote_literal(str(year + 1) + '-01-01')}"
+
+    match = re.search(r"(?<!年)(\d{1,2})\s*月?\s*(?:-|到|至|~)\s*(\d{1,2})\s*月", question)
+    if match:
+        start_month, end_month = map(int, match.groups())
+        start, end = month_bounds(default_year, start_month, end_month)
+        return date_field, f"{quote_ident(date_field)} >= {quote_literal(start)} AND {quote_ident(date_field)} < {quote_literal(end)}"
+
+    match = re.search(r"(?<!年)(\d{1,2})\s*月", question)
+    if match:
+        month = int(match.group(1))
+        start, end = month_bounds(default_year, month, month)
+        return date_field, f"{quote_ident(date_field)} >= {quote_literal(start)} AND {quote_ident(date_field)} < {quote_literal(end)}"
 
     return None
 
@@ -399,7 +453,7 @@ def make_plan(question: str, db: MysqlCli) -> SemanticPlan:
     metric = pick_metric(question, metrics, aliases)
     picked_dimensions = pick_dimensions(question, metric, dimensions, aliases)
     filters = parse_filters(question, metric, dimensions, db)
-    time_filter = parse_time_filter(question, metric.table)
+    time_filter = parse_time_filter(question, metric.table, default_year_for_table(db, metric.table))
     order_by = bool(picked_dimensions) and any(
         word in question for word in ["排行", "排名", "最高", "最低", "top", "Top", "对比"]
     )

@@ -15,6 +15,8 @@ Use this skill to add missing natural-language synonyms to the ChatBI semantic l
 4. Run the original query again with `chatbi-semantic-query` if the user wants verification.
 5. When the alias should survive database rebuilds, also add the printed values tuple to `init.sql` under the `INSERT INTO alias_mapping` block.
 
+Do not use this skill for ordinary metric questions such as `1-4月销售额排行`; those should trigger `chatbi-semantic-query` directly unless a missing synonym needs to be inserted first.
+
 ## Commands
 
 ```bash

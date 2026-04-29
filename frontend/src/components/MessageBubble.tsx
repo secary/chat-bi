@@ -7,6 +7,53 @@ interface MessageBubbleProps {
   message: ChatMessage;
 }
 
+function FormattedContent({ content }: { content: string }) {
+  return (
+    <div className="space-y-1">
+      {content.split('\n').map((line, index) => {
+        const trimmed = line.trim();
+        if (!trimmed) {
+          return <div key={index} className="h-2" />;
+        }
+        if (trimmed.startsWith('## ')) {
+          return (
+            <h2 key={index} className="pt-1 text-base font-semibold text-gray-950">
+              {trimmed.slice(3)}
+            </h2>
+          );
+        }
+        if (trimmed.startsWith('### ')) {
+          return (
+            <h3 key={index} className="pt-3 text-sm font-semibold text-gray-900">
+              {trimmed.slice(4)}
+            </h3>
+          );
+        }
+        if (/^\d+\.\s/.test(trimmed)) {
+          return (
+            <p key={index} className="pt-2 text-sm font-semibold text-gray-900">
+              {trimmed}
+            </p>
+          );
+        }
+        if (trimmed.startsWith('- ')) {
+          return (
+            <div key={index} className="flex gap-2 text-sm text-gray-700">
+              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-gray-400" />
+              <span>{trimmed.slice(2)}</span>
+            </div>
+          );
+        }
+        return (
+          <p key={index} className="text-sm text-gray-700">
+            {trimmed}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
 export function MessageBubble({ message }: MessageBubbleProps) {
   if (message.role === 'user') {
     return (
@@ -32,7 +79,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
 
         {message.content && (
           <div className="prose prose-sm max-w-none rounded-2xl rounded-tl-md bg-white px-4 py-2.5 text-sm leading-relaxed text-gray-800 shadow-sm">
-            <div className="whitespace-pre-wrap">{message.content}</div>
+            <FormattedContent content={message.content} />
           </div>
         )}
 

@@ -5,7 +5,7 @@ import { streamChat } from '../api/client';
 export interface UseChatReturn {
   messages: ChatMessage[];
   loading: boolean;
-  sendMessage: (text: string) => Promise<void>;
+  sendMessage: (text: string, traceId?: string) => Promise<void>;
   clearMessages: () => void;
 }
 
@@ -20,7 +20,7 @@ export function useChat(): UseChatReturn {
     messagesRef.current = messages;
   }, [messages]);
 
-  const sendMessage = useCallback(async (text: string) => {
+  const sendMessage = useCallback(async (text: string, traceId?: string) => {
     if (!text.trim() || loading) return;
 
     const userMsg: ChatMessage = {
@@ -44,7 +44,7 @@ export function useChat(): UseChatReturn {
     }));
 
     try {
-      for await (const event of streamChat({ message: text, history })) {
+      for await (const event of streamChat({ message: text, history }, traceId)) {
         setMessages((prev) => {
           const updated = [...prev];
           const last = updated[updated.length - 1];

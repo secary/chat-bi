@@ -2,7 +2,11 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    def load_dotenv() -> None:
+        return None
 
 
 load_dotenv()
@@ -19,6 +23,19 @@ class Settings:
     db_user: str = field(default_factory=lambda: os.getenv("CHATBI_DB_USER", "demo_user"))
     db_password: str = field(default_factory=lambda: os.getenv("CHATBI_DB_PASSWORD", "demo_pass"))
     db_name: str = field(default_factory=lambda: os.getenv("CHATBI_DB_NAME", "chatbi_demo"))
+    log_db_host: str = field(
+        default_factory=lambda: os.getenv("CHATBI_LOG_DB_HOST", os.getenv("CHATBI_DB_HOST", "127.0.0.1"))
+    )
+    log_db_port: str = field(
+        default_factory=lambda: os.getenv("CHATBI_LOG_DB_PORT", os.getenv("CHATBI_DB_PORT", "3307"))
+    )
+    log_db_user: str = field(
+        default_factory=lambda: os.getenv("CHATBI_LOG_DB_USER", os.getenv("CHATBI_DB_USER", "demo_user"))
+    )
+    log_db_password: str = field(
+        default_factory=lambda: os.getenv("CHATBI_LOG_DB_PASSWORD", os.getenv("CHATBI_DB_PASSWORD", "demo_pass"))
+    )
+    log_db_name: str = field(default_factory=lambda: os.getenv("CHATBI_LOG_DB_NAME", "chatbi_logs"))
 
     project_root: Path = Path(__file__).resolve().parent.parent
     skills_dir: Path = field(init=False)
@@ -34,6 +51,16 @@ class Settings:
             "user": self.db_user,
             "password": self.db_password,
             "database": self.db_name,
+        }
+
+    @property
+    def log_db_config(self) -> dict[str, str]:
+        return {
+            "host": self.log_db_host,
+            "port": self.log_db_port,
+            "user": self.log_db_user,
+            "password": self.log_db_password,
+            "database": self.log_db_name,
         }
 
     @property

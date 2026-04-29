@@ -27,7 +27,7 @@ services:
     container_name: chatbi-dev-backend
     restart: unless-stopped
     env_file:
-      - path: env.dev
+      - path: .env.dev
         required: false
     environment:
       CHATBI_DB_HOST: demo-mysql

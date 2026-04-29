@@ -13,10 +13,18 @@ export function parseSseLine(line: string): SseEvent | null {
   }
 }
 
-export async function* streamChat(req: ChatRequest): AsyncGenerator<SseEvent> {
+export function newTraceId(): string {
+  if (crypto.randomUUID) return crypto.randomUUID().replaceAll('-', '');
+  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
+}
+
+export async function* streamChat(
+  req: ChatRequest,
+  traceId = newTraceId(),
+): AsyncGenerator<SseEvent> {
   const response = await fetch(CHAT_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-Trace-Id': traceId },
     body: JSON.stringify(req),
   });
 
@@ -56,12 +64,13 @@ export async function* streamChat(req: ChatRequest): AsyncGenerator<SseEvent> {
   }
 }
 
-export async function uploadFile(file: File): Promise<UploadedFile> {
+export async function uploadFile(file: File, traceId = newTraceId()): Promise<UploadedFile> {
   const formData = new FormData();
   formData.append('file', file);
 
   const response = await fetch(UPLOAD_URL, {
     method: 'POST',
+    headers: { 'X-Trace-Id': traceId },
     body: formData,
   });
 

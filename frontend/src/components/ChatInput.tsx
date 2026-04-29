@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react';
-import { uploadFile } from '../api/client';
+import { newTraceId, uploadFile } from '../api/client';
 
 interface ChatInputProps {
-  onSend: (text: string) => void;
+  onSend: (text: string, traceId?: string) => void;
   loading: boolean;
 }
 
@@ -11,13 +11,15 @@ export function ChatInput({ onSend, loading }: ChatInputProps) {
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
+  const [pendingTraceId, setPendingTraceId] = useState<string>();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (message.trim() && !loading && !uploading) {
-      onSend(message);
+      onSend(message, pendingTraceId);
       setMessage('');
+      setPendingTraceId(undefined);
     }
   };
 
@@ -25,10 +27,12 @@ export function ChatInput({ onSend, loading }: ChatInputProps) {
     if (loading || uploading) return;
     setUploadError('');
     setUploading(true);
+    const traceId = newTraceId();
     try {
-      const uploaded = await uploadFile(file);
+      const uploaded = await uploadFile(file, traceId);
       const prompt = `请读取我上传的文件 ${uploaded.server_path}，按数据库表结构校验`;
       setMessage((current) => (current.trim() ? `${current.trim()}\n${prompt}` : prompt));
+      setPendingTraceId(uploaded.trace_id || traceId);
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : String(err));
     } finally {

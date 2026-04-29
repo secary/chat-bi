@@ -99,3 +99,5 @@
 | 22 | 收敛环境配置：删除多余 `.env.dev.example`、`.env.test.example` 和 `docker-compose.test.yml`，开发只保留本地 `env.dev`，测试复用普通 `docker-compose.yml` | `env.dev` 已加入 Git/Docker ignore；测试不再有独立端口和数据卷 | 后续只维护 `.env` 与 `env.dev` 两套本地环境变量 |
 | 23 | 新增 `chatbi-file-ingestion` Skill：支持读取用户上传 CSV/XLSX，按 `sales_order` 与 `customer_profile` 表结构识别表头、校验类型并返回预览 JSON；补 CSV 单测 | 目前仅做文件读取与校验，不执行写库；前端尚未提供真实文件上传入口 | 下一步可补上传 API/前端控件，并设计显式导入到临时表或业务表的审批流程 |
 | 24 | 新增 `/upload` 后端接口和聊天框文件入口：支持点击选择或拖拽 CSV/XLSX/XLSM，上传后自动生成带后端文件路径的校验消息草稿 | 当前上传后仍需用户点击发送触发 Skill；上传 API 测试在本机缺 FastAPI 时跳过，需 Docker 环境完整验证 | 重建 backend/frontend 容器后在浏览器拖入 `data/chatbi_sales.csv` 做端到端验证 |
+| 25 | 新增 trace-id 链路日志：前端上传/聊天透传 `X-Trace-Id`，后端记录 upload、chat、planner、skill、SSE 节点到独立 `chatbi_logs.chatbi_trace_log`；BI 业务数据仍统一使用 `chatbi_demo` | 旧数据卷不会自动重放 `database/init.sql`，已在当前 dev MySQL 手动补建 `chatbi_logs` 授权；日志写入为 best-effort，不阻塞主链路 | 后续可加日志查询页面或按 trace-id 展示完整链路时间线 |
+| 26 | 将日志库连接与业务库连接拆分：新增 `CHATBI_LOG_DB_HOST/PORT/USER/PASSWORD/NAME`，trace 写库优先使用日志库专用配置；dev/prod compose 不再硬编码日志库名，交给 env 注入 | `.env.dev` 可指向本机 MySQL，如 `host.docker.internal`；未配置日志库专用连接时仍回退到业务库连接以兼容现有 Docker dev | 配置本机日志库账号后重建 backend 容器，并用固定 trace-id 验证日志进入目标库 |

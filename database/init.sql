@@ -1,5 +1,13 @@
 SET NAMES utf8mb4;
 
+CREATE DATABASE IF NOT EXISTS chatbi_logs
+  DEFAULT CHARACTER SET utf8mb4
+  DEFAULT COLLATE utf8mb4_unicode_ci;
+
+GRANT ALL PRIVILEGES ON chatbi_logs.* TO 'demo_user'@'%';
+
+USE chatbi_demo;
+
 -- ============================================================
 -- 业务数据表
 -- ============================================================

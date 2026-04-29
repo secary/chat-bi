@@ -29,4 +29,5 @@ export interface UploadedFile {
   filename: string;
   server_path: string;
   size: number;
+  trace_id: string;
 }

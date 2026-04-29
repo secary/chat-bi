@@ -25,6 +25,7 @@ class UploadApiTest(unittest.TestCase):
         self.assertEqual(data["filename"], "sales.csv")
         self.assertGreater(data["size"], 0)
         self.assertTrue(data["server_path"].endswith(".csv"))
+        self.assertTrue(data["trace_id"])
 
     def test_upload_rejects_other_suffixes(self):
         client = TestClient(app)

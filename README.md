@@ -43,6 +43,24 @@ npm run dev
 
 浏览器打开 `http://localhost:5173` 即可开始对话。
 
+### 5. 以前端容器方式启动
+
+如果后端仍然跑在宿主机 `8000` 端口，可以直接：
+
+```bash
+docker compose build frontend
+docker compose up -d frontend
+```
+
+浏览器访问 `http://localhost:5173`。
+
+默认会把前端 API 指向 `http://localhost:8000`。如需改成别的后端地址，可在启动前设置：
+
+```bash
+export FRONTEND_API_BASE_URL=http://localhost:8000
+docker compose up -d --build frontend
+```
+
 ## 技术栈
 
 | 层 | 技术 |

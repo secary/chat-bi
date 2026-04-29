@@ -30,14 +30,16 @@ DEFAULT_DB = {
 class MysqlCli:
     def __init__(self, config: Dict[str, str]):
         self.config = config
+        self.mysql_cmd = os.getenv("CHATBI_MYSQL_CMD", "mysql")
 
     def query(self, sql: str) -> List[Dict[str, str]]:
         cmd = [
-            "mysql",
+            self.mysql_cmd,
             f"-h{self.config['host']}",
             f"-P{self.config['port']}",
             f"-u{self.config['user']}",
             f"-p{self.config['password']}",
+            "--ssl=0",
             "--batch",
             "--raw",
             "--default-character-set=utf8mb4",

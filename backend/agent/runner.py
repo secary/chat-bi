@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from typing import Any, AsyncGenerator, Dict, List, Optional
@@ -92,18 +93,28 @@ async def _call_llm_for_plan(
     try:
         params = settings.llm_params
         resp = await acompletion(
-            model=params["model"],
+            **params,
             messages=llm_messages,
             response_format={"type": "json_object"},
             temperature=0.1,
         )
-        content = resp.choices[0].message.content
-        if content:
-            return json.loads(content)
-    except Exception:
-        pass
+    except Exception as exc:
+        raise RuntimeError(f"LLM 调用失败：{type(exc).__name__}: {exc}") from exc
+
+    content = resp.choices[0].message.content
+    if content:
+        return _parse_json_object(content)
 
     return None
+
+
+def _parse_json_object(content: str) -> Dict[str, Any]:
+    """Parse model JSON, tolerating fenced JSON blocks."""
+    text = content.strip()
+    fence_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+    if fence_match:
+        text = fence_match.group(1)
+    return json.loads(text)
 
 
 def _find_skill(skills: List[SkillDoc], name: str) -> Optional[SkillDoc]:

@@ -1,0 +1,12 @@
+.git
+.venv
+.env
+mysql-data
+frontend/node_modules
+frontend/dist
+*.pdf
+*.zip
+*.xlsx
+*.log
+__pycache__
+*.pyc

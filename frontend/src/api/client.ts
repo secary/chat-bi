@@ -1,6 +1,7 @@
 import type { ChatRequest, SseEvent } from '../types/message';
 
-const CHAT_URL = '/chat';
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+const CHAT_URL = `${API_BASE_URL}/chat`;
 
 export function parseSseLine(line: string): SseEvent | null {
   if (!line.startsWith('data: ')) return null;

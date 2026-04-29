@@ -71,6 +71,7 @@ class MysqlCli:
             f"-P{self.config['port']}",
             f"-u{self.config['user']}",
             f"-p{self.config['password']}",
+            "--ssl=0",
             "--batch",
             "--raw",
             "--default-character-set=utf8mb4",

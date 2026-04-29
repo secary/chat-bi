@@ -17,3 +17,32 @@ services:
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: chatbi-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      CHATBI_DB_HOST: demo-mysql
+      CHATBI_DB_PORT: 3306
+      CHATBI_MYSQL_CMD: mysql
+    ports:
+      - "8000:8000"
+    depends_on:
+      - demo-mysql
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: ${FRONTEND_API_BASE_URL:-http://localhost:8000}
+    container_name: chatbi-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend

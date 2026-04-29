@@ -1,5 +1,9 @@
 mysql-data
 .vscode
+.cursor
+.cli
+.claude
+.codex
 
 *debug*
 data

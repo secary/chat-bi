@@ -2,6 +2,11 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+
+load_dotenv()
+
 
 @dataclass(frozen=True)
 class Settings:
@@ -34,6 +39,8 @@ class Settings:
     @property
     def llm_params(self) -> dict:
         params: dict[str, object] = {"model": self.llm_model}
+        if self.openai_api_key:
+            params["api_key"] = self.openai_api_key
         if self.api_base:
             params["api_base"] = self.api_base
         return params

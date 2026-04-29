@@ -78,3 +78,6 @@
 | 1 | 补充 Skill 可视化指导与交互式图表要求 | 尚未实现 Agent chart plan、renderer 和前端图表交互 | 从任务 1 开始，后续在任务 3 和任务 6 落地可视化链路 |
 | 2 | 调整数据库初始化结构并通过 `docker compose config` 校验 | 尚未实际执行 `docker compose up` 验证容器启动与初始化落库 | 启动 MySQL 容器并用 SQL 校验核心表与样例数据 |
 | 3 | MySQL 容器启动并验证通过 + 完整后端(fastapi SSE, agent runner, prompt builder, renderers) + 完整前端(React chat UI, charts, KPI) | LLM API Key 尚未配置，无法进行端到端联调；MySQL CLI 在容器内而非宿主机 | 配置 LLM API Key 后验证完整链路 |
+| 4 | 梳理 API Key 与数据库接入方式，并修复 `.env` 加载顺序、LiteLLM 参数透传、`.env.example` 示例 | 本机尚未创建 `.env`，实际 API Key 未配置 | 创建 `.env` 后启动后端并进行端到端联调 |
+| 5 | 验证 `.env` 已包含 LLM、API_BASE 和数据库变量，确认 MySQL 容器与演示数据可用 | 后端虚拟环境尚未安装依赖；联网安装依赖授权被拒；Codex 沙箱直连 127.0.0.1:3307 受限 | 安装 `backend/requirements.txt` 后启动 FastAPI 做端到端联调 |
+| 6 | 定位前端 `TypeError: Load failed`，补充 backend Docker 服务，修复容器内 MySQL SSL、MiniMax LiteLLM 模型配置和 fenced JSON 解析 | 端到端问数已在容器内跑通；仍需浏览器刷新后人工确认交互渲染 | 继续验证别名补充与经营决策建议场景 |

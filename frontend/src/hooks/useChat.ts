@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import type { ChatMessage, SseEvent } from '../types/message';
+import type { ChatMessage } from '../types/message';
 import { streamChat } from '../api/client';
 
 export interface UseChatReturn {

@@ -13,7 +13,7 @@
   - [x] `docker compose up` 可以启动 MySQL 8.0
   - [x] `chatbi_demo` 包含 `sales_order`、`customer_profile` 和语义层元数据表
   - [x] 演示数据覆盖 2026 年 1-4 月和华东、华南、华北、西南区域
-- 涉及文件：`docker-compose.yml`、`init_db/init.sql`、`.env.example`
+- 涉及文件：`docker-compose.yml`、`database/init.sql`、`.env.example`
 - 复杂度：中
 
 ### 任务 2：Skill 脚本验证
@@ -89,3 +89,11 @@
 | 12 | 在 backend 容器内验证 3 个 Skill 脚本：语义查询短问法、决策建议 JSON、别名管理均执行成功；`营收` 已映射到 `销售额` 且可用于问数 | 别名验证新增了 `营收 -> 销售额` 到当前 MySQL 数据；如需重建后保留，应同步到初始化 SQL | 在前端分别验证问数、别名和决策建议完整交互 |
 | 13 | 修复决策技能前端卡住：runner 将 decision-advisor JSON 渲染为 Markdown 文本，跳过普通表格图表/KPI 渲染，并重建 backend；`/chat` SSE 已返回完整文本和 `done` | 决策技能当前只输出文本建议，尚未为嵌套 facts 定制图表/KPI 渲染 | 在浏览器刷新后复测 `2026年1-4月经营决策建议` |
 | 14 | 优化前端消息排版：新增轻量内容渲染，将 Markdown 标题、编号和列表转换为页面友好的层级文本；Docker 前端构建通过并重启容器 | 决策建议仍以文本为主，尚未拆成专门的建议卡片或趋势图 | 浏览器刷新后复测决策建议展示效果 |
+| 15 | 完成第一阶段架构优化：新增统一 SkillResult 协议、`skills/_shared`、拆分 Agent planner/executor/formatter/runner，并补协议单测；backend 容器重建通过，3 个 Skill 脚本协议输出验证通过 | 两个历史大脚本仍超过 300 行，尚未拆分为 parser/rules/render 等子模块 | 第二阶段拆分 semantic-query 与 decision-advisor 大脚本，并补端到端回归 |
+| 16 | 完成文档收口：`CLAUDE.md` 降级为 `AGENTS.md` 入口，合并架构 overview/boundaries 到 `docs/architecture/README.md`，归档历史 PRD，删除模板化 `frontend/README.md` | 文档结构已收敛，但 README 项目结构仍可继续按最新目录细化 | 后续维护统一以 README、AGENTS、architecture README、SKILL.md 为事实源 |
+| 17 | 清理剩余冗余目录与重复文件：删除根目录重复 `init.sql`，将 `.cli/`、`.claude/` 从 Git 跟踪中移除但保留本地文件，并更新别名 Skill 中的初始化 SQL 路径说明 | `database/mysql-data/` 仍是本地 Docker 数据卷，`docs/reference/` 仍用于保留历史资料和用户要求保留的 SVG/PDF | 后续如需彻底瘦身，可决定是否归档或删除未被运行链路引用的历史参考文件 |
+| 18 | 新增 Docker 开发热更新编排：`docker-compose.dev.yml` 挂载 `backend/`、`skills/`、`frontend/`，后端使用 `uvicorn --reload`，前端使用 Vite dev server，并修正文档中的 LLM 环境变量名 | 依赖文件、Dockerfile 和数据库初始化 SQL 变更仍需要重建镜像或重置数据卷；生产式本地运行与开发运行已使用不同项目名、容器名、端口和 MySQL 数据目录 | 后续开发可优先使用 `docker compose -f docker-compose.dev.yml up -d --build` 启动 |
+| 19 | 将生产式 compose 与开发 compose 明确隔离：`chatbi-prod-*` 使用 5173/8000/3307 和 `database/mysql-data/`，`chatbi-dev-*` 使用 5174/8001/3308 和 `database/mysql-data-dev/` | 测试复用普通 compose；开发使用独立 `env.dev` | 如需切换 LLM 或数据库账号，可分别调整 `.env` 与 `env.dev` |
+| 20 | 同步数据库目录命名：将原 `init_db/init.sql` 引用更新为 `database/init.sql`，并将 compose 数据卷统一放入 `database/mysql-data*` | `database/mysql-data*` 是运行数据目录，已加入 Git/Docker ignore；修改初始化 SQL 后仍需重置对应数据目录才会重放 | 后续数据库相关文件统一放在 `database/` 下维护 |
+| 21 | 同步数据库运行数据目录命名：移除旧根目录 `mysql-data*` 忽略规则，保留并验证 `database/mysql-data*` 作为生产和开发数据卷目录 | 当前仅发现 `database/mysql-data/` 已存在，`database/mysql-data-dev/` 会在开发 compose 首次启动时创建 | 若之后改成更细的目录如 `database/data/prod`，需同步 compose、ignore 和 README |
+| 22 | 收敛环境配置：删除多余 `.env.dev.example`、`.env.test.example` 和 `docker-compose.test.yml`，开发只保留本地 `env.dev`，测试复用普通 `docker-compose.yml` | `env.dev` 已加入 Git/Docker ignore；测试不再有独立端口和数据卷 | 后续只维护 `.env` 与 `env.dev` 两套本地环境变量 |

@@ -1,9 +1,17 @@
-FROM node:22-alpine AS build
+FROM node:22-alpine AS deps
 
 WORKDIR /app
 
 COPY package.json package-lock.json ./
 RUN npm ci
+
+FROM deps AS dev
+
+EXPOSE 5173
+
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+
+FROM deps AS build
 
 COPY . .
 

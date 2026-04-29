@@ -1,9 +1,9 @@
-name: chatbi-prod
+name: chatbi-dev
 
 services:
   demo-mysql:
     image: mysql:8.0
-    container_name: chatbi-prod-mysql
+    container_name: chatbi-dev-mysql
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: root123456
@@ -12,9 +12,9 @@ services:
       MYSQL_PASSWORD: demo_pass
       TZ: Asia/Shanghai
     ports:
-      - "3307:3306"
+      - "3308:3306"
     volumes:
-      - ./database/mysql-data:/var/lib/mysql
+      - ./database/mysql-data-dev:/var/lib/mysql
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     command:
       - --character-set-server=utf8mb4
@@ -24,28 +24,52 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    container_name: chatbi-prod-backend
+    container_name: chatbi-dev-backend
     restart: unless-stopped
     env_file:
-      - path: .env
+      - path: env.dev
         required: false
     environment:
       CHATBI_DB_HOST: demo-mysql
       CHATBI_DB_PORT: 3306
       CHATBI_MYSQL_CMD: mysql
+      WATCHFILES_FORCE_POLLING: "true"
     ports:
-      - "8000:8000"
+      - "8001:8000"
+    volumes:
+      - ./backend:/app/backend
+      - ./skills:/app/skills
+    command:
+      - uvicorn
+      - backend.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --reload
+      - --reload-dir
+      - /app/backend
+      - --reload-dir
+      - /app/skills
     depends_on:
       - demo-mysql
 
   frontend:
     build:
       context: ./frontend
-      args:
-        VITE_API_BASE_URL: ${FRONTEND_API_BASE_URL:-http://localhost:8000}
-    container_name: chatbi-prod-frontend
+      target: dev
+    container_name: chatbi-dev-frontend
     restart: unless-stopped
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+      VITE_PROXY_TARGET: http://backend:8000
     ports:
-      - "5173:80"
+      - "5174:5173"
+    volumes:
+      - ./frontend:/app
+      - frontend-node-modules:/app/node_modules
     depends_on:
       - backend
+
+volumes:
+  frontend-node-modules:

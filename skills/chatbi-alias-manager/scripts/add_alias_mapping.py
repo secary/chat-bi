@@ -11,53 +11,18 @@ package is required.
 from __future__ import annotations
 
 import argparse
-import csv
+import json
 import os
-import subprocess
 import sys
+from pathlib import Path
 from typing import Dict, List, Optional, Sequence
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-DEFAULT_DB = {
-    "host": os.getenv("CHATBI_DB_HOST", "127.0.0.1"),
-    "port": os.getenv("CHATBI_DB_PORT", "3307"),
-    "user": os.getenv("CHATBI_DB_USER", "demo_user"),
-    "password": os.getenv("CHATBI_DB_PASSWORD", "demo_pass"),
-    "database": os.getenv("CHATBI_DB_NAME", "chatbi_demo"),
-}
+from _shared.db import MysqlCli, default_db, quote_literal
+from _shared.output import skill_response
 
-
-class MysqlCli:
-    def __init__(self, config: Dict[str, str]):
-        self.config = config
-        self.mysql_cmd = os.getenv("CHATBI_MYSQL_CMD", "mysql")
-
-    def query(self, sql: str) -> List[Dict[str, str]]:
-        cmd = [
-            self.mysql_cmd,
-            f"-h{self.config['host']}",
-            f"-P{self.config['port']}",
-            f"-u{self.config['user']}",
-            f"-p{self.config['password']}",
-            "--ssl=0",
-            "--batch",
-            "--raw",
-            "--default-character-set=utf8mb4",
-            self.config["database"],
-            "-e",
-            sql,
-        ]
-        proc = subprocess.run(cmd, text=True, capture_output=True, check=False)
-        if proc.returncode != 0:
-            raise RuntimeError(proc.stderr.strip() or proc.stdout.strip())
-        lines = [line for line in proc.stdout.splitlines() if line.strip()]
-        if not lines:
-            return []
-        return [dict(row) for row in csv.DictReader(lines, delimiter="\t")]
-
-
-def quote_literal(value: str) -> str:
-    return "'" + value.replace("\\", "\\\\").replace("'", "''") + "'"
+DEFAULT_DB = default_db()
 
 
 def load_standard_names(db: MysqlCli) -> Dict[str, str]:
@@ -125,7 +90,12 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--standard", required=True, help="Existing standard metric/dimension name")
     parser.add_argument("--type", choices=["指标", "维度"], help="Optional object type")
     parser.add_argument("--description", help="Optional business description")
-    parser.add_argument("--print-init-sql", action="store_true", help="Print VALUES tuple for init.sql")
+    parser.add_argument(
+        "--print-init-sql",
+        action="store_true",
+        help="Print VALUES tuple for database/init.sql",
+    )
+    parser.add_argument("--json", action="store_true", help="print structured SkillResult JSON")
     parser.add_argument("--host", default=DEFAULT_DB["host"])
     parser.add_argument("--port", default=DEFAULT_DB["port"])
     parser.add_argument("--user", default=DEFAULT_DB["user"])
@@ -153,7 +123,23 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return 1
 
     status = "inserted" if inserted else "exists"
-    print(f"{status}: {args.alias} -> {args.standard} ({object_type})")
+    text = f"{status}: {args.alias} -> {args.standard} ({object_type})"
+    if args.json:
+        payload = skill_response(
+            kind="alias",
+            text=text,
+            data={
+                "status": status,
+                "alias": args.alias,
+                "standard": args.standard,
+                "object_type": object_type,
+                "init_sql": init_sql_line(args.alias, args.standard, object_type, description),
+            },
+        )
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
+
+    print(text)
     if args.print_init_sql:
         print(init_sql_line(args.alias, args.standard, object_type, description))
     return 0

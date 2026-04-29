@@ -10,25 +10,21 @@ No Python MySQL package is required; the script uses the local `mysql` CLI.
 from __future__ import annotations
 
 import argparse
-import csv
 import html
 import json
 import os
 import re
-import subprocess
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-DEFAULT_DB = {
-    "host": os.getenv("CHATBI_DB_HOST", "127.0.0.1"),
-    "port": os.getenv("CHATBI_DB_PORT", "3307"),
-    "user": os.getenv("CHATBI_DB_USER", "demo_user"),
-    "password": os.getenv("CHATBI_DB_PASSWORD", "demo_pass"),
-    "database": os.getenv("CHATBI_DB_NAME", "chatbi_demo"),
-}
+from _shared.db import MysqlCli, default_db, quote_ident, quote_literal
+from _shared.output import skill_response
 
+DEFAULT_DB = default_db()
 DEFAULT_YEAR = int(os.getenv("CHATBI_DEFAULT_YEAR", "2026"))
 
 
@@ -59,72 +55,6 @@ class SemanticPlan:
     order_by_metric_desc: bool
     limit: Optional[int]
     sql: str
-
-
-class MysqlCli:
-    def __init__(self, config: Dict[str, str]):
-        self.config = config
-        self.mysql_cmd = os.getenv("CHATBI_MYSQL_CMD", "mysql")
-
-    def query(self, sql: str) -> List[Dict[str, str]]:
-        base_cmd = [
-            self.mysql_cmd,
-            f"-h{self.config['host']}",
-            f"-P{self.config['port']}",
-            f"-u{self.config['user']}",
-            f"-p{self.config['password']}",
-        ]
-        tail_cmd = [
-            "--batch",
-            "--raw",
-            "--default-character-set=utf8mb4",
-            self.config["database"],
-            "-e",
-            sql,
-        ]
-        proc = self._run_with_ssl_fallback(base_cmd, tail_cmd)
-        if proc.returncode != 0:
-            raise RuntimeError(proc.stderr.strip() or proc.stdout.strip())
-        lines = [line for line in proc.stdout.splitlines() if line.strip()]
-        if not lines:
-            return []
-        reader = csv.DictReader(lines, delimiter="\t")
-        return [dict(row) for row in reader]
-
-    def _run_with_ssl_fallback(
-        self, base_cmd: List[str], tail_cmd: List[str]
-    ) -> subprocess.CompletedProcess[str]:
-        attempts = [
-            ["--ssl-mode=DISABLED"],
-            ["--ssl=0"],
-            [],
-        ]
-        last_proc: Optional[subprocess.CompletedProcess[str]] = None
-        for ssl_args in attempts:
-            cmd = [*base_cmd, *ssl_args, *tail_cmd]
-            proc = subprocess.run(cmd, text=True, capture_output=True, check=False)
-            last_proc = proc
-            error = proc.stderr.strip()
-            if proc.returncode == 0:
-                return proc
-            if "unknown variable" in error and ("ssl-mode" in error or "ssl=0" in error):
-                continue
-            if "TLS/SSL error" in error or "self-signed certificate" in error:
-                continue
-            return proc
-        if last_proc is None:
-            raise RuntimeError("mysql command was not executed")
-        return last_proc
-
-
-def quote_ident(identifier: str) -> str:
-    if not identifier or "`" in identifier or "\x00" in identifier:
-        raise ValueError(f"Unsafe identifier: {identifier}")
-    return f"`{identifier}`"
-
-
-def quote_literal(value: str) -> str:
-    return "'" + value.replace("\\", "\\\\").replace("'", "''") + "'"
 
 
 def normalize_text(text: str) -> str:
@@ -645,6 +575,15 @@ def write_chart_html(path: str, question: str, plan: SemanticPlan, rows: Sequenc
         file.write(document)
 
 
+def response_text(rows: Sequence[Dict[str, str]]) -> str:
+    if not rows:
+        return "查询完成，未返回数据。"
+    if len(rows) == 1:
+        parts = [f"{key}: {value}" for key, value in rows[0].items() if value]
+        return f"查询完成：{'，'.join(parts)}"
+    return f"查询完成，共返回 {len(rows)} 条结果。"
+
+
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="ChatBI natural-language semantic query")
     parser.add_argument("question", nargs="+", help="Chinese natural-language question")
@@ -681,7 +620,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(plan.sql)
         print()
     if args.json:
-        print(json.dumps(rows, ensure_ascii=False, indent=2))
+        payload = skill_response(
+            kind="table",
+            text=response_text(rows),
+            data={"question": question, "sql": plan.sql, "rows": rows},
+        )
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
         print_table(rows)
     if args.chart_html:

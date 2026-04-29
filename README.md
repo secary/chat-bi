@@ -1,64 +1,75 @@
-# ChatBI Demo
+# 零眸智能 ChatBI
 
 面向银行业务场景的对话式数据分析 Demo，让用户用中文自然语言完成问数、语义别名维护和经营决策建议生成。
 
-## 快速开始
+## 快速开始（Docker 全栈）
 
-### 1. 配置环境变量
+生产式本地运行会构建前端静态产物，并由 nginx 提供页面：
 
 ```bash
-# 复制环境变量模板
+# 1. 复制环境变量模板，填入 LLM API Key
 cp .env.example .env
-# 编辑 .env，填入你的 OPENAI_API_KEY
+
+# 2. 启动所有服务
+docker compose up -d --build
+
+# 3. 浏览器访问
+open http://localhost:5173
 ```
 
-### 2. 启动 MySQL
+服务端口：
+
+| 服务 | 宿主机端口 |
+|------|-----------|
+| frontend | 5173 |
+| backend | 8000 |
+| MySQL | 3307 |
+
+容器名前缀为 `chatbi-prod-*`，项目名为 `chatbi-prod`。
+
+## 本地开发启动
+
+### 方式 A：Docker 热更新
+
+推荐日常开发使用，前后端源码会挂载进容器：
 
 ```bash
-docker compose up -d
-# MySQL 启动在 localhost:3307，表结构和演示数据自动初始化
+docker compose --env-file env.dev -f docker-compose.dev.yml up -d --build
+
+# 浏览器访问
+open http://localhost:5174
 ```
 
-### 3. 启动 Backend
+开发环境端口：
+
+| 服务 | 宿主机端口 |
+|------|-----------|
+| frontend | 5174 |
+| backend | 8001 |
+| MySQL | 3308 |
+
+- 修改 `backend/` 或 `skills/`：后端自动 reload，不需要重建镜像。
+- 修改 `frontend/`：Vite 自动热更新，不需要重建镜像。
+- 修改依赖文件、Dockerfile 或系统依赖：需要重新 `--build`。
+- 修改 `database/init.sql`：已有 `database/mysql-data-dev/` 不会自动重放初始化 SQL，需要重置开发数据目录后再启动。
+- 容器名前缀为 `chatbi-dev-*`，项目名为 `chatbi-dev`，可以和生产式本地运行并存。
+
+### 方式 B：宿主机启动前后端
 
 ```bash
-# 创建虚拟环境并安装依赖
-python -m venv .venv
-source .venv/Scripts/activate     # Windows Git Bash
-# source .venv/bin/activate       # macOS / Linux
+# Backend
+python -m venv .venv && source .venv/bin/activate
 pip install -r backend/requirements.txt
-
-# 启动 FastAPI 服务（端口 8000）
 uvicorn backend.main:app --reload --port 8000
+
+# Frontend（另开终端）
+cd frontend && npm install && npm run dev
 ```
 
-### 4. 启动 Frontend
+MySQL 仍需 Docker：
 
 ```bash
-cd frontend
-npm install
-npm run dev
-# 访问 http://localhost:5173
-```
-
-浏览器打开 `http://localhost:5173` 即可开始对话。
-
-### 5. 以前端容器方式启动
-
-如果后端仍然跑在宿主机 `8000` 端口，可以直接：
-
-```bash
-docker compose build frontend
-docker compose up -d frontend
-```
-
-浏览器访问 `http://localhost:5173`。
-
-默认会把前端 API 指向 `http://localhost:8000`。如需改成别的后端地址，可在启动前设置：
-
-```bash
-export FRONTEND_API_BASE_URL=http://localhost:8000
-docker compose up -d --build frontend
+docker compose up -d demo-mysql
 ```
 
 ## 技术栈
@@ -68,65 +79,100 @@ docker compose up -d --build frontend
 | 前端 | React 18 + TypeScript + Vite + Tailwind CSS + ECharts 5 |
 | 后端 | FastAPI + Python 3.11 + LiteLLM |
 | 数据库 | MySQL 8.0（Docker） |
-| 流式 | SSE |
-| 质量 | Python black + ruff; TypeScript ESLint + Prettier |
+| 流式 | Server-Sent Events（SSE） |
+| 质量 | black + ruff；ESLint + Prettier |
 
 ## 项目结构
 
-```text
-chatbi/
-├── AGENTS.md                          # AI Agent 项目地图
-├── CLAUDE.md                          # Agent 工作手册
-├── .env.example                       # 环境变量模板
-├── docker-compose.yml                 # MySQL 容器
-├── init_db/
-│   └── init.sql                       # 表结构 + 演示数据 + 语义层
+```
+chat-bi/
+├── AGENTS.md                        # AI Agent 项目地图（规则事实源）
+├── CLAUDE.md                        # 指向 AGENTS.md 的入口
+├── .env.example                     # 环境变量模板
+├── env.dev                          # 开发环境变量（本地文件，Git 忽略）
+├── docker-compose.yml               # MySQL + Backend + Frontend 三服务
+├── docker-compose.dev.yml           # Docker 开发热更新编排
+├── database/
+│   └── init.sql                     # 表结构、演示数据、语义层元数据
 ├── backend/
-│   ├── main.py                        # FastAPI SSE 入口
-│   ├── config.py                      # 环境变量配置
+│   ├── main.py                      # FastAPI 入口，POST /chat SSE 接口
+│   ├── config.py                    # 环境变量读取
 │   ├── agent/
-│   │   ├── prompt_builder.py          # 读取 SKILL.md → System Prompt
-│   │   └── runner.py                  # Agent 主循环 + Skill 调度
+│   │   ├── protocol.py              # SkillResult 统一协议定义
+│   │   ├── prompt_builder.py        # 读取 SKILL.md，构造 System Prompt
+│   │   ├── planner.py               # LiteLLM 调用，生成 Skill 执行计划
+│   │   ├── executor.py              # 定位并执行 Skill 脚本，归一化结果
+│   │   ├── formatter.py             # SkillResult → SSE 消息
+│   │   └── runner.py                # plan → execute → format 主循环
 │   └── renderers/
-│       ├── chart.py                   # Chart plan → ECharts option
-│       └── kpi.py                     # KPI 卡片构造
+│       ├── chart.py                 # 构造 ECharts option
+│       └── kpi.py                   # 构造 KPI 卡片数据
 ├── frontend/
-│   ├── src/
-│   │   ├── types/message.ts           # 消息类型定义
-│   │   ├── api/client.ts              # SSE 流式客户端
-│   │   ├── hooks/useChat.ts           # 对话状态管理
-│   │   └── components/
-│   │       ├── MessageBubble.tsx       # 消息分发渲染
-│   │       ├── ThinkingBubble.tsx      # 思考步骤（折叠）
-│   │       ├── ChartRenderer.tsx       # ECharts 图表
-│   │       ├── KPICards.tsx            # KPI 卡片
-│   │       └── ChatInput.tsx           # 输入框
-│   └── ...
-└── skills/
-    ├── chatbi-semantic-query/         # 自然语言问数
-    ├── chatbi-alias-manager/          # 语义别名管理
-    └── chatbi-decision-advisor/       # 经营决策建议
+│   └── src/
+│       ├── types/message.ts         # 消息类型定义
+│       ├── api/client.ts            # SSE 流式客户端
+│       ├── hooks/useChat.ts         # 对话状态管理
+│       └── components/
+│           ├── MessageBubble.tsx    # 消息分发渲染
+│           ├── ThinkingBubble.tsx   # 思考步骤（可折叠）
+│           ├── ChartRenderer.tsx    # ECharts 图表
+│           ├── KPICards.tsx         # KPI 卡片
+│           └── ChatInput.tsx        # 输入框
+├── skills/
+│   ├── _shared/                     # 脚本共享的数据库和协议工具
+│   ├── chatbi-semantic-query/       # 自然语言问数
+│   ├── chatbi-alias-manager/        # 语义别名管理
+│   └── chatbi-decision-advisor/     # 经营决策建议
+└── tests/
+    └── test_agent_skill_protocol.py # SkillResult 协议单测
 ```
 
 ## 架构流程
 
 ```
-用户输入 → React 前端 → POST /chat (SSE) → FastAPI → AgentRunner + LiteLLM
-  → 读取 skills/*/SKILL.md → 选择 Skill → 执行 Python 脚本 → MySQL
-  → 结果整理（图表/KPI） → SSE 流式返回 → 前端渲染
+用户输入
+  → React 前端
+  → POST /chat（SSE）
+  → FastAPI → AgentRunner
+      → prompt_builder 读取 skills/*/SKILL.md
+      → planner 生成执行计划（LiteLLM）
+      → executor 执行 Skill 脚本 → MySQL chatbi_demo
+      → 统一 SkillResult 协议（kind / text / data / charts / kpis）
+      → formatter 转换为 SSE 消息
+      → renderers 构造 ECharts option / KPI 卡片
+  → SSE 流式返回
+  → 前端渲染（thinking / text / chart / kpi_cards / error）
 ```
 
-## 开发说明
+## 环境变量
 
-本项目使用 **Harness Engineering** 开发模式：
+关键变量见 `.env.example`：
 
-- 所有规则见 `AGENTS.md`
-- 当前任务见 `docs/plans/current-sprint.md`
-- 项目目标见 `docs/goal.md`
-- 系统架构见 `docs/architecture/overview.md`
-- 模块边界见 `docs/architecture/boundaries.md`
-- 编码规范见 `docs/conventions/README.md`
+| 变量 | 说明 |
+|------|------|
+| `LLM_MODEL` | LiteLLM 模型名（如 `minimax/abab6.5s-chat`） |
+| `OPENAI_API_KEY` | LLM API Key |
+| `API_BASE` | LLM API Base URL（可选） |
+| `CHATBI_DB_HOST` | MySQL 主机（容器内默认 `demo-mysql`） |
+| `CHATBI_DB_PORT` | MySQL 端口（容器内默认 `3306`） |
+| `CHATBI_DB_USER` | 数据库用户（默认 `demo_user`） |
+| `CHATBI_DB_PASSWORD` | 数据库密码（默认 `demo_pass`） |
+| `FRONTEND_API_BASE_URL` | 前端指向的后端地址（默认 `http://localhost:8000`） |
 
-## 验收标准
+环境文件建议：
 
-见 `docs/goal.md`。
+| 环境 | env 文件 | Compose |
+|------|----------|---------|
+| 生产式本地 / 测试 | `.env` | `docker-compose.yml` |
+| 开发热更新 | `env.dev` | `docker-compose.dev.yml` |
+
+## 开发文档
+
+| 主题 | 路径 |
+|------|------|
+| Agent 规则与工作方式 | [AGENTS.md](AGENTS.md) |
+| 系统架构与模块边界 | [docs/architecture/README.md](docs/architecture/README.md) |
+| 编码规范 | [docs/conventions/README.md](docs/conventions/README.md) |
+| 当前迭代任务 | [docs/plans/current-sprint.md](docs/plans/current-sprint.md) |
+| 项目目标与验收标准 | [docs/goal.md](docs/goal.md) |
+| Skill 能力说明 | `skills/<skill-name>/SKILL.md` |

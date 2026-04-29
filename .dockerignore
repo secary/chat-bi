@@ -1,7 +1,11 @@
 .git
 .venv
 .env
-mysql-data
+env.dev
+.env.*
+!.env.example
+database/mysql-data
+database/mysql-data-*
 frontend/node_modules
 frontend/dist
 *.pdf

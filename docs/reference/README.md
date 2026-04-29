@@ -3,6 +3,6 @@
 用于存放外部参考资料、接口说明、业务口径来源和调研记录。
 
 当前主要参考：
-- `ChatBI_frontend_agent_PRD.md`
+- `ChatBI_frontend_agent_PRD.md`：历史 PRD，仅作参考，不作为当前事实源
 - `README.md`
 - `skills/*/SKILL.md`

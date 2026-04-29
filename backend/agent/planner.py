@@ -1,0 +1,42 @@
+from __future__ import annotations
+
+import json
+import re
+from typing import Any, Dict, List, Optional
+
+from litellm import acompletion
+
+from backend.config import settings
+
+
+async def call_llm_for_plan(
+    system_prompt: str, messages: List[Dict[str, str]]
+) -> Optional[Dict[str, Any]]:
+    llm_messages = [
+        {"role": "system", "content": system_prompt},
+        *messages,
+        {"role": "user", "content": "请以 JSON 格式输出你的行动计划。"},
+    ]
+
+    try:
+        resp = await acompletion(
+            **settings.llm_params,
+            messages=llm_messages,
+            response_format={"type": "json_object"},
+            temperature=0.1,
+        )
+    except Exception as exc:
+        raise RuntimeError(f"LLM 调用失败：{type(exc).__name__}: {exc}") from exc
+
+    content = resp.choices[0].message.content
+    if not content:
+        return None
+    return parse_json_object(content)
+
+
+def parse_json_object(content: str) -> Dict[str, Any]:
+    text = content.strip()
+    fence_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+    if fence_match:
+        text = fence_match.group(1)
+    return json.loads(text)

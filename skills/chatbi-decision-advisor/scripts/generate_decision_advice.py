@@ -9,24 +9,21 @@ explicit rules. It does not ask a model to invent conclusions from raw tables.
 from __future__ import annotations
 
 import argparse
-import csv
 import json
 import os
 import re
-import subprocess
 import sys
 from dataclasses import dataclass, asdict
 from decimal import Decimal
+from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-DEFAULT_DB = {
-    "host": os.getenv("CHATBI_DB_HOST", "127.0.0.1"),
-    "port": os.getenv("CHATBI_DB_PORT", "3307"),
-    "user": os.getenv("CHATBI_DB_USER", "demo_user"),
-    "password": os.getenv("CHATBI_DB_PASSWORD", "demo_pass"),
-    "database": os.getenv("CHATBI_DB_NAME", "chatbi_demo"),
-}
+from _shared.db import MysqlCli, default_db, quote_ident, quote_literal
+from _shared.output import kpi, skill_response
+
+DEFAULT_DB = default_db()
 
 
 @dataclass
@@ -47,35 +44,6 @@ class Scope:
     has_sales_only_filter: bool
 
 
-class MysqlCli:
-    def __init__(self, config: Dict[str, str]):
-        self.config = config
-        self.mysql_cmd = os.getenv("CHATBI_MYSQL_CMD", "mysql")
-
-    def query(self, sql: str) -> List[Dict[str, str]]:
-        cmd = [
-            self.mysql_cmd,
-            f"-h{self.config['host']}",
-            f"-P{self.config['port']}",
-            f"-u{self.config['user']}",
-            f"-p{self.config['password']}",
-            "--ssl=0",
-            "--batch",
-            "--raw",
-            "--default-character-set=utf8mb4",
-            self.config["database"],
-            "-e",
-            sql,
-        ]
-        proc = subprocess.run(cmd, text=True, capture_output=True, check=False)
-        if proc.returncode != 0:
-            raise RuntimeError(proc.stderr.strip() or proc.stdout.strip())
-        lines = [line for line in proc.stdout.splitlines() if line.strip()]
-        if not lines:
-            return []
-        return [dict(row) for row in csv.DictReader(lines, delimiter="\t")]
-
-
 def decimal_value(row: Dict[str, str], key: str) -> Decimal:
     value = row.get(key)
     if value in (None, "", "NULL"):
@@ -89,16 +57,6 @@ def pct(value: Decimal) -> str:
 
 def money(value: Decimal) -> str:
     return f"{value.quantize(Decimal('0.01'))}元"
-
-
-def quote_ident(identifier: str) -> str:
-    if not identifier or "`" in identifier or "\x00" in identifier:
-        raise ValueError(f"Unsafe identifier: {identifier}")
-    return f"`{identifier}`"
-
-
-def quote_literal(value: str) -> str:
-    return "'" + value.replace("\\", "\\\\").replace("'", "''") + "'"
 
 
 def month_bounds(year: int, start_month: int, end_month: int) -> Tuple[str, str]:
@@ -492,6 +450,21 @@ def render_markdown(facts: Dict[str, object], advices: List[Advice]) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
+def build_kpis(facts: Dict[str, object]) -> List[Dict[str, str]]:
+    overview = facts["overview"]
+    achievement = decimal_value(overview, "target_achievement_rate")
+    margin = decimal_value(overview, "gross_margin_rate")
+    achievement_status = "success" if achievement >= Decimal("1.0") else "warning"
+    margin_status = "success" if margin >= Decimal("0.35") else "warning"
+    return [
+        kpi("销售额", money(decimal_value(overview, "sales")), status="neutral"),
+        kpi("目标完成率", pct(achievement), status=achievement_status),
+        kpi("毛利率", pct(margin), status=margin_status),
+        kpi("订单数", str(decimal_value(overview, "order_count")), status="neutral"),
+        kpi("客户数", str(decimal_value(overview, "customer_count")), status="neutral"),
+    ]
+
+
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate ChatBI decision advice")
     parser.add_argument("question_terms", nargs="*", help="Optional Chinese scope, such as 华东2026年4月决策建议")
@@ -525,7 +498,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return 1
 
     if args.json:
-        print(json.dumps({"facts": facts, "advices": [asdict(item) for item in advices]}, ensure_ascii=False, indent=2))
+        data = {"facts": facts, "advices": [asdict(item) for item in advices]}
+        payload = skill_response(
+            kind="decision",
+            text=render_markdown(facts, advices),
+            data=data,
+            kpis=build_kpis(facts),
+        )
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
         print(render_markdown(facts, advices))
     return 0

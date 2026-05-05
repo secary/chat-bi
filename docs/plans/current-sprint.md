@@ -101,3 +101,5 @@
 | 24 | 新增 `/upload` 后端接口和聊天框文件入口：支持点击选择或拖拽 CSV/XLSX/XLSM，上传后自动生成带后端文件路径的校验消息草稿 | 当前上传后仍需用户点击发送触发 Skill；上传 API 测试在本机缺 FastAPI 时跳过，需 Docker 环境完整验证 | 重建 backend/frontend 容器后在浏览器拖入 `data/chatbi_sales.csv` 做端到端验证 |
 | 25 | 新增 trace-id 链路日志：前端上传/聊天透传 `X-Trace-Id`，后端记录 upload、chat、planner、skill、SSE 节点到独立 `chatbi_logs.chatbi_trace_log`；BI 业务数据仍统一使用 `chatbi_demo` | 旧数据卷不会自动重放 `database/init.sql`，已在当前 dev MySQL 手动补建 `chatbi_logs` 授权；日志写入为 best-effort，不阻塞主链路 | 后续可加日志查询页面或按 trace-id 展示完整链路时间线 |
 | 26 | 将日志库连接与业务库连接拆分：新增 `CHATBI_LOG_DB_HOST/PORT/USER/PASSWORD/NAME`，trace 写库优先使用日志库专用配置；dev/prod compose 不再硬编码日志库名，交给 env 注入 | `.env.dev` 可指向本机 MySQL，如 `host.docker.internal`；未配置日志库专用连接时仍回退到业务库连接以兼容现有 Docker dev | 配置本机日志库账号后重建 backend 容器，并用固定 trace-id 验证日志进入目标库 |
+| 27 | 新增 `.envrc` 配置 direnv 项目级钩子：进入目录时加载 `.env`，再加载 `env.dev` 或 `.env.dev`，并加入本地 `.venv/bin` | 仍需要执行 `direnv allow` 信任本目录配置；shell 全局 hook 需用户 shell rc 已配置 | 执行 `direnv allow` 后重新进入目录，验证环境变量与虚拟环境 PATH 自动生效 |
+| 28 | 执行 `direnv allow` 信任当前目录 `.envrc`，并验证 zsh 全局 hook 已在 `~/.zshrc` 配置 | 当前非交互命令环境不会持久加载 direnv 导出的变量；新开或重新进入交互式 zsh 后会自动生效 | 重新进入项目目录后用 `direnv status` 或 `echo $CHATBI_DB_PORT` 验证 |

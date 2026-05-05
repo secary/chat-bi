@@ -10,6 +10,7 @@ database/mysql-data-*
 data
 output
 .venv
+.envrc
 .env
 env.dev
 .env.*

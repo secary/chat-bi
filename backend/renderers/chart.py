@@ -9,8 +9,15 @@ def plan_to_option(
 ) -> Dict[str, Any]:
     """Convert a chart plan + data to an ECharts option dict."""
     chart_type = plan.get("chart_type", "bar")
-    dimension_field = plan.get("dimension", "")
-    metric_fields: List[str] = plan.get("metrics", [])
+    dimension_field = str(plan.get("dimension") or "")
+    metric_fields: List[str] = plan.get("metrics", []) or []
+
+    if data and (not dimension_field or not metric_fields):
+        inferred_dimension, inferred_metrics = _infer_fields_from_rows(data)
+        if not dimension_field:
+            dimension_field = inferred_dimension
+        if not metric_fields:
+            metric_fields = inferred_metrics
 
     if not data or not dimension_field:
         return _empty_option(chart_type, "暂无数据")
@@ -99,3 +106,15 @@ def _empty_option(chart_type: str, msg: str) -> Dict[str, Any]:
         "yAxis": {"type": "value"},
         "series": [{"type": chart_type, "data": []}],
     }
+
+
+def _infer_fields_from_rows(data: List[Dict[str, str]]) -> tuple[str, List[str]]:
+    if not data:
+        return "", []
+    first_row = data[0]
+    keys = list(first_row.keys())
+    if not keys:
+        return "", []
+    dimension = keys[0]
+    metrics = [key for key in keys if key != dimension]
+    return dimension, metrics

@@ -24,7 +24,7 @@ output
 *.xlsx
 
 
-tests/
+
 *.jpg
 *.jpeg
 *.png

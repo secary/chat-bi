@@ -23,7 +23,9 @@ flowchart TD
 - `backend/agent/planner.py`：调用 LiteLLM，生成 Skill 执行计划。
 - `backend/agent/executor.py`：定位 Skill 脚本，执行脚本并归一化 SkillResult。
 - `backend/agent/formatter.py`：将 SkillResult 转换为 SSE 消息。
-- `backend/agent/runner.py`：串联 plan → execute → format 流程。
+- `backend/agent/runner.py`：按配置串联 ReAct 多轮或 Legacy 单次 plan → execute → format。
+- `backend/agent/react_runner.py`：ReAct 循环（LLM JSON 步进、Observation 回灌、`finish` 收口）。
+- `backend/agent/observation.py`：工具结果摘要供下一轮 LLM 使用。
 - `backend/renderers/`：将结构化结果转换为 ECharts option 和 KPI 卡片数据。
 - `skills/`：Agent Skill 目录，每个 Skill 由 `SKILL.md` 和可选 `scripts/` 组成。
 - `database/`：MySQL 表结构、业务数据和语义层元数据初始化。
@@ -57,6 +59,11 @@ flowchart TD
 - Agent 禁止绕过 Skill 文档直接编造数据库操作。
 - 渲染模块禁止修改数据库。
 - LLM 禁止替代确定性脚本计算指标事实。
+
+## Agent 运行时与演进说明
+- 验收清单（默认 ReAct + 可选 Legacy）：[`docs/design/agent-runtime-acceptance.md`](../design/agent-runtime-acceptance.md)。
+- ReAct 设计与扩展点：[`docs/design/agent-react-evolution.md`](../design/agent-react-evolution.md)。
+- 编排：`backend/agent/runner.py` 按配置分发到 `react_runner`（多轮）或 `_stream_chat_legacy`（单次规划）。
 
 ## 关键技术决策
 - 使用 `SKILL.md + scripts/` 管理业务能力：Agent 负责选择能力，确定性脚本负责查询、别名写入和规则建议。

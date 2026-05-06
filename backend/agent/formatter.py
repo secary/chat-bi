@@ -14,7 +14,7 @@ async def stream_result_events(
         yield {"type": "text", "content": text}
 
     rows = table_rows(result)
-    chart_plan = plan.get("chart_plan")
+    chart_plan = result.get("chart_plan") or plan.get("chart_plan")
     if chart_plan and rows:
         try:
             yield {"type": "chart", "content": plan_to_option(chart_plan, rows)}

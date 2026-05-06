@@ -432,6 +432,37 @@ def infer_chart_type(rows: Sequence[Dict[str, str]], dimension_columns: Sequence
     return "bar"
 
 
+def infer_chart_plan(question: str, rows: Sequence[Dict[str, str]]) -> Optional[Dict[str, object]]:
+    if not rows:
+        return None
+    columns = list(rows[0].keys())
+    if len(columns) < 2:
+        return None
+    dimension = columns[0]
+    metrics = [col for col in columns[1:]]
+    if not metrics:
+        return None
+
+    question_text = question or ""
+    if any(word in question_text for word in ["占比", "构成", "贡献", "比例", "份额"]):
+        chart_type = "pie"
+    elif any(word in question_text for word in ["趋势", "变化", "按月", "时间"]) or dimension in (
+        "月份",
+        "时间",
+    ):
+        chart_type = "line"
+    else:
+        chart_type = "bar"
+
+    return {
+        "chart_type": chart_type,
+        "title": question_text,
+        "dimension": dimension,
+        "metrics": metrics[:2],
+        "highlight": {"mode": "max", "field": metrics[0]},
+    }
+
+
 def build_chart_points(rows: Sequence[Dict[str, str]]) -> Tuple[List[str], List[float], str, List[str]]:
     if not rows:
         return [], [], "指标", []
@@ -625,6 +656,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             text=response_text(rows),
             data={"question": question, "sql": plan.sql, "rows": rows},
         )
+        chart_plan = infer_chart_plan(question, rows)
+        if chart_plan:
+            payload["chart_plan"] = chart_plan
         print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
         print_table(rows)

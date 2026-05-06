@@ -9,6 +9,35 @@ from litellm import acompletion
 from backend.config import settings
 
 
+async def call_llm_for_react_step(
+    system_prompt: str, messages: List[Dict[str, str]]
+) -> Optional[Dict[str, Any]]:
+    """One ReAct iteration: model returns JSON with `action` call_skill|finish."""
+    llm_messages = [
+        {"role": "system", "content": system_prompt},
+        *messages,
+        {
+            "role": "user",
+            "content": "请只输出一个 JSON 对象作为本步决策（必须包含 action 字段），不要输出其它文字。",
+        },
+    ]
+
+    try:
+        resp = await acompletion(
+            **settings.llm_params,
+            messages=llm_messages,
+            response_format={"type": "json_object"},
+            temperature=0.1,
+        )
+    except Exception as exc:
+        raise RuntimeError(f"LLM 调用失败：{type(exc).__name__}: {exc}") from exc
+
+    content = resp.choices[0].message.content
+    if not content:
+        return None
+    return parse_json_object(content)
+
+
 async def call_llm_for_plan(
     system_prompt: str, messages: List[Dict[str, str]]
 ) -> Optional[Dict[str, Any]]:

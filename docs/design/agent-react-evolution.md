@@ -1,6 +1,10 @@
-# Agent ReAct 演进设计（后续迭代）
+# Agent ReAct 演进设计
 
-本文档约定 **若** 产品需要将 ChatBI Agent 从「单次规划 + 单次 Skill」升级为经典 **ReAct**（想 → 做 → 观察 → 再想…）时可落地的设计要点，便于与 [`SkillResult`](../../backend/agent/protocol.py)、SSE 衔接。
+## 实现状态（runner 层）
+
+已在 [`react_runner.py`](../../backend/agent/react_runner.py) 落地 **无 LangGraph** 的多轮循环：`call_llm_for_react_step` →（可选）`run_script` → Observation 摘要追加 → 再调用 LLM，直至 `action=finish` 或步数上限。配置：`CHATBI_AGENT_REACT`、`CHATBI_AGENT_MAX_STEPS`（见 [`.env.example`](../../.env.example)）。
+
+下文保留 **后续可选增强**（原生 function calling、独立 `tool_result` SSE 类型等）。
 
 ## 目标行为
 

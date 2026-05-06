@@ -15,13 +15,15 @@ export function useChat(): UseChatReturn {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const messagesRef = useRef(messages);
+  const streamingRef = useRef(false);
 
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
 
   const sendMessage = useCallback(async (text: string, traceId?: string) => {
-    if (!text.trim() || loading) return;
+    if (!text.trim() || loading || streamingRef.current) return;
+    streamingRef.current = true;
 
     const userMsg: ChatMessage = {
       id: String(nextId++),
@@ -52,24 +54,30 @@ export function useChat(): UseChatReturn {
 
           switch (event.type) {
             case 'thinking': {
-              last.thinking = [...(last.thinking || []), String(event.content)];
+              updated[updated.length - 1] = {
+                ...last,
+                thinking: [...(last.thinking || []), String(event.content)],
+              };
               break;
             }
             case 'text': {
               const nextChunk = String(event.content);
-              last.content = last.content ? `${last.content}\n\n${nextChunk}` : nextChunk;
+              updated[updated.length - 1] = {
+                ...last,
+                content: last.content ? `${last.content}\n\n${nextChunk}` : nextChunk,
+              };
               break;
             }
             case 'chart': {
-              last.chart = event.content as Record<string, unknown>;
+              updated[updated.length - 1] = { ...last, chart: event.content as Record<string, unknown> };
               break;
             }
             case 'kpi_cards': {
-              last.kpiCards = event.content as typeof last.kpiCards;
+              updated[updated.length - 1] = { ...last, kpiCards: event.content as typeof last.kpiCards };
               break;
             }
             case 'error': {
-              last.error = String(event.content);
+              updated[updated.length - 1] = { ...last, error: String(event.content) };
               break;
             }
           }
@@ -84,6 +92,7 @@ export function useChat(): UseChatReturn {
         return updated;
       });
     } finally {
+      streamingRef.current = false;
       setLoading(false);
     }
   }, [loading]);

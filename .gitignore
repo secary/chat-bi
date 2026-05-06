@@ -16,7 +16,6 @@ env.dev
 .env.*
 !.env.example
 *.session.sql
-*.html
 .pycache
 *.log
 .Ds_Store

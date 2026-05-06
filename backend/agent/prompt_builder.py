@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import List
+from typing import List, Sequence
+
 
 class SkillDoc:
     def __init__(self, name: str, description: str, content: str, skill_dir: Path):
@@ -32,13 +33,18 @@ def scan_skills(skills_dir: Path) -> List[SkillDoc]:
     docs: List[SkillDoc] = []
     pattern = str(skills_dir / "*" / "SKILL.md")
     from glob import glob
+
     for path_str in glob(pattern):
         path = Path(path_str)
         text = path.read_text(encoding="utf-8")
         meta, body = parse_frontmatter(text)
         name = meta.get("name", path.parent.name)
         description = meta.get("description", "")
-        docs.append(SkillDoc(name=name, description=description, content=body, skill_dir=path.parent))
+        docs.append(
+            SkillDoc(
+                name=name, description=description, content=body, skill_dir=path.parent
+            )
+        )
     return docs
 
 
@@ -100,15 +106,53 @@ KPI 卡片格式：
 - 不要编造数据，所有结果来自脚本执行
 """
 
+AGENT_REACT_INSTRUCTION = """你是一个 ChatBI 数据分析助手，帮助用户用自然语言查询业务数据、管理语义别名、生成经营决策建议。
 
-def build_system_prompt(skills_docs: List[SkillDoc]) -> str:
-    """Build the full system prompt including available skills."""
-    parts = [AGENT_SYSTEM_INSTRUCTION, "\n## 可用 Skill\n"]
+## ReAct 工作方式
+系统在对话中循环：你输出 JSON 决策 → 可能执行 Skill → 将 Observation 摘要追加到对话 → 你再输出下一步 JSON，直到 `action` 为 `finish`。
+每一轮只输出**一个** JSON 对象，不要用 Markdown 代码围栏包裹。
 
+## 自然语言触发规则
+- 用户只要在问业务数据、排行、趋势、对比、汇总或指标值，就选择 `chatbi-semantic-query`
+- 短句也必须触发查询，例如 `1-4月销售额排行`、`各区域销售额`、`华东4月毛利率`
+- 不要把用户没有写出的年份、区域、指标或维度自行改写成别的值
+- 给 `chatbi-semantic-query` 的第一个参数优先使用用户原始问题，让脚本自己补默认年份和默认排行维度
+- 演示数据默认年份是 2026；不要臆造 2024 等不存在的数据年份
+
+## 每一步 JSON 字段
+- `action`（必填）：`call_skill` 或 `finish`
+- `thought`（可选）：一句中文简要思考
+
+当 `action` 为 `call_skill` 时必填：
+- `skill`：Skill 名称
+- `skill_args`：字符串数组；语义查询/决策建议通常把**用户原问题**作为第一参数
+
+当 `action` 为 `finish` 时必填：
+- `text`：对用户的 Markdown 回答
+- `chart_plan`：图表计划对象或 null
+- `kpi_cards`：KPI 数组或 []
+
+chart_plan / KPI 格式与单次模式相同；仅在 `finish` 步填写，用于渲染最后一次相关工具结果（若有多轮工具，以 Observation 中的事实为准）。
+
+## 可视化规则
+- 分类对比、排名 → 柱状图 (bar)
+- 时间趋势 → 折线图 (line)
+- 构成/占比 → 饼图 (pie)
+- 单值指标汇总 → KPI 卡片
+
+## 约束
+- 收到 Observation 后必须基于其中的数值与事实作答，禁止编造数据。
+- 若只需一次 Skill：第一轮 `call_skill`，下一轮必须 `finish`。
+- 每轮最多安排一次 `call_skill`；需要多个 Skill 时请分多轮输出。
+- 只从可用 Skill 中选择；不要直接连接数据库。
+"""
+
+
+def _skills_markdown_lines(skills_docs: Sequence[SkillDoc]) -> List[str]:
+    parts: List[str] = []
     for doc in skills_docs:
         parts.append(f"### {doc.name}")
         parts.append(f"描述：{doc.description}")
-        # Extract key sections from the skill content
         lines = doc.content.splitlines()
         in_section = None
         captured: list[str] = []
@@ -117,9 +161,19 @@ def build_system_prompt(skills_docs: List[SkillDoc]) -> str:
             if stripped.startswith("## "):
                 in_section = stripped.lstrip("#").strip()
                 captured = []
-            elif in_section in ("Workflow", "工作流", "Commands", "常用命令", "Safety", "安全边界",
-                                "Visualization Guidance", "可视化指导", "Supported Semantics", "支持的语义",
-                                "Presentation Guidance"):
+            elif in_section in (
+                "Workflow",
+                "工作流",
+                "Commands",
+                "常用命令",
+                "Safety",
+                "安全边界",
+                "Visualization Guidance",
+                "可视化指导",
+                "Supported Semantics",
+                "支持的语义",
+                "Presentation Guidance",
+            ):
                 if stripped:
                     captured.append(stripped)
 
@@ -127,5 +181,24 @@ def build_system_prompt(skills_docs: List[SkillDoc]) -> str:
             parts.append("```")
             parts.extend(captured)
             parts.append("```")
+    return parts
 
+
+def build_system_prompt(skills_docs: List[SkillDoc]) -> str:
+    """Build the full system prompt including available skills (single-shot plan)."""
+    parts = [
+        AGENT_SYSTEM_INSTRUCTION,
+        "\n## 可用 Skill\n",
+        *_skills_markdown_lines(skills_docs),
+    ]
+    return "\n".join(parts)
+
+
+def build_react_system_prompt(skills_docs: List[SkillDoc]) -> str:
+    """System prompt for multi-step ReAct (multiple JSON rounds)."""
+    parts = [
+        AGENT_REACT_INSTRUCTION,
+        "\n## 可用 Skill\n",
+        *_skills_markdown_lines(skills_docs),
+    ]
     return "\n".join(parts)

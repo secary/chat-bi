@@ -23,6 +23,8 @@ export interface KpiCard {
 export interface ChatRequest {
   message: string;
   history: { role: string; content: string }[];
+  session_id?: number;
+  db_connection_id?: number;
 }
 
 export interface UploadedFile {

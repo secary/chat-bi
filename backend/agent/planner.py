@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 
 from litellm import acompletion
 
-from backend.config import settings
+from backend.app_llm import effective_llm_params
 
 
 async def call_llm_for_react_step(
@@ -24,7 +24,7 @@ async def call_llm_for_react_step(
 
     try:
         resp = await acompletion(
-            **settings.llm_params,
+            **effective_llm_params(),
             messages=llm_messages,
             response_format={"type": "json_object"},
             temperature=0.1,
@@ -49,7 +49,7 @@ async def call_llm_for_plan(
 
     try:
         resp = await acompletion(
-            **settings.llm_params,
+            **effective_llm_params(),
             messages=llm_messages,
             response_format={"type": "json_object"},
             temperature=0.1,

@@ -1,8 +1,33 @@
 import type { ChatRequest, SseEvent, UploadedFile } from '../types/message';
+import type {
+  AdminSkillRow,
+  CurrentDbConnectionView,
+  DbConnectionRow,
+  LlmSettingsView,
+  SessionRow,
+} from '../types/admin';
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 const CHAT_URL = `${API_BASE_URL}/chat`;
 const UPLOAD_URL = `${API_BASE_URL}/upload`;
+
+async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = {
+    ...(init?.headers as Record<string, string> | undefined),
+  };
+  if (init?.body && !headers['Content-Type']) {
+    headers['Content-Type'] = 'application/json';
+  }
+  const res = await fetch(`${API_BASE_URL}${path}`, { ...init, headers });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `请求失败: ${res.status}`);
+  }
+  if (res.status === 204) {
+    return undefined as T;
+  }
+  return res.json() as Promise<T>;
+}
 
 export function parseSseLine(line: string): SseEvent | null {
   if (!line.startsWith('data: ')) return null;
@@ -57,7 +82,6 @@ export async function* streamChat(
     }
   }
 
-  // Process remaining buffer
   if (buffer.trim()) {
     const event = parseSseLine(buffer.trim());
     if (event) yield event;
@@ -86,4 +110,122 @@ export async function uploadFile(file: File, traceId = newTraceId()): Promise<Up
   }
 
   return (await response.json()) as UploadedFile;
+}
+
+export async function listSessionsApi(): Promise<SessionRow[]> {
+  return requestJson<SessionRow[]>('/sessions');
+}
+
+export async function createSessionApi(title = '新对话'): Promise<{ id: number }> {
+  return requestJson<{ id: number }>('/sessions', {
+    method: 'POST',
+    body: JSON.stringify({ title }),
+  });
+}
+
+export async function deleteSessionApi(id: number): Promise<void> {
+  await requestJson(`/sessions/${id}`, { method: 'DELETE' });
+}
+
+export async function getSessionMessagesApi(
+  id: number,
+): Promise<Record<string, unknown>[]> {
+  return requestJson<Record<string, unknown>[]>(`/sessions/${id}/messages`);
+}
+
+export async function listAdminSkills(): Promise<AdminSkillRow[]> {
+  return requestJson<AdminSkillRow[]>('/admin/skills');
+}
+
+export async function getSkillFile(slug: string): Promise<{ markdown: string }> {
+  return requestJson<{ markdown: string }>(`/admin/skills/${encodeURIComponent(slug)}/file`);
+}
+
+export async function putSkillFile(slug: string, markdown: string): Promise<void> {
+  await requestJson(`/admin/skills/${encodeURIComponent(slug)}`, {
+    method: 'PUT',
+    body: JSON.stringify({ markdown }),
+  });
+}
+
+export async function patchSkillEnabled(slug: string, enabled: boolean): Promise<void> {
+  await requestJson(`/admin/skills/${encodeURIComponent(slug)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ enabled }),
+  });
+}
+
+export async function createSkillApi(slug: string, markdown = ''): Promise<void> {
+  await requestJson('/admin/skills', {
+    method: 'POST',
+    body: JSON.stringify({ slug, markdown }),
+  });
+}
+
+export async function deleteSkillApi(slug: string): Promise<void> {
+  await requestJson(`/admin/skills/${encodeURIComponent(slug)}`, { method: 'DELETE' });
+}
+
+export async function listDbConnections(): Promise<DbConnectionRow[]> {
+  return requestJson<DbConnectionRow[]>('/admin/db-connections');
+}
+
+export async function getCurrentDbConnection(): Promise<CurrentDbConnectionView> {
+  return requestJson<CurrentDbConnectionView>('/admin/db-connections/current');
+}
+
+export async function createDbConnectionApi(payload: {
+  name: string;
+  host: string;
+  port: number;
+  username: string;
+  password: string;
+  database_name: string;
+  is_default: boolean;
+}): Promise<void> {
+  await requestJson('/admin/db-connections', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateDbConnectionApi(
+  id: number,
+  payload: {
+    name: string;
+    host: string;
+    port: number;
+    username: string;
+    password?: string | null;
+    database_name: string;
+    is_default: boolean;
+  },
+): Promise<void> {
+  await requestJson(`/admin/db-connections/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteDbConnectionApi(id: number): Promise<void> {
+  await requestJson(`/admin/db-connections/${id}`, { method: 'DELETE' });
+}
+
+export async function testDbConnectionApi(id: number): Promise<void> {
+  await requestJson(`/admin/db-connections/${id}/test`, { method: 'POST' });
+}
+
+export async function getLlmSettings(): Promise<LlmSettingsView> {
+  return requestJson<LlmSettingsView>('/admin/llm-settings');
+}
+
+export async function putLlmSettings(payload: {
+  model?: string | null;
+  api_base?: string | null;
+  api_key?: string | null;
+}): Promise<LlmSettingsView> {
+  return requestJson<LlmSettingsView>('/admin/llm-settings', {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
 }

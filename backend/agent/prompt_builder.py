@@ -48,6 +48,14 @@ def scan_skills(skills_dir: Path) -> List[SkillDoc]:
     return docs
 
 
+def scan_skills_enabled(skills_dir: Path) -> List[SkillDoc]:
+    """Like scan_skills but excludes skills disabled in skill_registry."""
+    from backend.skill_registry_repo import disabled_slugs
+
+    blocked = disabled_slugs()
+    return [s for s in scan_skills(skills_dir) if s.skill_dir.name not in blocked]
+
+
 AGENT_SYSTEM_INSTRUCTION = """你是一个 ChatBI 数据分析助手，帮助用户用自然语言查询业务数据、管理语义别名、生成经营决策建议。
 
 ## 工作方式

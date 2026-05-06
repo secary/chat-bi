@@ -56,7 +56,8 @@ export function useChat(): UseChatReturn {
               break;
             }
             case 'text': {
-              last.content += String(event.content);
+              const nextChunk = String(event.content);
+              last.content = last.content ? `${last.content}\n\n${nextChunk}` : nextChunk;
               break;
             }
             case 'chart': {

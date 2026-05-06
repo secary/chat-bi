@@ -49,6 +49,19 @@ export function LlmConfigPage() {
   return (
     <div className="h-full overflow-auto p-6">
       <h2 className="mb-4 text-lg font-semibold text-gray-900">LLM 配置</h2>
+      <div className="mb-4 max-w-xl rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+        当前生效模型：
+        <span className="ml-1 font-medium">{view?.effective_model || '未配置'}</span>
+        <span className="ml-2 text-xs text-blue-700">
+          来源：{view?.effective_source === 'saved_settings' ? '管理页配置' : '环境变量'}
+        </span>
+        {view?.effective_api_base && (
+          <div className="mt-1 text-xs text-blue-800">API Base：{view.effective_api_base}</div>
+        )}
+        <div className="mt-1 text-xs text-blue-800">
+          API Key：{view?.effective_api_key_set ? '已配置' : '未配置'}
+        </div>
+      </div>
       <p className="mb-4 max-w-xl text-sm text-gray-600">
         此处保存的配置会覆盖进程环境变量中的 `LLM_MODEL` / `API_BASE` / `OPENAI_API_KEY`（非空字段）。
         {view?.updated_at ? ` 最近更新：${String(view.updated_at)}` : ''}

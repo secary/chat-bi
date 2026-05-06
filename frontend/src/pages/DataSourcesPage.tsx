@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import type { DbConnectionRow } from '../types/admin';
+import type { CurrentDbConnectionView, DbConnectionRow } from '../types/admin';
 import {
   createDbConnectionApi,
   deleteDbConnectionApi,
+  getCurrentDbConnection,
   listDbConnections,
   testDbConnectionApi,
   updateDbConnectionApi,
@@ -11,6 +12,7 @@ import { logger } from '../lib/logger';
 
 export function DataSourcesPage() {
   const [rows, setRows] = useState<DbConnectionRow[]>([]);
+  const [current, setCurrent] = useState<CurrentDbConnectionView | null>(null);
   const [editing, setEditing] = useState<number | null>(null);
   const [form, setForm] = useState({
     name: '',
@@ -24,7 +26,12 @@ export function DataSourcesPage() {
 
   const refresh = async () => {
     try {
-      setRows(await listDbConnections());
+      const [list, currentView] = await Promise.all([
+        listDbConnections(),
+        getCurrentDbConnection(),
+      ]);
+      setRows(list);
+      setCurrent(currentView);
     } catch (e) {
       logger.error('db connections', e);
     }
@@ -34,8 +41,14 @@ export function DataSourcesPage() {
     let cancelled = false;
     void (async () => {
       try {
-        const list = await listDbConnections();
-        if (!cancelled) setRows(list);
+        const [list, currentView] = await Promise.all([
+          listDbConnections(),
+          getCurrentDbConnection(),
+        ]);
+        if (!cancelled) {
+          setRows(list);
+          setCurrent(currentView);
+        }
       } catch (e) {
         logger.error('db connections', e);
       }
@@ -126,6 +139,17 @@ export function DataSourcesPage() {
   return (
     <div className="h-full overflow-auto p-6">
       <h2 className="mb-4 text-lg font-semibold text-gray-900">数据源管理</h2>
+      {current && (
+        <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+          当前使用中：
+          <span className="ml-1 font-medium">
+            {current.name}（{current.host}:{current.port}/{current.database_name}）
+          </span>
+          <span className="ml-2 text-xs text-blue-700">
+            来源：{current.source === 'saved_default' ? '管理页默认连接' : '环境变量'}
+          </span>
+        </div>
+      )}
 
       <div className="mb-6 rounded-lg border border-gray-200 bg-white p-4">
         <p className="mb-3 text-sm font-medium text-gray-700">
@@ -240,7 +264,10 @@ export function DataSourcesPage() {
                 {r.host}:{r.port}
               </td>
               <td className="p-2">{r.database_name}</td>
-              <td className="p-2">{r.is_default ? '是' : ''}</td>
+              <td className="p-2">
+                {r.is_default ? '是' : ''}
+                {current?.id === r.id ? '（当前）' : ''}
+              </td>
               <td className="space-x-2 p-2">
                 <button
                   type="button"

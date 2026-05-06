@@ -1,5 +1,11 @@
 import type { ChatRequest, SseEvent, UploadedFile } from '../types/message';
-import type { AdminSkillRow, DbConnectionRow, LlmSettingsView, SessionRow } from '../types/admin';
+import type {
+  AdminSkillRow,
+  CurrentDbConnectionView,
+  DbConnectionRow,
+  LlmSettingsView,
+  SessionRow,
+} from '../types/admin';
 
 export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 const CHAT_URL = `${API_BASE_URL}/chat`;
@@ -162,6 +168,10 @@ export async function deleteSkillApi(slug: string): Promise<void> {
 
 export async function listDbConnections(): Promise<DbConnectionRow[]> {
   return requestJson<DbConnectionRow[]>('/admin/db-connections');
+}
+
+export async function getCurrentDbConnection(): Promise<CurrentDbConnectionView> {
+  return requestJson<CurrentDbConnectionView>('/admin/db-connections/current');
 }
 
 export async function createDbConnectionApi(payload: {

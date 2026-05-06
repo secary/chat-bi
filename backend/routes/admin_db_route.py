@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from backend.connection_repo import (
     delete_connection,
+    effective_connection_view,
     get_connection,
     insert_connection,
     list_connections,
@@ -42,6 +43,11 @@ class DbConnectionUpdate(BaseModel):
 @router.get("/db-connections")
 def list_db_connections() -> List[dict]:
     return list_connections()
+
+
+@router.get("/db-connections/current")
+def get_current_db_connection() -> dict:
+    return effective_connection_view()
 
 
 @router.post("/db-connections")

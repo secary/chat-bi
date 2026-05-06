@@ -98,42 +98,42 @@ export function useChat(
           traceId,
         )) {
           setMessages((prev) => {
-            const updated = [...prev];
-            const last = updated[updated.length - 1];
-            if (last?.role !== 'assistant') return updated;
+            const idx = prev.length - 1;
+            const last = prev[idx];
+            if (!last || last.role !== 'assistant') return prev;
 
+            const nextLast: ChatMessage = { ...last };
             switch (event.type) {
-              case 'thinking': {
-                last.thinking = [...(last.thinking || []), String(event.content)];
+              case 'thinking':
+                nextLast.thinking = [...(last.thinking || []), String(event.content)];
                 break;
-              }
-              case 'text': {
-                last.content += String(event.content);
+              case 'text':
+                nextLast.content = `${last.content}${String(event.content)}`;
                 break;
-              }
-              case 'chart': {
-                last.chart = event.content as Record<string, unknown>;
+              case 'chart':
+                nextLast.chart = event.content as Record<string, unknown>;
                 break;
-              }
-              case 'kpi_cards': {
-                last.kpiCards = event.content as typeof last.kpiCards;
+              case 'kpi_cards':
+                nextLast.kpiCards = event.content as typeof last.kpiCards;
                 break;
-              }
-              case 'error': {
-                last.error = String(event.content);
+              case 'error':
+                nextLast.error = String(event.content);
                 break;
-              }
+              default:
+                return prev;
             }
-            return updated;
+
+            return [...prev.slice(0, idx), nextLast];
           });
         }
       } catch (err) {
         logger.error('stream chat', err);
         setMessages((prev) => {
-          const updated = [...prev];
-          const last = updated[updated.length - 1];
-          if (last?.role === 'assistant') last.error = String(err);
-          return updated;
+          const idx = prev.length - 1;
+          const last = prev[idx];
+          if (!last || last.role !== 'assistant') return prev;
+          const nextLast: ChatMessage = { ...last, error: String(err) };
+          return [...prev.slice(0, idx), nextLast];
         });
       } finally {
         setLoading(false);

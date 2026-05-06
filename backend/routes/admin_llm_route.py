@@ -7,6 +7,7 @@ from typing import Optional
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
+from backend.app_llm import effective_llm_params
 from backend import llm_settings_repo
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -20,7 +21,14 @@ class LlmSettingsPut(BaseModel):
 
 @router.get("/llm-settings")
 def get_llm_settings() -> dict:
-    return llm_settings_repo.public_view(llm_settings_repo.get_row())
+    row = llm_settings_repo.get_row()
+    view = llm_settings_repo.public_view(row)
+    effective = effective_llm_params()
+    view["effective_model"] = effective.get("model")
+    view["effective_api_base"] = effective.get("api_base")
+    view["effective_api_key_set"] = bool(effective.get("api_key"))
+    view["effective_source"] = "saved_settings" if row else "env"
+    return view
 
 
 @router.put("/llm-settings")
@@ -31,4 +39,11 @@ def put_llm_settings(body: LlmSettingsPut) -> dict:
         api_base=data.get("api_base"),
         api_key=data.get("api_key"),
     )
-    return llm_settings_repo.public_view(llm_settings_repo.get_row())
+    row = llm_settings_repo.get_row()
+    view = llm_settings_repo.public_view(row)
+    effective = effective_llm_params()
+    view["effective_model"] = effective.get("model")
+    view["effective_api_base"] = effective.get("api_base")
+    view["effective_api_key_set"] = bool(effective.get("api_key"))
+    view["effective_source"] = "saved_settings" if row else "env"
+    return view

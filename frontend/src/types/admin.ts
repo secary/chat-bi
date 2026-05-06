@@ -23,9 +23,24 @@ export interface DbConnectionRow {
   created_at: string;
 }
 
+export interface CurrentDbConnectionView {
+  source: 'saved_default' | 'env';
+  id: number | null;
+  name: string;
+  host: string;
+  port: number;
+  username: string;
+  database_name: string;
+  is_default: boolean;
+}
+
 export interface LlmSettingsView {
   model: string | null;
   api_base: string | null;
   api_key_set: boolean;
   updated_at: string | null;
+  effective_model?: string | null;
+  effective_api_base?: string | null;
+  effective_api_key_set?: boolean;
+  effective_source?: 'saved_settings' | 'env';
 }

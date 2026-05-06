@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from time import perf_counter
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
@@ -59,6 +60,11 @@ def _assistant_payload(acc: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
+def _session_title_from_message(message: str) -> str:
+    collapsed = re.sub(r"\s+", " ", message).strip()
+    return (collapsed[:80] or "新对话")
+
+
 @router.post("/chat")
 async def chat(req: ChatRequest, request: Request):
     trace_id = request_trace_id(request)
@@ -76,11 +82,7 @@ async def chat(req: ChatRequest, request: Request):
         persist_sid = req.session_id
         try:
             insert_message(persist_sid, "user", req.message)
-            if not prior and (sess.get("title") == "新对话" or sess.get("title") == ""):
-                update_session_title(
-                    persist_sid,
-                    (req.message.strip()[:80] or "新对话"),
-                )
+            update_session_title(persist_sid, _session_title_from_message(req.message))
         except Exception as exc:
             log_event(
                 trace_id,

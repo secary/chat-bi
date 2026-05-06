@@ -65,11 +65,11 @@ export function ChatInput({ onSend, loading, disabled = false }: ChatInputProps)
         setDragging(false);
         handleFiles(e.dataTransfer.files);
       }}
-      className={`border-t p-4 transition ${
-        dragging ? 'border-blue-300 bg-blue-50' : 'border-gray-200 bg-white'
+      className={`rounded-2xl border p-4 shadow-sm transition ${
+        dragging ? 'border-blue-300 bg-blue-50/80' : 'border-gray-200 bg-white'
       }`}
     >
-      <div className="flex gap-2">
+      <div className="flex items-center gap-2">
         <input
           ref={fileInputRef}
           type="file"
@@ -84,7 +84,7 @@ export function ChatInput({ onSend, loading, disabled = false }: ChatInputProps)
           type="button"
           disabled={loading || uploading || disabled}
           onClick={() => fileInputRef.current?.click()}
-          className="h-10 shrink-0 rounded-md border border-gray-300 px-3 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400"
+          className="h-11 shrink-0 rounded-full border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400"
           title="上传 CSV 或 Excel"
         >
           {uploading ? '上传中' : '附件'}
@@ -96,12 +96,12 @@ export function ChatInput({ onSend, loading, disabled = false }: ChatInputProps)
           onChange={(e) => setMessage(e.target.value)}
           placeholder="输入业务问题，或拖入 CSV/Excel..."
           disabled={loading || uploading || disabled}
-          className="h-10 min-w-0 flex-1 rounded-md border border-gray-300 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+          className="h-11 min-w-0 flex-1 rounded-full border border-gray-300 bg-white px-5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
         />
         <button
           type="submit"
           disabled={loading || uploading || !message.trim() || disabled}
-          className="h-10 shrink-0 rounded-md bg-blue-600 px-5 text-sm font-medium text-white hover:bg-blue-700 disabled:bg-gray-400"
+          className="h-11 shrink-0 rounded-full bg-blue-600 px-6 text-sm font-medium text-white hover:bg-blue-700 disabled:bg-gray-400"
         >
           {loading ? '处理中' : '发送'}
         </button>

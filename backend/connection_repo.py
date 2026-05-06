@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
+from backend.config import settings
 from backend.db_mysql import app_connection, execute, fetch_all, fetch_one
 
 
@@ -63,6 +64,32 @@ def resolve_skill_db_env(
     if row:
         return skill_env_from_row(row)
     return None
+
+
+def effective_connection_view() -> Dict[str, Any]:
+    """Active DB connection used by Skill scripts: default row first, then env."""
+    row = get_default_connection()
+    if row:
+        return {
+            "source": "saved_default",
+            "id": row.get("id"),
+            "name": row.get("name"),
+            "host": row.get("host"),
+            "port": int(row.get("port") or 3306),
+            "username": row.get("username"),
+            "database_name": row.get("database_name"),
+            "is_default": bool(row.get("is_default")),
+        }
+    return {
+        "source": "env",
+        "id": None,
+        "name": "环境变量默认连接",
+        "host": settings.db_host,
+        "port": int(settings.db_port),
+        "username": settings.db_user,
+        "database_name": settings.db_name,
+        "is_default": False,
+    }
 
 
 def insert_connection(

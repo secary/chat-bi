@@ -58,6 +58,10 @@ flowchart TD
 - 渲染模块禁止修改数据库。
 - LLM 禁止替代确定性脚本计算指标事实。
 
+## Agent 运行时与演进说明
+- 当前行为验收（单次 LLM 规划、单次 Skill 执行）：[`docs/design/agent-runtime-acceptance.md`](../design/agent-runtime-acceptance.md)。
+- 若需多步 ReAct（`max_steps`、Observation、SSE 衔接）：[`docs/design/agent-react-evolution.md`](../design/agent-react-evolution.md)。
+
 ## 关键技术决策
 - 使用 `SKILL.md + scripts/` 管理业务能力：Agent 负责选择能力，确定性脚本负责查询、别名写入和规则建议。
 - Skill 脚本的 `--json` 输出统一为 SkillResult：`kind`、`text`、`data`、`charts`、`kpis`。

@@ -42,6 +42,7 @@ class Scope:
     customer_conditions: List[str]
     labels: List[str]
     has_sales_only_filter: bool
+    focus_dimensions: List[str]
 
 
 def decimal_value(row: Dict[str, str], key: str) -> Decimal:
@@ -108,11 +109,29 @@ def load_distinct_values(db: MysqlCli, table: str, fields: Iterable[str]) -> Dic
     return values
 
 
+def parse_focus_dimensions(question: str) -> List[str]:
+    patterns = {
+        "区域": ["区域", "大区", "地区", "片区", "市场"],
+        "渠道": ["渠道", "成交渠道", "获客渠道", "销售渠道", "来源渠道"],
+        "产品类别": ["产品类别", "产品线", "品类", "业务线", "产品分类", "产品类型"],
+        "产品名称": ["产品名称", "产品名", "具体产品", "服务名称"],
+        "部门": ["部门", "团队", "组织", "业务部门"],
+        "客户类型": ["客户类型", "客户类别", "客户分层", "客群"],
+        "月份": ["月份", "时间", "按月", "月度", "趋势"],
+    }
+    matched: List[str] = []
+    for dim_name, words in patterns.items():
+        if any(word in question for word in words):
+            matched.append(dim_name)
+    return matched
+
+
 def build_scope(db: MysqlCli, question: str) -> Scope:
     sales_conditions, customer_conditions, labels = parse_time_conditions(question)
     dimension_names = {"区域", "部门", "产品类别", "产品名称", "渠道", "客户类型", "时间", "月份"}
     sales_only_dims = {"部门", "产品类别", "产品名称", "渠道"}
     has_sales_only_filter = False
+    focus_dimensions = parse_focus_dimensions(question)
 
     sales_fields = {
         "region": "区域",
@@ -152,7 +171,24 @@ def build_scope(db: MysqlCli, question: str) -> Scope:
         customer_conditions=list(dict.fromkeys(customer_conditions)),
         labels=list(dict.fromkeys(labels)),
         has_sales_only_filter=has_sales_only_filter,
+        focus_dimensions=list(dict.fromkeys(focus_dimensions)),
     )
+
+
+def focus_enabled(scope: Dict[str, object], dimension_name: str) -> bool:
+    focus_dimensions = scope.get("focus_dimensions", []) if isinstance(scope, dict) else []
+    if not focus_dimensions:
+        return True
+    if dimension_name == "客户运营":
+        return any(name in focus_dimensions for name in ["客户类型", "区域", "月份"])
+    if dimension_name == "销售趋势":
+        return "月份" in focus_dimensions
+    mapping = {
+        "区域经营": "区域",
+        "渠道策略": "渠道",
+        "产品组合": "产品类别",
+    }
+    return mapping.get(dimension_name) in focus_dimensions
 
 
 def where_clause(conditions: Sequence[str]) -> str:
@@ -264,6 +300,7 @@ def build_advices(facts: Dict[str, object]) -> List[Advice]:
     channels = facts["channels"]
     products = facts["products"]
     retention = facts["retention"]
+    scope = facts.get("scope", {})
 
     advices: List[Advice] = []
     achievement = decimal_value(overview, "target_achievement_rate")
@@ -298,7 +335,7 @@ def build_advices(facts: Dict[str, object]) -> List[Advice]:
             )
         )
 
-    if months:
+    if months and focus_enabled(scope, "销售趋势"):
         first = decimal_value(months[0], "sales")
         last = decimal_value(months[-1], "sales")
         if first and last > first:
@@ -317,7 +354,7 @@ def build_advices(facts: Dict[str, object]) -> List[Advice]:
                 )
             )
 
-    if regions:
+    if regions and focus_enabled(scope, "区域经营"):
         top_region = regions[0]
         bottom_region = sorted(regions, key=lambda row: decimal_value(row, "target_achievement_rate"))[0]
         advices.append(
@@ -337,7 +374,7 @@ def build_advices(facts: Dict[str, object]) -> List[Advice]:
             )
         )
 
-    if channels:
+    if channels and focus_enabled(scope, "渠道策略"):
         top_channel = channels[0]
         low_margin_channel = sorted(channels, key=lambda row: decimal_value(row, "gross_margin_rate"))[0]
         advices.append(
@@ -357,7 +394,7 @@ def build_advices(facts: Dict[str, object]) -> List[Advice]:
             )
         )
 
-    if products:
+    if products and focus_enabled(scope, "产品组合"):
         top_product = products[0]
         low_margin_product = sorted(products, key=lambda row: decimal_value(row, "gross_margin_rate"))[0]
         advices.append(
@@ -377,7 +414,7 @@ def build_advices(facts: Dict[str, object]) -> List[Advice]:
             )
         )
 
-    if retention:
+    if retention and focus_enabled(scope, "客户运营"):
         latest = retention[-1]
         retention_rate = decimal_value(latest, "retention_rate")
         churned = decimal_value(latest, "churned_customers")

@@ -30,6 +30,7 @@ export function useChat(
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const messagesRef = useRef(messages);
+  const streamingRef = useRef(false);
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -62,7 +63,10 @@ export function useChat(
 
   const sendMessage = useCallback(
     async (text: string, traceId?: string) => {
-      if (!text.trim() || loading || sessionId == null) return;
+      if (!text.trim() || loading || streamingRef.current || sessionId == null) {
+        return;
+      }
+      streamingRef.current = true;
 
       const userMsg: ChatMessage = {
         id: String(nextId++),
@@ -108,7 +112,9 @@ export function useChat(
                 nextLast.thinking = [...(last.thinking || []), String(event.content)];
                 break;
               case 'text':
-                nextLast.content = `${last.content}${String(event.content)}`;
+                nextLast.content = last.content
+                  ? `${last.content}\n\n${String(event.content)}`
+                  : String(event.content);
                 break;
               case 'chart':
                 nextLast.chart = event.content as Record<string, unknown>;
@@ -136,6 +142,7 @@ export function useChat(
           return [...prev.slice(0, idx), nextLast];
         });
       } finally {
+        streamingRef.current = false;
         setLoading(false);
       }
     },

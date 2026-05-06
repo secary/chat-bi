@@ -92,9 +92,11 @@ def _get_value(row: Dict[str, str], key: str) -> str:
     return row.get(key, row.get(key.replace("_", ""), ""))
 
 
-def _parse_num(value: str) -> float:
+def _parse_num(value: object) -> float:
+    if isinstance(value, (int, float)):
+        return float(value)
     try:
-        return float(value.replace(",", "").replace("%", ""))
+        return float(str(value).replace(",", "").replace("%", ""))
     except (ValueError, AttributeError):
         return 0.0
 

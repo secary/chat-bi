@@ -1,6 +1,7 @@
 database/mysql-data
 database/mysql-data-*
 .vscode
+*.code-workspace
 .cursor
 .cli
 .claude
@@ -12,8 +13,8 @@ output
 .venv
 .envrc
 .env
-env.dev
-.env.*
+.env.dev
+.env.*·
 !.env.example
 *.session.sql
 *.html
@@ -23,6 +24,8 @@ env.dev
 *.zip
 *.xlsx
 
+
+tests/
 *.jpg
 *.jpeg
 *.png

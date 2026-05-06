@@ -17,6 +17,9 @@ export function AppLayout() {
           <NavLink to="/" end className={linkCls}>
             对话
           </NavLink>
+          <NavLink to="/dashboard" className={linkCls}>
+            仪表盘
+          </NavLink>
           <NavLink to="/skills" className={linkCls}>
             技能管理
           </NavLink>

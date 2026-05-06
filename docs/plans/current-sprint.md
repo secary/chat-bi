@@ -83,6 +83,15 @@
 - 涉及文件：`backend/routes/*`、`backend/session_repo.py`、`backend/db_mysql.py`、`frontend/src/pages/*`、`database/init.sql`
 - 复杂度：高
 
+### 任务 9：数据仪表盘
+- 状态：✅ 已完成
+- 验收标准：
+  - [x] `GET /dashboard/overview` 基于生效业务库（与 Skill 相同的连接解析）只读聚合 `sales_order`、`customer_profile` 及语义层表行数
+  - [x] 前端左侧导航「仪表盘」，路由 `/dashboard`：KPI 卡片、区域饼图、按月柱状图、客户活跃度柱状图、语义层资产列表；Vite 代理 `/dashboard`
+  - [x] `tests/test_dashboard_overview.py`、`frontend` Vitest `dashboardCharts.test.ts`
+- 涉及文件：`backend/business_db.py`、`backend/dashboard_overview.py`、`backend/routes/dashboard_route.py`、`frontend/src/pages/DashboardPage.tsx`、`frontend/src/lib/dashboardCharts.ts`、`frontend/vitest.config.ts`
+- 复杂度：中
+
 ## Gap 追踪（每次执行后更新）
 | 轮次 | 完成内容 | 发现问题 | 下一步 |
 |------|---------|---------|-------|
@@ -126,3 +135,4 @@
 | 37 | 新增“当前使用中”展示：`/admin/db-connections/current` 返回当前生效数据库连接（默认连接优先，缺省回退 env），`/admin/llm-settings` 增加 `effective_*` 字段；前端数据源页与 LLM 页顶部展示当前生效配置 | 当前仅展示“技能脚本使用”的数据库来源与“LiteLLM 实际参数来源”，未按会话级 `db_connection_id` 做实时覆盖展示 | 刷新管理页验证：数据源页显示当前连接摘要，LLM 页显示当前生效模型/API Base/API Key 状态 |
 | 38 | 会话标题改为随聊天内容动态更新：`POST /chat` 在落库用户消息后，每轮都按最新问题生成并写入 `chat_session.title`（空白折叠、去换行、80 字截断） | 若用户希望“手工重命名后不再自动覆盖”，当前逻辑尚未区分该场景 | 发送多轮消息并观察左侧会话列表，标题应始终跟随最近一次用户输入 |
 | 39 | 聊天输入区视觉优化：`ChatInput` 改为更圆润风格（外层 `rounded-2xl`，按钮与输入框 `rounded-full`，统一高度与留白）以匹配整体页面气质 | 当前仅调整输入区组件样式，未改全局色板与阴影体系 | 刷新聊天页确认输入区不再“方块感”，交互功能保持不变 |
+| 40 | 新增数据仪表盘页与 `GET /dashboard/overview`：业务库只读连接、`semantic_counts` 容错、`DashboardPage` + ECharts 饼图/柱状图、Vitest 与 pytest | 仪表盘未按会话级 `db_connection_id` 切换数据源（与任务 8 管理页一致使用生效默认连接） | 启动后端后访问 `/dashboard` 验证图表与 KPI；若需会话级数据源再迭代 API |

@@ -13,6 +13,8 @@ export default defineConfig({
       '/chat': proxyTarget,
       '/health': proxyTarget,
       '/upload': proxyTarget,
+      '/sessions': proxyTarget,
+      '/admin': proxyTarget,
     },
   },
 })

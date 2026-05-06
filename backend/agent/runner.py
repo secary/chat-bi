@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from typing import Any, AsyncGenerator, Dict, List
+from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from backend.agent.executor import find_skill, run_script, skill_args_for_execution
 from backend.agent.formatter import stream_result_events
 from backend.agent.planner import call_llm_for_plan
-from backend.agent.prompt_builder import build_system_prompt, scan_skills
+from backend.agent.prompt_builder import build_system_prompt, scan_skills_enabled
 from backend.agent.react_runner import stream_chat_react
 from backend.config import settings
 from backend.trace import log_event
@@ -14,20 +14,26 @@ from backend.trace import log_event
 async def stream_chat(
     messages: List[Dict[str, str]],
     trace_id: str = "",
+    skill_db_overrides: Optional[Dict[str, str]] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """Agent loop: ReAct multi-step (default) or legacy single plan + one Skill."""
     if settings.agent_react:
-        async for event in stream_chat_react(messages, trace_id=trace_id):
+        async for event in stream_chat_react(
+            messages, trace_id=trace_id, skill_db_overrides=skill_db_overrides
+        ):
             yield event
         return
 
-    async for event in _stream_chat_legacy(messages, trace_id=trace_id):
+    async for event in _stream_chat_legacy(
+        messages, trace_id=trace_id, skill_db_overrides=skill_db_overrides
+    ):
         yield event
 
 
 async def _stream_chat_legacy(
     messages: List[Dict[str, str]],
     trace_id: str = "",
+    skill_db_overrides: Optional[Dict[str, str]] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """Single LLM JSON plan and at most one Skill execution."""
     log_event(
@@ -36,7 +42,7 @@ async def _stream_chat_legacy(
         "started",
         payload={"message_count": len(messages), "mode": "legacy"},
     )
-    skills = scan_skills(settings.skills_dir)
+    skills = scan_skills_enabled(settings.skills_dir)
     system_prompt = build_system_prompt(skills)
 
     yield {"type": "thinking", "content": "正在分析您的问题，理解业务语义..."}
@@ -86,7 +92,9 @@ async def _stream_chat_legacy(
             "started",
             payload={"skill": skill_name, "args": args},
         )
-        result = run_script(skill_doc, args, trace_id=trace_id)
+        result = run_script(
+            skill_doc, args, trace_id=trace_id, skill_db_overrides=skill_db_overrides
+        )
         log_event(
             trace_id,
             "agent.skill",

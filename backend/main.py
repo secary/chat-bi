@@ -1,19 +1,21 @@
 from __future__ import annotations
 
-import json
 import re
 import uuid
 from pathlib import Path
 from time import perf_counter
-from typing import AsyncGenerator, List
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from sse_starlette.sse import EventSourceResponse
 
-from backend.agent.runner import stream_chat
+from backend.http_utils import request_trace_id
+from backend.routes.admin_db_route import router as admin_db_router
+from backend.routes.admin_llm_route import router as admin_llm_router
+from backend.routes.admin_skills_route import router as admin_skills_router
+from backend.routes.chat_route import router as chat_router
+from backend.routes.sessions_route import router as sessions_router
 from backend.trace import log_event
 
 load_dotenv()
@@ -29,10 +31,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-class ChatRequest(BaseModel):
-    message: str
-    history: List[dict] = []
+app.include_router(chat_router)
+app.include_router(sessions_router)
+app.include_router(admin_llm_router)
+app.include_router(admin_db_router)
+app.include_router(admin_skills_router)
 
 
 class UploadResult(BaseModel):
@@ -45,13 +48,6 @@ class UploadResult(BaseModel):
 @app.get("/health")
 async def health():
     return {"status": "ok"}
-
-
-def request_trace_id(request: Request) -> str:
-    incoming = request.headers.get("x-trace-id", "").strip()
-    if incoming and re.fullmatch(r"[0-9A-Za-z._:-]{8,64}", incoming):
-        return incoming
-    return uuid.uuid4().hex
 
 
 @app.post("/upload")
@@ -92,7 +88,9 @@ async def upload(request: Request, file: UploadFile = File(...)):
 
     if size == 0:
         target.unlink(missing_ok=True)
-        log_event(trace_id, "http.upload", "request.rejected", "empty file", level="WARN")
+        log_event(
+            trace_id, "http.upload", "request.rejected", "empty file", level="WARN"
+        )
         raise HTTPException(status_code=400, detail="上传文件为空")
 
     log_event(
@@ -111,54 +109,3 @@ async def upload(request: Request, file: UploadFile = File(...)):
         size=size,
         trace_id=trace_id,
     )
-
-
-@app.post("/chat")
-async def chat(req: ChatRequest, request: Request):
-    trace_id = request_trace_id(request)
-    messages = [
-        *req.history,
-        {"role": "user", "content": req.message},
-    ]
-    log_event(
-        trace_id,
-        "http.chat",
-        "request.started",
-        payload={"message_length": len(req.message), "history_count": len(req.history)},
-    )
-
-    async def event_gen() -> AsyncGenerator[dict, None]:
-        started_at = perf_counter()
-        try:
-            async for event in stream_chat(messages, trace_id=trace_id):
-                if await request.is_disconnected():
-                    log_event(trace_id, "http.chat", "request.disconnected", level="WARN")
-                    break
-                log_event(
-                    trace_id,
-                    "http.chat",
-                    "sse.event",
-                    payload={"type": event.get("type")},
-                )
-                yield {
-                    "event": "message",
-                    "data": json.dumps(event, ensure_ascii=False),
-                }
-            log_event(
-                trace_id,
-                "http.chat",
-                "request.completed",
-                payload={"elapsed_ms": round((perf_counter() - started_at) * 1000, 2)},
-            )
-        except Exception as exc:
-            log_event(trace_id, "http.chat", "request.failed", str(exc), level="ERROR")
-            yield {
-                "event": "message",
-                "data": json.dumps({"type": "error", "content": str(exc)}, ensure_ascii=False),
-            }
-            yield {
-                "event": "message",
-                "data": json.dumps({"type": "done", "content": None}, ensure_ascii=False),
-            }
-
-    return EventSourceResponse(event_gen(), headers={"X-Trace-Id": trace_id})

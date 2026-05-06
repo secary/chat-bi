@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -56,8 +57,11 @@ class FileIngestionSkillTest(unittest.TestCase):
                 [sys.executable, str(SCRIPT), str(path), "--json", "--include-rows"],
                 cwd=ROOT,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 capture_output=True,
                 check=False,
+                env={**os.environ, "PYTHONIOENCODING": "utf-8"},
             )
 
         self.assertEqual(proc.returncode, 0, proc.stderr)
@@ -96,8 +100,11 @@ class FileIngestionSkillTest(unittest.TestCase):
                 [sys.executable, str(SCRIPT), str(path), "--json"],
                 cwd=ROOT,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 capture_output=True,
                 check=False,
+                env={**os.environ, "PYTHONIOENCODING": "utf-8"},
             )
 
         self.assertEqual(proc.returncode, 0, proc.stderr)
@@ -110,5 +117,3 @@ class FileIngestionSkillTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
-

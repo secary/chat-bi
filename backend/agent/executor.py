@@ -36,7 +36,12 @@ def latest_user_content(messages: List[Dict[str, str]]) -> str:
     return ""
 
 
-def run_script(skill: SkillDoc, args: List[str], trace_id: str = "") -> Dict[str, Any]:
+def run_script(
+    skill: SkillDoc,
+    args: List[str],
+    trace_id: str = "",
+    skill_db_overrides: Optional[Dict[str, str]] = None,
+) -> Dict[str, Any]:
     script_dir = skill.skill_dir / "scripts"
     if not script_dir.is_dir():
         raise RuntimeError(f"脚本目录不存在：{script_dir}")
@@ -52,7 +57,7 @@ def run_script(skill: SkillDoc, args: List[str], trace_id: str = "") -> Dict[str
         capture_output=True,
         text=True,
         timeout=60,
-        env={**os.environ, **skill_env(trace_id)},
+        env={**os.environ, **skill_env(trace_id, skill_db_overrides)},
     )
 
     if proc.returncode != 0:
@@ -68,9 +73,12 @@ def run_script(skill: SkillDoc, args: List[str], trace_id: str = "") -> Dict[str
         return {"kind": "text", "text": output, "data": {}}
 
 
-def skill_env(trace_id: str = "") -> Dict[str, str]:
+def skill_env(
+    trace_id: str = "",
+    db_overrides: Optional[Dict[str, str]] = None,
+) -> Dict[str, str]:
     venv_bin = str(settings.project_root / ".venv" / "Scripts")
-    return {
+    base = {
         "CHATBI_DB_HOST": settings.db_host,
         "CHATBI_DB_PORT": settings.db_port,
         "CHATBI_DB_USER": settings.db_user,
@@ -80,3 +88,6 @@ def skill_env(trace_id: str = "") -> Dict[str, str]:
         "PYTHONIOENCODING": "utf-8",
         "CHATBI_TRACE_ID": trace_id,
     }
+    if db_overrides:
+        base.update(db_overrides)
+    return base

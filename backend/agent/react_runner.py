@@ -7,7 +7,7 @@ from backend.agent.executor import find_skill, run_script, skill_args_for_execut
 from backend.agent.formatter import stream_result_events
 from backend.agent.observation import summarize_observation
 from backend.agent.planner import call_llm_for_react_step
-from backend.agent.prompt_builder import build_react_system_prompt, scan_skills
+from backend.agent.prompt_builder import build_react_system_prompt, scan_skills_enabled
 from backend.config import settings
 from backend.trace import log_event
 
@@ -26,6 +26,7 @@ def _merge_finish_result(
 async def stream_chat_react(
     messages: List[Dict[str, str]],
     trace_id: str = "",
+    skill_db_overrides: Optional[Dict[str, str]] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     log_event(
         trace_id,
@@ -33,7 +34,7 @@ async def stream_chat_react(
         "started",
         payload={"message_count": len(messages), "mode": "react"},
     )
-    skills = scan_skills(settings.skills_dir)
+    skills = scan_skills_enabled(settings.skills_dir)
     system_prompt = build_react_system_prompt(skills)
 
     working = [dict(m) for m in messages]
@@ -112,7 +113,12 @@ async def stream_chat_react(
                 "started",
                 payload={"skill": skill_name, "args": args},
             )
-            result = run_script(skill_doc, args, trace_id=trace_id)
+            result = run_script(
+                skill_doc,
+                args,
+                trace_id=trace_id,
+                skill_db_overrides=skill_db_overrides,
+            )
             log_event(
                 trace_id,
                 "agent.skill",

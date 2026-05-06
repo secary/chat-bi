@@ -71,6 +71,18 @@
 - 涉及文件：`backend/`、`frontend/`、`skills/`、`docs/`
 - 复杂度：高
 
+### 任务 8：会话记忆 + 管理导航（MVP）
+- 状态：✅ 已完成
+- 验收标准：
+  - [x] `chatbi_demo` 增加 `chat_session` / `chat_message` / `skill_registry` / `app_db_connection` / `llm_settings`；`database/migrations/001_app_tables.sql` 供旧库增量执行
+  - [x] `GET/POST/PATCH/DELETE /sessions` 与 `GET /sessions/{id}/messages`；`POST /chat` 支持 `session_id`、`db_connection_id`，助手回合落库
+  - [x] Skill 子进程可注入默认或指定的数据源连接；LiteLLM 使用 `llm_settings` 合并覆盖 env
+  - [x] `/admin/skills`、`/admin/db-connections`、`/admin/llm-settings` 管理接口；`scan_skills_enabled` 尊重禁用 Skill
+  - [x] 前端左侧导航：对话 / 技能 / 数据源 / LLM；对话页会话列表、切换、新对话；管理页 CRUD
+  - [x] `pytest` 19 项通过；前端 `eslint`、`npm run build` 通过
+- 涉及文件：`backend/routes/*`、`backend/session_repo.py`、`backend/db_mysql.py`、`frontend/src/pages/*`、`database/init.sql`
+- 复杂度：高
+
 ## Gap 追踪（每次执行后更新）
 | 轮次 | 完成内容 | 发现问题 | 下一步 |
 |------|---------|---------|-------|
@@ -108,3 +120,5 @@
 | 31 | 落地 ReAct runner：`react_runner` + `call_llm_for_react_step` + Observation 摘要回灌；`CHATBI_AGENT_REACT` / `CHATBI_AGENT_MAX_STEPS`；Legacy 路径保留；单测 `test_react_runner` / `test_observation` | 模型需遵守两轮 JSON（call_skill → finish）会增加一次 LLM 费用；`MAX_STEPS=1` 无法完成「工具+收尾」 | 联调时关注延迟与费用；勿将 `MAX_STEPS` 设为 1 |
 | 32 | 修复图表空渲染容错：`plan_to_option` 在 LLM `chart_plan` 缺少 `dimension/metrics` 时自动从结果列推断并正常出图；补 `tests/test_chart_renderer.py` | 若数据列顺序与业务预期不一致，自动推断的维度可能不理想（默认首列为维度） | 后续可在 planner prompt 增加字段校验，优先输出完整 `chart_plan` 并附置信度 |
 | 33 | 落地“Skill 决策，Tool 执行”图表链路：`chatbi-semantic-query` 脚本在 JSON 结果中输出 `chart_plan`（按问题语义自动选择 bar/line/pie 并给出维度与指标）；`stream_result_events` 优先使用 skill 返回的 `chart_plan` 调用 renderer；补协议单测验证优先级 | 当前 `chart_plan` 由单个语义查询技能内规则推断，尚未拆成独立 chart-planner Skill | 后续可新增 `chatbi-chart-planner` Skill 支持多轮 Observation 决策与置信度输出 |
+| 34 | 落地会话持久化与管理中心 UI：`pymysql` 访问应用表、会话 REST、`/chat` 关联会话与数据源、`executor` 注入 DB；LLM 运行时合并 `llm_settings`；前端 Router + 四页管理；`skill_registry` 缺失表时 Runner 降级；文件上传单测 Windows 编码修复 | 已有数据卷需手动执行 `database/migrations/001_app_tables.sql` 或重建卷；管理 API 无鉴权（Demo） | 任务 7 端到端联调时在浏览器验证会话切换与管理页保存 |
+| 35 | 修复 Docker 开发环境输入框不可用：前端 Vite 代理补齐 `/sessions` 与 `/admin`，并为 backend 补充 `cryptography` 依赖以兼容 MySQL8 `caching_sha2_password`；重建 backend 后 `/sessions` 经前端域名返回 200 JSON | 这是开发编排链路问题（代理 + 依赖），非前端输入组件本身逻辑缺陷 | 浏览器刷新 `http://localhost:5174`，确认输入框可聚焦并可发送消息 |

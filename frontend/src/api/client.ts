@@ -8,6 +8,7 @@ import type {
 } from '../types/admin';
 import type { AppUser, AppUserRow } from '../types/auth';
 import type { DashboardOverview } from '../types/dashboard';
+import { authEnabled } from '../lib/authFlags';
 
 export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 const CHAT_URL = `${API_BASE_URL}/chat`;
@@ -46,7 +47,11 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
     headers['Content-Type'] = 'application/json';
   }
   const res = await fetch(`${API_BASE_URL}${path}`, { ...init, headers });
-  if (res.status === 401 && !path.startsWith('/auth/login')) {
+  if (
+    authEnabled &&
+    res.status === 401 &&
+    !path.startsWith('/auth/login')
+  ) {
     setStoredToken(null);
     if (typeof window !== 'undefined' && !window.location.pathname.endsWith('/login')) {
       window.location.assign('/login');
@@ -90,9 +95,11 @@ export async function* streamChat(
   });
 
   if (response.status === 401) {
-    setStoredToken(null);
-    if (typeof window !== 'undefined' && !window.location.pathname.endsWith('/login')) {
-      window.location.assign('/login');
+    if (authEnabled) {
+      setStoredToken(null);
+      if (typeof window !== 'undefined' && !window.location.pathname.endsWith('/login')) {
+        window.location.assign('/login');
+      }
     }
     yield { type: 'error', content: '未登录或会话已过期' };
     return;
@@ -144,9 +151,11 @@ export async function uploadFile(file: File, traceId = newTraceId()): Promise<Up
   });
 
   if (response.status === 401) {
-    setStoredToken(null);
-    if (typeof window !== 'undefined' && !window.location.pathname.endsWith('/login')) {
-      window.location.assign('/login');
+    if (authEnabled) {
+      setStoredToken(null);
+      if (typeof window !== 'undefined' && !window.location.pathname.endsWith('/login')) {
+        window.location.assign('/login');
+      }
     }
     throw new Error('未登录或会话已过期');
   }

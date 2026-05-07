@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
-
 from backend.db_mysql import app_connection, app_execute, app_fetch_all, app_fetch_one
 
 

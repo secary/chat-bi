@@ -1,8 +1,13 @@
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { authEnabled } from '../lib/authFlags';
 
 export function RequireAuth() {
   const { user, ready } = useAuth();
+
+  if (!authEnabled) {
+    return <Outlet />;
+  }
 
   if (!ready) {
     return (

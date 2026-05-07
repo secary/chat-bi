@@ -22,7 +22,11 @@ def find_skill(skills: List[SkillDoc], name: str) -> Optional[SkillDoc]:
 def skill_args_for_execution(
     skill_name: str, args: List[str], messages: List[Dict[str, str]]
 ) -> List[str]:
-    if skill_name in {"chatbi-semantic-query", "chatbi-decision-advisor"}:
+    if skill_name in {
+        "chatbi-semantic-query",
+        "chatbi-decision-advisor",
+        "chatbi-semantic-processing",
+    }:
         latest_user = latest_user_content(messages)
         if latest_user:
             return [latest_user]

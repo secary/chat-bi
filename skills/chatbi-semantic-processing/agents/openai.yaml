@@ -1,0 +1,7 @@
+interface:
+  display_name: "ChatBI Semantic Processing"
+  short_description: "Normalize ambiguous banking BI questions into query intent JSON."
+  default_prompt: "Use $chatbi-semantic-processing to normalize a banking BI question into Query Intent JSON."
+
+policy:
+  allow_implicit_invocation: true

@@ -81,5 +81,11 @@ class MeResponse(BaseModel):
 
 
 @router.get("/me", response_model=MeResponse)
-def me(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
+def me(request: Request, user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
+    log_event(
+        request_trace_id(request),
+        "auth.me",
+        "viewed",
+        payload={"user_id": int(user["id"]), "username": user["username"], "role": user["role"]},
+    )
     return {"id": user["id"], "username": user["username"], "role": user["role"]}

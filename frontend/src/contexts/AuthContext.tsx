@@ -10,6 +10,7 @@ import {
 import type { AppUser } from '../types/auth';
 import { getMeApi, getStoredToken, loginApi, setStoredToken } from '../api/client';
 import { authEnabled } from '../lib/authFlags';
+import { devAuthFallbackAdmin } from '../lib/devAuthDefaults';
 
 interface AuthState {
   user: AppUser | null;
@@ -28,7 +29,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!authEnabled) {
       void getMeApi()
         .then(setUser)
-        .catch(() => setUser(null))
+        .catch(() => setUser(devAuthFallbackAdmin))
         .finally(() => setReady(true));
       return;
     }

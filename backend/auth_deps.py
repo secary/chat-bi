@@ -10,7 +10,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from backend.auth_tokens import decode_access_token
 from backend.config import settings
-from backend.user_repo import get_by_id
+from backend.user_repo import get_by_id, get_by_username
 
 _bearer = HTTPBearer(auto_error=False)
 
@@ -42,13 +42,22 @@ def _user_from_token(token: str) -> Dict[str, Any] | None:
 
 
 def _fallback_dev_user() -> Dict[str, Any]:
+    """免登录开发模式：优先使用管理员账号，便于与前端管理页一致。"""
     row = get_by_id(settings.auth_dev_user_id)
-    if not row or not row.get("is_active"):
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="开发免登录模式需要数据库中存在默认用户（见 CHATBI_AUTH_DEV_USER_ID）",
-        )
-    return _row_to_user(row)
+    if row and row.get("is_active") and str(row.get("role")) == "admin":
+        return _row_to_user(row)
+
+    admin_row = get_by_username("admin")
+    if admin_row and admin_row.get("is_active") and str(admin_row.get("role")) == "admin":
+        return _row_to_user(admin_row)
+
+    if row and row.get("is_active"):
+        return _row_to_user(row)
+
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="开发免登录模式需要数据库中存在可用用户（优先种子 admin）",
+    )
 
 
 def get_current_user(
@@ -74,6 +83,7 @@ def get_current_user(
             return user
 
     return _fallback_dev_user()
+
 
 def require_admin(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
     if user.get("role") != "admin":

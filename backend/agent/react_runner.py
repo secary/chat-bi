@@ -75,7 +75,6 @@ async def stream_chat_react(
         yield {"type": "text", "content": small_talk_reply(user_text)}
         yield {"type": "done", "content": None}
         return
-
     system_prompt = build_react_system_prompt(skills)
     if role_prompt and role_prompt.strip():
         system_prompt = role_prompt.strip() + "\n\n" + system_prompt

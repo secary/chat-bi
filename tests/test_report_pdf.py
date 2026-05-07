@@ -14,6 +14,13 @@ except ImportError:
 
 
 class ReportPdfTest(unittest.TestCase):
+    def test_select_sans_fonts_prefers_cjk(self) -> None:
+        from backend.report.pdf_chart_png import _select_sans_fonts
+
+        fonts = _select_sans_fonts({"DejaVu Sans", "Noto Sans CJK SC"})
+        self.assertEqual(fonts[0], "Noto Sans CJK SC")
+        self.assertIn("DejaVu Sans", fonts)
+
     def test_messages_to_html_document(self) -> None:
         from backend.report.pdf_report import messages_to_html_document
 

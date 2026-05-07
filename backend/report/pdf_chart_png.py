@@ -8,24 +8,39 @@ from typing import Any, Dict, List, Optional, Tuple
 
 # Headless backend before pyplot import
 import matplotlib
+from matplotlib import font_manager
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-if sys.platform == "win32":
-    plt.rcParams["font.sans-serif"] = [
+def _select_sans_fonts(installed: Optional[set[str]] = None) -> List[str]:
+    names = installed
+    if names is None:
+        names = {f.name for f in font_manager.fontManager.ttflist}
+    # Put CJK fonts before generic latin fonts to avoid tofu squares.
+    candidates = [
         "Microsoft YaHei",
         "SimHei",
         "SimSun",
+        "Noto Sans CJK SC",
+        "Noto Sans CJK JP",
+        "Noto Sans CJK TC",
+        "Source Han Sans CN",
+        "WenQuanYi Zen Hei",
         "Arial Unicode MS",
         "DejaVu Sans",
     ]
+    picked = [name for name in candidates if name in names]
+    if "DejaVu Sans" not in picked:
+        picked.append("DejaVu Sans")
+    return picked
+
+
+if sys.platform == "win32":
+    plt.rcParams["font.sans-serif"] = _select_sans_fonts()
 else:
-    plt.rcParams["font.sans-serif"] = [
-        "Noto Sans CJK SC",
-        "WenQuanYi Zen Hei",
-        "DejaVu Sans",
-    ]
+    plt.rcParams["font.sans-serif"] = _select_sans_fonts()
+plt.rcParams["font.family"] = "sans-serif"
 plt.rcParams["axes.unicode_minus"] = False
 
 

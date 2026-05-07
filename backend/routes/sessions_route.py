@@ -5,11 +5,13 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from backend.auth_deps import get_current_user
 from backend.http_utils import request_trace_id
 from backend.memory_repo import suggested_prompts_for_user
+from backend.report.pdf_report import render_session_pdf_bytes
 from backend.session_repo import (
     create_session,
     delete_session,
@@ -85,6 +87,25 @@ def get_messages(
         payload={"user_id": int(user["id"]), "session_id": session_id, "message_count": len(rows)},
     )
     return rows
+
+
+@router.get("/{session_id}/report.pdf")
+def get_session_report_pdf(
+    session_id: int, user: Dict[str, Any] = Depends(get_current_user)
+) -> Response:
+    sess = get_session_for_user(session_id, user["id"])
+    if not sess:
+        raise HTTPException(status_code=404, detail="会话不存在")
+    messages = load_messages_ui(session_id)
+    title = str(sess.get("title") or f"会话 {session_id}")
+    pdf_bytes = render_session_pdf_bytes(messages, title)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="chatbi-session-{session_id}.pdf"'
+        },
+    )
 
 
 @router.patch("/{session_id}")

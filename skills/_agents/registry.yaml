@@ -1,0 +1,24 @@
+# Multi-Agent 专线：slug 对应 skills/<name>/ 目录名；须与 skill_registry 启用状态求交集
+max_agents_per_round: 2
+agents:
+  risk:
+    label: "风控"
+    role_prompt: "你代表【风控】专线：侧重合规、异常波动、风险敞口与授信相关指标解读；调用工具时优先回答风险视角。"
+    skills:
+      - chatbi-semantic-query
+      - chatbi-decision-advisor
+  marketing:
+    label: "营销"
+    role_prompt: "你代表【营销】专线：侧重渠道、客群结构、活动效果与增长类指标；调用工具时优先回答营销视角。"
+    skills:
+      - chatbi-semantic-query
+      - chatbi-comparison
+      - chatbi-metric-explainer
+  analysis:
+    label: "分析"
+    role_prompt: "你代表【分析】专线：侧重跨维度对比、趋势拆解、环比与综合诊断；可结合上传数据做分析。"
+    skills:
+      - chatbi-semantic-query
+      - chatbi-comparison
+      - chatbi-metric-explainer
+      - chatbi-file-ingestion

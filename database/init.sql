@@ -1,9 +1,24 @@
 SET NAMES utf8mb4;
 
+CREATE DATABASE IF NOT EXISTS chatbi_demo
+  DEFAULT CHARACTER SET utf8mb4
+  DEFAULT COLLATE utf8mb4_unicode_ci;
+
+CREATE DATABASE IF NOT EXISTS chatbi_app
+  DEFAULT CHARACTER SET utf8mb4
+  DEFAULT COLLATE utf8mb4_unicode_ci;
+
+CREATE DATABASE IF NOT EXISTS chatbi_admin
+  DEFAULT CHARACTER SET utf8mb4
+  DEFAULT COLLATE utf8mb4_unicode_ci;
+
 CREATE DATABASE IF NOT EXISTS chatbi_logs
   DEFAULT CHARACTER SET utf8mb4
   DEFAULT COLLATE utf8mb4_unicode_ci;
 
+GRANT ALL PRIVILEGES ON chatbi_demo.* TO 'demo_user'@'%';
+GRANT ALL PRIVILEGES ON chatbi_app.* TO 'demo_user'@'%';
+GRANT ALL PRIVILEGES ON chatbi_admin.* TO 'demo_user'@'%';
 GRANT ALL PRIVILEGES ON chatbi_logs.* TO 'demo_user'@'%';
 
 USE chatbi_demo;
@@ -247,8 +262,10 @@ VALUES
 ('时间趋势', '时间', '维度', '时间趋势统一映射到时间维度');
 
 -- ============================================================
--- 应用表：会话、管理配置（与演示业务数据同库，便于 Demo）
+-- 应用用户表：前端登录、会话、记忆
 -- ============================================================
+
+USE chatbi_app;
 
 DROP TABLE IF EXISTS user_memory;
 DROP TABLE IF EXISTS chat_message;
@@ -310,6 +327,12 @@ CREATE TABLE user_memory (
   CONSTRAINT fk_user_memory_session FOREIGN KEY (source_session_id) REFERENCES chat_session (id) ON DELETE SET NULL,
   KEY idx_user_memory_user_kind (user_id, kind, updated_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- 应用配置表：数据源连接、LLM 配置、技能开关
+-- ============================================================
+
+USE chatbi_admin;
 
 DROP TABLE IF EXISTS skill_registry;
 

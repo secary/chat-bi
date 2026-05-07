@@ -34,6 +34,58 @@ class Settings:
     db_name: str = field(
         default_factory=lambda: os.getenv("CHATBI_DB_NAME", "chatbi_demo")
     )
+    app_db_host: str = field(
+        default_factory=lambda: os.getenv(
+            "CHATBI_APP_DB_HOST", os.getenv("CHATBI_DB_HOST", "127.0.0.1")
+        )
+    )
+    app_db_port: str = field(
+        default_factory=lambda: os.getenv(
+            "CHATBI_APP_DB_PORT", os.getenv("CHATBI_DB_PORT", "3307")
+        )
+    )
+    app_db_user: str = field(
+        default_factory=lambda: os.getenv(
+            "CHATBI_APP_DB_USER", os.getenv("CHATBI_DB_USER", "demo_user")
+        )
+    )
+    app_db_password: str = field(
+        default_factory=lambda: os.getenv(
+            "CHATBI_APP_DB_PASSWORD", os.getenv("CHATBI_DB_PASSWORD", "demo_pass")
+        )
+    )
+    app_db_name: str = field(
+        default_factory=lambda: os.getenv("CHATBI_APP_DB_NAME", "chatbi_app")
+    )
+    admin_db_host: str = field(
+        default_factory=lambda: os.getenv(
+            "CHATBI_ADMIN_DB_HOST",
+            os.getenv("CHATBI_APP_DB_HOST", os.getenv("CHATBI_DB_HOST", "127.0.0.1")),
+        )
+    )
+    admin_db_port: str = field(
+        default_factory=lambda: os.getenv(
+            "CHATBI_ADMIN_DB_PORT",
+            os.getenv("CHATBI_APP_DB_PORT", os.getenv("CHATBI_DB_PORT", "3307")),
+        )
+    )
+    admin_db_user: str = field(
+        default_factory=lambda: os.getenv(
+            "CHATBI_ADMIN_DB_USER",
+            os.getenv("CHATBI_APP_DB_USER", os.getenv("CHATBI_DB_USER", "demo_user")),
+        )
+    )
+    admin_db_password: str = field(
+        default_factory=lambda: os.getenv(
+            "CHATBI_ADMIN_DB_PASSWORD",
+            os.getenv(
+                "CHATBI_APP_DB_PASSWORD", os.getenv("CHATBI_DB_PASSWORD", "demo_pass")
+            ),
+        )
+    )
+    admin_db_name: str = field(
+        default_factory=lambda: os.getenv("CHATBI_ADMIN_DB_NAME", "chatbi_admin")
+    )
     log_db_host: str = field(
         default_factory=lambda: os.getenv(
             "CHATBI_LOG_DB_HOST", os.getenv("CHATBI_DB_HOST", "127.0.0.1")
@@ -97,6 +149,26 @@ class Settings:
             "user": self.log_db_user,
             "password": self.log_db_password,
             "database": self.log_db_name,
+        }
+
+    @property
+    def app_db_config(self) -> dict[str, str]:
+        return {
+            "host": self.app_db_host,
+            "port": self.app_db_port,
+            "user": self.app_db_user,
+            "password": self.app_db_password,
+            "database": self.app_db_name,
+        }
+
+    @property
+    def admin_db_config(self) -> dict[str, str]:
+        return {
+            "host": self.admin_db_host,
+            "port": self.admin_db_port,
+            "user": self.admin_db_user,
+            "password": self.admin_db_password,
+            "database": self.admin_db_name,
         }
 
     @property

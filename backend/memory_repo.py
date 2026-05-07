@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from backend.db_mysql import execute, fetch_all, fetch_one
+from backend.db_mysql import app_connection, app_execute, app_fetch_all, app_fetch_one
 
 
 def suggested_prompts_for_user(user_id: int, limit: int = 5) -> List[str]:
     try:
-        rows = fetch_all(
+        rows = app_fetch_all(
             "SELECT title FROM user_memory "
             "WHERE user_id = %s AND kind = 'session_summary' "
             "AND title IS NOT NULL AND TRIM(title) <> '' "
@@ -32,8 +32,6 @@ def insert_session_summary(
     title: str,
     content: str,
 ) -> int:
-    from backend.db_mysql import app_connection
-
     with app_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -50,7 +48,7 @@ def insert_session_summary(
 
 
 def list_recent_session_summaries(user_id: int, limit: int = 5) -> List[Dict[str, Any]]:
-    return fetch_all(
+    return app_fetch_all(
         "SELECT id, title, content, source_session_id, updated_at "
         "FROM user_memory WHERE user_id = %s AND kind = 'session_summary' "
         "ORDER BY updated_at DESC LIMIT %s",
@@ -59,7 +57,7 @@ def list_recent_session_summaries(user_id: int, limit: int = 5) -> List[Dict[str
 
 
 def get_long_term_row(user_id: int) -> Optional[Dict[str, Any]]:
-    return fetch_one(
+    return app_fetch_one(
         "SELECT id, content, updated_at FROM user_memory "
         "WHERE user_id = %s AND kind = 'long_term' LIMIT 1",
         (user_id,),
@@ -69,12 +67,12 @@ def get_long_term_row(user_id: int) -> Optional[Dict[str, Any]]:
 def upsert_long_term(user_id: int, content: str) -> None:
     existing = get_long_term_row(user_id)
     if existing:
-        execute(
+        app_execute(
             "UPDATE user_memory SET content = %s WHERE id = %s",
             (content, existing["id"]),
         )
         return
-    execute(
+    app_execute(
         "INSERT INTO user_memory (user_id, kind, title, content) "
         "VALUES (%s, 'long_term', %s, %s)",
         (user_id, "用户习惯与偏好", content),
@@ -82,7 +80,7 @@ def upsert_long_term(user_id: int, content: str) -> None:
 
 
 def trim_session_summaries(user_id: int, keep: int = 30) -> None:
-    rows = fetch_all(
+    rows = app_fetch_all(
         "SELECT id FROM user_memory WHERE user_id = %s AND kind = 'session_summary' "
         "ORDER BY updated_at DESC",
         (user_id,),
@@ -90,4 +88,4 @@ def trim_session_summaries(user_id: int, keep: int = 30) -> None:
     if len(rows) <= keep:
         return
     for row in rows[keep:]:
-        execute("DELETE FROM user_memory WHERE id = %s", (int(row["id"]),))
+        app_execute("DELETE FROM user_memory WHERE id = %s", (int(row["id"]),))

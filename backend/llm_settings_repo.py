@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
-from backend.db_mysql import execute, fetch_one
+from backend.db_mysql import admin_execute, admin_fetch_one
 
 
 def get_row() -> Optional[Dict[str, Any]]:
     try:
-        return fetch_one(
+        return admin_fetch_one(
             "SELECT id, model, api_base, api_key, updated_at FROM llm_settings WHERE id = 1"
         )
     except Exception:
@@ -26,7 +26,7 @@ def save_merged(
     m = _pick(model, (row or {}).get("model"))
     b = _pick(api_base, (row or {}).get("api_base"))
     k = _pick(api_key, (row or {}).get("api_key"))
-    execute(
+    admin_execute(
         "REPLACE INTO llm_settings (id, model, api_base, api_key) VALUES (1, %s, %s, %s)",
         (_blank_to_none(m), _blank_to_none(b), _blank_to_none(k)),
     )

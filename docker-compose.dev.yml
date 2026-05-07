@@ -32,6 +32,12 @@ services:
     environment:
       CHATBI_DB_HOST: demo-mysql
       CHATBI_DB_PORT: 3306
+      CHATBI_APP_DB_HOST: demo-mysql
+      CHATBI_APP_DB_PORT: 3306
+      CHATBI_ADMIN_DB_HOST: demo-mysql
+      CHATBI_ADMIN_DB_PORT: 3306
+      CHATBI_LOG_DB_HOST: demo-mysql
+      CHATBI_LOG_DB_PORT: 3306
       CHATBI_MYSQL_CMD: mysql
       WATCHFILES_FORCE_POLLING: "true"
     ports:

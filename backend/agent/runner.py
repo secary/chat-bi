@@ -11,6 +11,7 @@ from backend.agent.executor import (
     skill_args_for_execution,
 )
 from backend.agent.formatter import stream_result_events
+from backend.agent.intent_guard import small_talk_reply, should_skip_skill_for_message
 from backend.agent.planner import call_llm_for_plan
 from backend.agent.prompt_builder import (
     SkillDoc,
@@ -40,7 +41,6 @@ _QUERY_RE = re.compile(
     r"(排行|排名|对比|趋势|汇总|查询|销售额|毛利|毛利率|目标完成率|留存率|客户数|订单数|"
     r"各区域|按区域|按月|按照.{0,10}划分|按.{0,10}划分|产品|渠道|部门|客户类型)"
 )
-
 
 def _is_query_plus_decision(messages: List[Dict[str, str]]) -> bool:
     text = latest_user_content(messages)
@@ -145,6 +145,14 @@ async def _stream_chat_legacy(
     skills = (
         skill_docs if skill_docs is not None else scan_skills_enabled(settings.skills_dir)
     )
+    user_text = latest_user_content(messages)
+    if should_skip_skill_for_message(user_text):
+        log_event(trace_id, "agent.runner", "skip_skill_small_talk")
+        _legacy_sink_write(result_sink, None, None)
+        yield {"type": "thinking", "content": "识别为简单话语，直接回复。"}
+        yield {"type": "text", "content": small_talk_reply(user_text)}
+        yield {"type": "done", "content": None}
+        return
     system_prompt = build_system_prompt(skills)
     if role_prompt and role_prompt.strip():
         system_prompt = role_prompt.strip() + "\n\n" + system_prompt

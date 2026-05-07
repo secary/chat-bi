@@ -69,6 +69,12 @@ def _session_title_from_message(message: str) -> str:
     return (collapsed[:80] or "新对话")
 
 
+def _next_disconnect_state(disconnected: bool, request_disconnected: bool) -> bool:
+    if disconnected:
+        return True
+    return request_disconnected
+
+
 @router.post("/chat")
 async def chat(
     req: ChatRequest,
@@ -128,6 +134,7 @@ async def chat(
     async def event_gen() -> AsyncGenerator[dict, None]:
         started_at = perf_counter()
         acc: Dict[str, Any] = {"content": "", "thinking": []}
+        disconnected = False
         try:
             async for event in stream_chat(
                 messages,
@@ -136,12 +143,17 @@ async def chat(
                 memory_block=memory_block or None,
                 multi_agents=req.multi_agents,
             ):
-                if await request.is_disconnected():
+                next_disconnected = _next_disconnect_state(
+                    disconnected, await request.is_disconnected()
+                )
+                if next_disconnected and not disconnected:
                     log_event(
                         trace_id, "http.chat", "request.disconnected", level="WARN"
                     )
-                    break
+                disconnected = next_disconnected
                 _accumulate_assistant(acc, event)
+                if disconnected:
+                    continue
                 log_event(
                     trace_id,
                     "http.chat",

@@ -92,6 +92,15 @@
 - 涉及文件：`backend/business_db.py`、`backend/dashboard_overview.py`、`backend/routes/dashboard_route.py`、`frontend/src/pages/DashboardPage.tsx`、`frontend/src/lib/dashboardCharts.ts`、`frontend/vitest.config.ts`
 - 复杂度：中
 
+### 任务 11：Multi-Agent、多模态与 PDF 报告
+- 状态：✅ 已完成
+- 验收标准：
+  - [x] `skills/_agents/registry.yaml` 定义风控 / 营销 / 分析与 Skill 白名单；路由 LLM 输出专线列表（上限见 registry）；顺序执行专线并按 Observation 汇总输出；`POST /chat` 支持 `multi_agents`
+  - [x] 前端「多专线协作」开关 + `localStorage`；`CHATBI_VISION_DISABLED` 可关闭图像抽取；`/upload` 支持 PNG/JPG/WebP；会话发起前对用户消息中的上传图像路径做 LiteLLM Vision 表格抽取并注入上下文
+  - [x] `GET /sessions/{id}/report.pdf` 导出服务端 PDF（WeasyPrint）；前端「导出 PDF 报告」；镜像安装 Pango/Cairo 与 Noto CJK；`tests/test_multi_agent_*`、`test_vision_extract.py`、`test_report_pdf.py`
+- 涉及文件：`backend/agent/multi_agent_*.py`、`backend/vision/`、`backend/report/pdf_report.py`、`backend/routes/sessions_route.py`、`frontend/src/pages/ChatPage.tsx`、`frontend/src/hooks/useChat.ts`、`backend/Dockerfile`、`requirements.txt`
+- 复杂度：高
+
 ### 任务 10：用户鉴权与长短期记忆（OpenClaw 风格 MVP）
 - 状态：✅ 已完成
 - 验收标准：
@@ -152,3 +161,4 @@
 | 42 | 在 PR 分支 `dev03/memoryAndFrontend` 合并 `origin/main` 并解决冲突：保留 ReAct/会话数据源覆盖、多步查询建议、SSE 不可变更新和文件导入测试；同时保留 `chatbi-comparison` 迭代记录 | 尚需本机执行 `git add`、`git commit`、`git push origin dev03/memoryAndFrontend` 完成 PR 分支更新 | 推送 PR 分支后刷新 GitHub PR，确认冲突提示消失 |
 | 43 | 完成任务 10：应用用户表 + JWT + 用户管理页 + `user_memory` 与会话归属；Agent 注入记忆块与异步摘要；旧库需执行 `002` 迁移或重建数据卷 | `tests/test_agent_workflow.py` 等仍因历史 `build_execution_steps` 导入错误无法收集；与本任务无关，需单独修复或移除过时导入 | 旧环境执行 `database/migrations/002_users_and_memory.sql`；浏览器用 admin 登录验证会话隔离与记忆 chip；可选修复失效测试文件导入 |
 | 44 | 开发环境可关闭用户登录：`CHATBI_AUTH_ENABLED` / `VITE_AUTH_ENABLED`（未设置视为开启以保护生产）；`docker-compose.dev.yml` 默认关闭；免登录时优先使用种子 `admin`（`CHATBI_AUTH_DEV_USER_ID` 为管理员时仍用该 id；否则回退到 `admin` 用户）；将 `chatbi-decision-advisor` 改为按问题中的指标/维度定向生成建议：拆分脚本为 `decision_advisor_core.py` + 轻量入口，新增 `focus_metrics` 解析，建议规则按指标与维度过滤，并补充 `test_decision_advisor_focus` 等 | 本机全量 `pytest` 仍会因 Windows 下误收集 `database/mysql-data*`、以及过时 runner 导入报错（既有问题）；同时当前本机无法连接 `127.0.0.1:3307`，未完成真实数据库场景回归 | 开发容器内需前后端开关一致并本地同步 `.env`/`env.dev` 两处变量；启动/连通本地 MySQL 后复测 `各渠道毛利率经营建议`、`华东销售额经营建议`、`客户留存经营建议`，确认建议主题随数据需求变化 |
+| 45 | 完成任务 11：Multi-Agent 编排（registry + 路由 + 专线过滤 Skill + 汇总）、图像上传与 Vision 抽取注入、`GET /sessions/{id}/report.pdf`、前端开关与 PDF 按钮；补充单测；backend Dockerfile 增加 WeasyPrint 系统依赖 | `tests/test_agent_workflow.py` 仍引用已删除符号无法收集；无 GTK 的 Windows 主机上 WeasyPrint PDF 生成会 RuntimeError，PDF 单测降级为跳过 | 重建 backend 镜像后验证 PDF；配置支持 vision 的 LLM；按需修复或移除过时 `test_agent_workflow` |

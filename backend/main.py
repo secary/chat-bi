@@ -26,7 +26,15 @@ load_dotenv()
 
 app = FastAPI(title="ChatBI API", version="0.1.0")
 UPLOAD_DIR = Path("/tmp/chatbi-uploads")
-ALLOWED_UPLOAD_SUFFIXES = {".csv", ".xlsx", ".xlsm"}
+ALLOWED_UPLOAD_SUFFIXES = {
+    ".csv",
+    ".xlsx",
+    ".xlsm",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".webp",
+}
 
 app.add_middleware(
     CORSMiddleware,
@@ -85,7 +93,10 @@ async def upload(
             {"suffix": suffix},
             "WARN",
         )
-        raise HTTPException(status_code=400, detail="仅支持 CSV 或 Excel 文件")
+        raise HTTPException(
+            status_code=400,
+            detail="不支持的文件类型（允许 CSV、Excel 或 PNG/JPG/WebP 图像）",
+        )
 
     safe_stem = re.sub(r"[^0-9A-Za-z._-]+", "_", Path(original_name).stem).strip("._")
     if not safe_stem:

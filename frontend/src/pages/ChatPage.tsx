@@ -1,10 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useChat } from '../hooks/useChat';
+import {
+  readMultiAgentsPreference,
+  useChat,
+  writeMultiAgentsPreference,
+} from '../hooks/useChat';
 import { MessageBubble } from '../components/MessageBubble';
 import { ChatInput } from '../components/ChatInput';
 import {
   createSessionApi,
   deleteSessionApi,
+  downloadSessionReportPdf,
   listSessionsApi,
 } from '../api/client';
 import type { SessionRow } from '../types/admin';
@@ -17,8 +22,18 @@ export function ChatPage() {
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [dbConnId, setDbConnId] = useState<number | null>(null);
   const [booting, setBooting] = useState(true);
+  const [multiAgents, setMultiAgents] = useState(() => readMultiAgentsPreference());
+  const [pdfExporting, setPdfExporting] = useState(false);
 
-  const { messages, loading, sendMessage } = useChat(sessionId, dbConnId);
+  const { messages, loading, sendMessage } = useChat(
+    sessionId,
+    dbConnId,
+    multiAgents,
+  );
+
+  useEffect(() => {
+    writeMultiAgentsPreference(multiAgents);
+  }, [multiAgents]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -63,6 +78,24 @@ export function ChatPage() {
       await refreshSessions();
     } catch (e) {
       logger.error('new session', e);
+    }
+  };
+
+  const exportPdf = async () => {
+    if (sessionId == null || pdfExporting) return;
+    setPdfExporting(true);
+    try {
+      const blob = await downloadSessionReportPdf(sessionId);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `chatbi-session-${sessionId}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      logger.error('export pdf', e);
+    } finally {
+      setPdfExporting(false);
     }
   };
 
@@ -127,6 +160,23 @@ export function ChatPage() {
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <header className="flex flex-wrap items-center gap-3 border-b border-gray-200 bg-white px-4 py-2">
+          <label className="flex cursor-pointer items-center gap-2 text-xs text-gray-600">
+            <input
+              type="checkbox"
+              className="rounded border-gray-300"
+              checked={multiAgents}
+              onChange={(e) => setMultiAgents(e.target.checked)}
+            />
+            多专线协作
+          </label>
+          <button
+            type="button"
+            disabled={booting || sessionId == null || pdfExporting}
+            onClick={() => void exportPdf()}
+            className="rounded-full border border-gray-300 bg-white px-3 py-1 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          >
+            {pdfExporting ? '导出中…' : '导出 PDF 报告'}
+          </button>
           <label className="flex items-center gap-2 text-xs text-gray-600">
             数据源连接 ID（可选）
             <input

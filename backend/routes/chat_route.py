@@ -24,6 +24,7 @@ from backend.session_repo import (
     update_session_title,
 )
 from backend.trace import log_event
+from backend.vision.chart_table_extract import enrich_last_user_message_with_vision
 
 router = APIRouter()
 
@@ -33,6 +34,7 @@ class ChatRequest(BaseModel):
     history: List[dict] = Field(default_factory=list)
     session_id: Optional[int] = None
     db_connection_id: Optional[int] = None
+    multi_agents: bool = False
 
 
 def _accumulate_assistant(acc: Dict[str, Any], event: Dict[str, Any]) -> None:
@@ -117,8 +119,11 @@ async def chat(
             "message_length": len(req.message),
             "history_count": len(req.history),
             "session_id": req.session_id,
+            "multi_agents": req.multi_agents,
         },
     )
+
+    messages = await enrich_last_user_message_with_vision(messages, trace_id)
 
     async def event_gen() -> AsyncGenerator[dict, None]:
         started_at = perf_counter()
@@ -129,6 +134,7 @@ async def chat(
                 trace_id=trace_id,
                 skill_db_overrides=skill_db,
                 memory_block=memory_block or None,
+                multi_agents=req.multi_agents,
             ):
                 if await request.is_disconnected():
                     log_event(

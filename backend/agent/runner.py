@@ -11,10 +11,25 @@ from backend.agent.executor import (
 )
 from backend.agent.formatter import stream_result_events
 from backend.agent.planner import call_llm_for_plan
-from backend.agent.prompt_builder import build_system_prompt, scan_skills_enabled
+from backend.agent.prompt_builder import (
+    SkillDoc,
+    build_system_prompt,
+    scan_skills_enabled,
+)
 from backend.agent.react_runner import stream_chat_react
 from backend.config import settings
 from backend.trace import log_event
+
+
+def _legacy_sink_write(
+    sink: Optional[Dict[str, Any]],
+    last_result: Optional[Dict[str, Any]],
+    last_skill_name: Optional[str],
+) -> None:
+    if sink is None:
+        return
+    sink["last_result"] = last_result
+    sink["last_skill_name"] = last_skill_name
 
 
 _DECISION_RE = re.compile(
@@ -76,8 +91,21 @@ async def stream_chat(
     trace_id: str = "",
     skill_db_overrides: Optional[Dict[str, str]] = None,
     memory_block: Optional[str] = None,
+    multi_agents: bool = False,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """Agent loop: ReAct multi-step or legacy single-plan Skill execution."""
+    if multi_agents:
+        from backend.agent.multi_agent_runner import stream_chat_multi_agent
+
+        async for event in stream_chat_multi_agent(
+            messages,
+            trace_id=trace_id,
+            skill_db_overrides=skill_db_overrides,
+            memory_block=memory_block,
+        ):
+            yield event
+        return
+
     if settings.agent_react:
         async for event in stream_chat_react(
             messages,
@@ -102,6 +130,9 @@ async def _stream_chat_legacy(
     trace_id: str = "",
     skill_db_overrides: Optional[Dict[str, str]] = None,
     memory_block: Optional[str] = None,
+    skill_docs: Optional[List[SkillDoc]] = None,
+    role_prompt: Optional[str] = None,
+    result_sink: Optional[Dict[str, Any]] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """Single LLM JSON plan with optional two-step query and advice execution."""
     log_event(
@@ -110,8 +141,12 @@ async def _stream_chat_legacy(
         "started",
         payload={"message_count": len(messages), "mode": "legacy"},
     )
-    skills = scan_skills_enabled(settings.skills_dir)
+    skills = (
+        skill_docs if skill_docs is not None else scan_skills_enabled(settings.skills_dir)
+    )
     system_prompt = build_system_prompt(skills)
+    if role_prompt and role_prompt.strip():
+        system_prompt = role_prompt.strip() + "\n\n" + system_prompt
     if memory_block and memory_block.strip():
         system_prompt = memory_block.strip() + "\n\n" + system_prompt
 
@@ -129,6 +164,7 @@ async def _stream_chat_legacy(
 
     if not plan or not plan.get("skill"):
         log_event(trace_id, "agent.runner", "no_skill")
+        _legacy_sink_write(result_sink, None, None)
         yield {"type": "thinking", "content": "正在整理回答..."}
         if plan and plan.get("text"):
             yield {"type": "text", "content": plan["text"]}
@@ -143,6 +179,7 @@ async def _stream_chat_legacy(
         }
 
     previous_result: Dict[str, Any] | None = None
+    last_skill_executed: Optional[str] = None
     for step in steps:
         skill_name = step["skill"]
         skill_doc = find_skill(skills, skill_name)
@@ -154,6 +191,7 @@ async def _stream_chat_legacy(
                 f"未找到技能：{skill_name}",
                 level="ERROR",
             )
+            _legacy_sink_write(result_sink, previous_result, last_skill_executed)
             yield {"type": "error", "content": f"未找到技能：{skill_name}"}
             yield {"type": "done", "content": None}
             return
@@ -197,6 +235,7 @@ async def _stream_chat_legacy(
                 {"skill": skill_name},
                 "ERROR",
             )
+            _legacy_sink_write(result_sink, previous_result, last_skill_executed)
             yield {"type": "error", "content": f"脚本执行失败：{exc}"}
             yield {"type": "done", "content": None}
             return
@@ -210,6 +249,42 @@ async def _stream_chat_legacy(
         async for event in stream_result_events(skill_name, step["plan"], result):
             yield event
         previous_result = result
+        last_skill_executed = skill_name
 
     log_event(trace_id, "agent.runner", "completed", payload={"mode": "legacy"})
+    _legacy_sink_write(result_sink, previous_result, last_skill_executed)
     yield {"type": "done", "content": None}
+
+
+async def stream_specialist(
+    messages: List[Dict[str, str]],
+    skill_docs: List[SkillDoc],
+    role_prompt: Optional[str] = None,
+    trace_id: str = "",
+    skill_db_overrides: Optional[Dict[str, str]] = None,
+    memory_block: Optional[str] = None,
+    result_sink: Optional[Dict[str, Any]] = None,
+) -> AsyncGenerator[Dict[str, Any], None]:
+    """One specialist pass: ReAct or Legacy with a filtered skill list."""
+    if settings.agent_react:
+        async for event in stream_chat_react(
+            messages,
+            trace_id=trace_id,
+            skill_db_overrides=skill_db_overrides,
+            memory_block=memory_block,
+            skill_docs=skill_docs,
+            role_prompt=role_prompt,
+            result_sink=result_sink,
+        ):
+            yield event
+        return
+    async for event in _stream_chat_legacy(
+        messages,
+        trace_id=trace_id,
+        skill_db_overrides=skill_db_overrides,
+        memory_block=memory_block,
+        skill_docs=skill_docs,
+        role_prompt=role_prompt,
+        result_sink=result_sink,
+    ):
+        yield event

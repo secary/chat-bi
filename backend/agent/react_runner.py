@@ -7,7 +7,11 @@ from backend.agent.executor import find_skill, run_script, skill_args_for_execut
 from backend.agent.formatter import stream_result_events
 from backend.agent.observation import summarize_observation
 from backend.agent.planner import call_llm_for_react_step
-from backend.agent.prompt_builder import build_react_system_prompt, scan_skills_enabled
+from backend.agent.prompt_builder import (
+    SkillDoc,
+    build_react_system_prompt,
+    scan_skills_enabled,
+)
 from backend.config import settings
 from backend.trace import log_event
 
@@ -23,11 +27,25 @@ def _merge_finish_result(
     return merged
 
 
+def _sink_write(
+    sink: Optional[Dict[str, Any]],
+    last_result: Optional[Dict[str, Any]],
+    last_skill_name: Optional[str],
+) -> None:
+    if sink is None:
+        return
+    sink["last_result"] = last_result
+    sink["last_skill_name"] = last_skill_name
+
+
 async def stream_chat_react(
     messages: List[Dict[str, str]],
     trace_id: str = "",
     skill_db_overrides: Optional[Dict[str, str]] = None,
     memory_block: Optional[str] = None,
+    skill_docs: Optional[List[SkillDoc]] = None,
+    role_prompt: Optional[str] = None,
+    result_sink: Optional[Dict[str, Any]] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     log_event(
         trace_id,
@@ -35,8 +53,14 @@ async def stream_chat_react(
         "started",
         payload={"message_count": len(messages), "mode": "react"},
     )
-    skills = scan_skills_enabled(settings.skills_dir)
+    skills = (
+        skill_docs
+        if skill_docs is not None
+        else scan_skills_enabled(settings.skills_dir)
+    )
     system_prompt = build_react_system_prompt(skills)
+    if role_prompt and role_prompt.strip():
+        system_prompt = role_prompt.strip() + "\n\n" + system_prompt
     if memory_block and memory_block.strip():
         system_prompt = memory_block.strip() + "\n\n" + system_prompt
 
@@ -55,6 +79,7 @@ async def stream_chat_react(
         )
         plan = await call_llm_for_react_step(system_prompt, working)
         if not plan:
+            _sink_write(result_sink, last_result, last_skill_name)
             yield {"type": "error", "content": "模型未返回有效 JSON。"}
             yield {"type": "done", "content": None}
             return
@@ -76,10 +101,12 @@ async def stream_chat_react(
                 "completed",
                 payload={"mode": "react", "steps": step + 1},
             )
+            _sink_write(result_sink, last_result, last_skill_name)
             yield {"type": "done", "content": None}
             return
 
         if action != "call_skill":
+            _sink_write(result_sink, last_result, last_skill_name)
             yield {
                 "type": "error",
                 "content": f"无法识别的 action：{plan.get('action')}",
@@ -89,12 +116,14 @@ async def stream_chat_react(
 
         skill_name = plan.get("skill")
         if not skill_name or not isinstance(skill_name, str):
+            _sink_write(result_sink, last_result, last_skill_name)
             yield {"type": "error", "content": "call_skill 缺少有效的 skill 名称。"}
             yield {"type": "done", "content": None}
             return
 
         skill_doc = find_skill(skills, skill_name)
         if not skill_doc:
+            _sink_write(result_sink, last_result, last_skill_name)
             yield {"type": "error", "content": f"未找到技能：{skill_name}"}
             yield {"type": "done", "content": None}
             return
@@ -175,4 +204,5 @@ async def stream_chat_react(
         "completed",
         payload={"mode": "react", "exhausted": True},
     )
+    _sink_write(result_sink, last_result, last_skill_name)
     yield {"type": "done", "content": None}

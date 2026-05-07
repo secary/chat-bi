@@ -17,6 +17,27 @@ async def _collect(events_gen):
 
 
 class ReactRunnerTest(unittest.TestCase):
+    def test_small_talk_skips_llm_and_skill(self):
+        async def run():
+            cfg = replace(settings, agent_react=True, agent_max_steps=4)
+            with patch("backend.agent.react_runner.settings", cfg):
+                with patch(
+                    "backend.agent.react_runner.call_llm_for_react_step",
+                    new_callable=AsyncMock,
+                ) as mock_llm:
+                    with patch("backend.agent.react_runner.run_script") as mock_run:
+                        events = await _collect(
+                            stream_chat_react(
+                                [{"role": "user", "content": "你好"}], trace_id="t0"
+                            )
+                        )
+                        mock_llm.assert_not_awaited()
+                        mock_run.assert_not_called()
+                        texts = [e for e in events if e.get("type") == "text"]
+                        self.assertTrue(any("您好" in str(e.get("content")) for e in texts))
+
+        asyncio.run(run())
+
     def test_call_skill_then_finish_uses_two_llm_rounds_and_one_script(self):
         first = {
             "action": "call_skill",
@@ -79,7 +100,7 @@ class ReactRunnerTest(unittest.TestCase):
                     with patch("backend.agent.react_runner.run_script") as mock_run:
                         events = await _collect(
                             stream_chat_react(
-                                [{"role": "user", "content": "你好"}], trace_id="t2"
+                                [{"role": "user", "content": "请总结一下"}], trace_id="t2"
                             )
                         )
                         mock_llm.assert_awaited_once()

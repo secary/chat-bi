@@ -10,6 +10,7 @@ from backend.agent.executor import (
     skill_args_for_execution,
 )
 from backend.agent.formatter import stream_result_events
+from backend.agent.intent_guard import small_talk_reply, should_skip_skill_for_message
 from backend.agent.observation import summarize_observation
 from backend.agent.planner import call_llm_for_react_step
 from backend.agent.prompt_builder import (
@@ -63,6 +64,18 @@ async def stream_chat_react(
         if skill_docs is not None
         else scan_skills_enabled(settings.skills_dir)
     )
+    user_text = next(
+        (str(m.get("content", "")) for m in reversed(messages) if m.get("role") == "user"),
+        "",
+    )
+    if should_skip_skill_for_message(user_text):
+        log_event(trace_id, "agent.runner", "skip_skill_small_talk", payload={"mode": "react"})
+        _sink_write(result_sink, None, None)
+        yield {"type": "thinking", "content": "识别为简单话语，直接回复。"}
+        yield {"type": "text", "content": small_talk_reply(user_text)}
+        yield {"type": "done", "content": None}
+        return
+
     system_prompt = build_react_system_prompt(skills)
     if role_prompt and role_prompt.strip():
         system_prompt = role_prompt.strip() + "\n\n" + system_prompt

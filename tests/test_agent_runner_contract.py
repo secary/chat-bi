@@ -47,6 +47,24 @@ class AgentRunnerContractTest(unittest.TestCase):
 
         asyncio.run(run())
 
+    def test_small_talk_in_legacy_mode_skips_planner_and_skill(self):
+        async def run():
+            legacy = replace(settings, agent_react=False)
+            with patch("backend.agent.runner.settings", legacy):
+                with patch(
+                    "backend.agent.runner.call_llm_for_plan", new_callable=AsyncMock
+                ) as mock_llm:
+                    with patch("backend.agent.runner.run_script") as mock_run:
+                        events = await _collect_events(
+                            [{"role": "user", "content": "谢谢"}]
+                        )
+                        mock_llm.assert_not_awaited()
+                        mock_run.assert_not_called()
+                        texts = [e for e in events if e.get("type") == "text"]
+                        self.assertTrue(any("不客气" in str(e.get("content")) for e in texts))
+
+        asyncio.run(run())
+
 
 if __name__ == "__main__":
     unittest.main()

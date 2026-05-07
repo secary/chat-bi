@@ -286,3 +286,19 @@ export function writeSidebarOpenPreference(value: boolean): void {
     /* ignore */
   }
 }
+
+export function readMultiAgentsPreference(): boolean {
+  try {
+    return localStorage.getItem(MULTI_AGENTS_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function writeMultiAgentsPreference(value: boolean): void {
+  try {
+    localStorage.setItem(MULTI_AGENTS_KEY, value ? '1' : '0');
+  } catch {
+    /* ignore */
+  }
+}

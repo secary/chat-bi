@@ -3,7 +3,12 @@ from __future__ import annotations
 import json
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
-from backend.agent.executor import find_skill, run_script, skill_args_for_execution
+from backend.agent.executor import (
+    find_skill,
+    run_script,
+    skill_result_log_payload,
+    skill_args_for_execution,
+)
 from backend.agent.formatter import stream_result_events
 from backend.agent.observation import summarize_observation
 from backend.agent.planner import call_llm_for_react_step
@@ -126,7 +131,7 @@ async def stream_chat_react(
                 trace_id,
                 "agent.skill",
                 "completed",
-                payload={"skill": skill_name, "kind": result.get("kind")},
+                payload={"skill": skill_name, **skill_result_log_payload(result)},
             )
             last_skill_name = skill_name
             last_result = result

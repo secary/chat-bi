@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+import base64
 import html
+import io
 from datetime import datetime, timezone
 from typing import Any, Dict, List
+
+from backend.report.pdf_chart_png import echarts_option_to_png_bytes
+from backend.report.pdf_summary import summarize_session_for_pdf
 
 
 def _kpi_table_row(card: Dict[str, Any]) -> str:
@@ -14,47 +19,75 @@ def _kpi_table_row(card: Dict[str, Any]) -> str:
     return f"<tr><td>{label}</td><td>{value}</td><td>{unit}</td></tr>"
 
 
-def messages_to_html_document(messages: List[Dict[str, Any]], title: str) -> str:
-    sections: List[str] = []
-    safe_title = html.escape(title)
+def _collect_kpi_cards(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
     for msg in messages:
-        role = str(msg.get("role") or "")
-        content = html.escape(str(msg.get("content") or "")).replace("\n", "<br/>")
-        cls = "user" if role == "user" else "assistant"
-        label = "用户" if role == "user" else "助手"
-        block = [
-            f'<section class="bubble {cls}">',
-            f'<div class="meta">{label}</div>',
-            f'<div class="body">{content}</div>',
-        ]
-        if role == "assistant":
-            thinking = msg.get("thinking")
-            if isinstance(thinking, list) and thinking:
-                items = "".join(
-                    f"<li>{html.escape(str(t))}</li>" for t in thinking if str(t).strip()
-                )
-                block.append(f"<details><summary>思考步骤</summary><ul>{items}</ul></details>")
-            kpis = msg.get("kpiCards")
-            if isinstance(kpis, list) and kpis:
-                rows = "".join(_kpi_table_row(k) for k in kpis if isinstance(k, dict))
-                block.append(
-                    "<table class='kpi'><thead><tr><th>指标</th><th>数值</th><th>单位</th></tr></thead>"
-                    f"<tbody>{rows}</tbody></table>"
-                )
-            if msg.get("chart") is not None:
-                block.append(
-                    "<p class=\"chart-note\">（本回合包含图表，详见应用内交互视图）</p>"
-                )
-            err = msg.get("error")
-            if err:
-                block.append(f'<p class="err">{html.escape(str(err))}</p>')
-        block.append("</section>")
-        sections.append("\n".join(block))
+        if str(msg.get("role") or "") != "assistant":
+            continue
+        kpis = msg.get("kpiCards")
+        if isinstance(kpis, list):
+            for k in kpis:
+                if isinstance(k, dict):
+                    out.append(k)
+    return out
 
-    body = "\n".join(sections)
+
+def _chart_pngs(messages: List[Dict[str, Any]]) -> List[bytes]:
+    pngs: List[bytes] = []
+    for msg in messages:
+        if str(msg.get("role") or "") != "assistant":
+            continue
+        chart = msg.get("chart")
+        if chart is None:
+            continue
+        png = echarts_option_to_png_bytes(chart)
+        if png:
+            pngs.append(png)
+    return pngs
+
+
+def messages_to_html_document(messages: List[Dict[str, Any]], title: str) -> str:
+    """精炼摘要 + KPI 汇总 + 图表 PNG（非全文复制对话）。"""
+    safe_title = html.escape(title)
+    summary = summarize_session_for_pdf(messages)
+    summary_html = html.escape(summary).replace("\n", "<br/>")
+
+    kpis = _collect_kpi_cards(messages)
+    kpi_block = ""
+    if kpis:
+        rows = "".join(_kpi_table_row(k) for k in kpis)
+        kpi_block = (
+            "<h2 class=\"sec\">关键指标</h2>"
+            "<table class='kpi'><thead><tr><th>指标</th><th>数值</th><th>单位</th></tr></thead>"
+            f"<tbody>{rows}</tbody></table>"
+        )
+
+    chart_sections: List[str] = []
+    idx = 0
+    for msg in messages:
+        if str(msg.get("role") or "") != "assistant":
+            continue
+        chart = msg.get("chart")
+        if chart is None:
+            continue
+        png = echarts_option_to_png_bytes(chart)
+        idx += 1
+        if not png:
+            chart_sections.append(
+                f'<p class="chart-note">图表 {idx}（无法导出为静态图，请在应用内查看）</p>'
+            )
+            continue
+        b64 = base64.standard_b64encode(png).decode("ascii")
+        chart_sections.append(
+            f'<figure class="chart-wrap"><figcaption>图表 {idx}</figcaption>'
+            f'<img class="chart-img" src="data:image/png;base64,{b64}" alt="chart {idx}"/></figure>'
+        )
+
+    charts_html = "\n".join(chart_sections)
     now = html.escape(
         datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     )
+
     return f"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -64,34 +97,123 @@ def messages_to_html_document(messages: List[Dict[str, Any]], title: str) -> str
 body {{ font-family: "Noto Sans CJK SC", "Microsoft YaHei", sans-serif; font-size: 11pt;
   margin: 24px; color: #222; }}
 h1 {{ font-size: 16pt; margin-bottom: 8px; }}
-.sub {{ color: #666; font-size: 9pt; margin-bottom: 24px; }}
-.bubble {{ margin-bottom: 16px; padding: 12px; border-radius: 8px; }}
-.user {{ background: #eef6ff; border: 1px solid #cfe8ff; }}
-.assistant {{ background: #f9fafb; border: 1px solid #e5e7eb; }}
-.meta {{ font-weight: 600; margin-bottom: 6px; font-size: 10pt; color: #374151; }}
-.body {{ line-height: 1.5; }}
-details {{ margin-top: 8px; font-size: 10pt; }}
+h2.sec {{ font-size: 12pt; margin-top: 20px; margin-bottom: 8px; color: #374151; }}
+.sub {{ color: #666; font-size: 9pt; margin-bottom: 16px; }}
+.summary {{ line-height: 1.6; margin-bottom: 20px; padding: 12px; background: #f9fafb;
+  border-radius: 8px; border: 1px solid #e5e7eb; }}
 .kpi {{ border-collapse: collapse; width: 100%; margin-top: 8px; font-size: 10pt; }}
 .kpi th, .kpi td {{ border: 1px solid #ddd; padding: 6px; text-align: left; }}
 .chart-note {{ font-size: 9pt; color: #6b7280; }}
-.err {{ color: #b91c1c; font-size: 10pt; }}
+.chart-wrap {{ margin: 16px 0; text-align: center; }}
+.chart-wrap figcaption {{ font-size: 9pt; color: #6b7280; margin-bottom: 6px; }}
+.chart-img {{ max-width: 100%; height: auto; }}
 </style>
 </head>
 <body>
 <h1>{safe_title}</h1>
 <p class="sub">导出时间 {now}</p>
-{body}
+<h2 class="sec">摘要</h2>
+<div class="summary">{summary_html}</div>
+{kpi_block}
+<h2 class="sec">可视化图表</h2>
+{charts_html if charts_html else '<p class="chart-note">本会话无可嵌入图表。</p>'}
 </body>
 </html>"""
 
 
 def render_session_pdf_bytes(messages: List[Dict[str, Any]], session_title: str) -> bytes:
-    """Return PDF bytes (requires WeasyPrint system libraries)."""
+    """Return PDF bytes, fallback to ReportLab when WeasyPrint fails."""
+    html_doc = messages_to_html_document(messages, session_title or "ChatBI 会话报告")
     try:
         from weasyprint import HTML
-    except OSError as exc:
+
+        return HTML(string=html_doc).write_pdf()
+    except Exception:
+        return _render_pdf_with_reportlab(messages, session_title or "ChatBI 会话报告")
+
+
+def _render_pdf_with_reportlab(
+    messages: List[Dict[str, Any]], session_title: str
+) -> bytes:
+    try:
+        from PIL import Image as PILImage
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import ParagraphStyle
+        from reportlab.lib.units import inch
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+        from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer
+    except Exception as exc:
         raise RuntimeError(
-            "WeasyPrint 无法加载本地图形库，请在服务器镜像中安装 Pango/Cairo 依赖。"
+            "PDF 导出依赖加载失败：请安装 weasyprint 系统依赖，或确保 reportlab / pillow 可用。"
         ) from exc
-    html_doc = messages_to_html_document(messages, session_title or "ChatBI 会话报告")
-    return HTML(string=html_doc).write_pdf()
+
+    font_name = "STSong-Light"
+    try:
+        pdfmetrics.registerFont(UnicodeCIDFont("STSong-Light"))
+    except Exception:
+        font_name = "Helvetica"
+
+    summary = summarize_session_for_pdf(messages)
+    pngs = _chart_pngs(messages)
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        leftMargin=36,
+        rightMargin=36,
+        topMargin=36,
+        bottomMargin=36,
+    )
+    style = ParagraphStyle(
+        name="Body",
+        fontName=font_name,
+        fontSize=10,
+        leading=14,
+    )
+    title_style = ParagraphStyle(
+        name="Title",
+        fontName=font_name,
+        fontSize=14,
+        leading=18,
+        spaceAfter=12,
+    )
+
+    story: List[Any] = []
+    story.append(Paragraph(html.escape(session_title), title_style))
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    story.append(Paragraph(html.escape(f"导出时间: {ts}"), style))
+    story.append(Spacer(1, 12))
+    story.append(Paragraph(html.escape("摘要"), title_style))
+    for para in summary.split("\n"):
+        line = para.strip() or " "
+        story.append(Paragraph(html.escape(line), style))
+    story.append(Spacer(1, 12))
+
+    kpis = _collect_kpi_cards(messages)
+    if kpis:
+        story.append(Paragraph(html.escape("关键指标"), title_style))
+        for card in kpis:
+            line = (
+                f"{card.get('label', '')}: {card.get('value', '')}{card.get('unit', '')}"
+            )
+            story.append(Paragraph(html.escape(line), style))
+        story.append(Spacer(1, 12))
+
+    if pngs:
+        story.append(Paragraph(html.escape("可视化图表"), title_style))
+        max_w = 6 * inch
+        for i, png_bytes in enumerate(pngs, start=1):
+            pil_img = PILImage.open(io.BytesIO(png_bytes))
+            iw, ih = pil_img.size
+            scale = min(1.0, max_w / float(iw))
+            w = iw * scale
+            h = ih * scale
+            story.append(Paragraph(html.escape(f"图表 {i}"), style))
+            story.append(Spacer(1, 6))
+            story.append(Image(io.BytesIO(png_bytes), width=w, height=h))
+            story.append(Spacer(1, 12))
+
+    doc.build(story)
+    return buffer.getvalue()

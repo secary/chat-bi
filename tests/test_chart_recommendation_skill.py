@@ -43,6 +43,18 @@ class ChartRecommendationSkillTest(unittest.TestCase):
         payload = MODULE.recommend_chart("推荐一个图表", [])
         self.assertEqual(payload["data"]["recommendation"]["status"], "need_clarification")
 
+    def test_parse_input_supports_natural_language_plus_json(self):
+        question, rows = MODULE.parse_input(
+            '请把下面结果用最合适的图表可视化出来：'
+            '{"question":"2026年1-4月销售额趋势","rows":['
+            '{"月份":"2026-01","销售额":"355000"},'
+            '{"月份":"2026-02","销售额":"394000"}]}'
+        )
+
+        self.assertEqual(question, "2026年1-4月销售额趋势")
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0]["月份"], "2026-01")
+
 
 if __name__ == "__main__":
     unittest.main()

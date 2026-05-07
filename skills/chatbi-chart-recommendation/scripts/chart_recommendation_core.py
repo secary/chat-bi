@@ -21,9 +21,8 @@ def parse_input(raw: str) -> Tuple[str, List[Dict[str, Any]]]:
     text = (raw or "").strip()
     if not text:
         return "", []
-    try:
-        payload = json.loads(text)
-    except json.JSONDecodeError:
+    payload = _extract_payload(text)
+    if payload is None:
         return text, []
     if isinstance(payload, dict):
         question = str(payload.get("question") or payload.get("query") or "")
@@ -32,6 +31,23 @@ def parse_input(raw: str) -> Tuple[str, List[Dict[str, Any]]]:
             return question, [row for row in rows if isinstance(row, dict)]
         return question, []
     return text, []
+
+
+def _extract_payload(text: str) -> Any:
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    start = text.find("{")
+    end = text.rfind("}")
+    if start == -1 or end == -1 or end <= start:
+        return None
+    candidate = text[start : end + 1]
+    try:
+        return json.loads(candidate)
+    except json.JSONDecodeError:
+        return None
 
 
 def recommend_chart(question: str, rows: Sequence[Dict[str, Any]]) -> Dict[str, Any]:

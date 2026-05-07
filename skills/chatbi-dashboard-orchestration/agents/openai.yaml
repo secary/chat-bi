@@ -1,0 +1,7 @@
+interface:
+  display_name: "Dashboard Orchestration"
+  short_description: "Arrange generated BI charts into frontend-ready dashboards."
+  default_prompt: "Use $dashboard-orchestration to build a dashboard layout from chart specs."
+
+policy:
+  allow_implicit_invocation: true

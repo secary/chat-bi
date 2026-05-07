@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, List, Optional
 
-from backend.db_mysql import app_connection, execute, fetch_all, fetch_one
+from backend.db_mysql import app_connection, app_execute, app_fetch_all, app_fetch_one
 
 
 def create_session(user_id: int, title: str = "新对话") -> int:
@@ -19,7 +19,7 @@ def create_session(user_id: int, title: str = "新对话") -> int:
 
 
 def list_sessions(user_id: int, limit: int = 100) -> List[Dict[str, Any]]:
-    return fetch_all(
+    return app_fetch_all(
         "SELECT id, title, created_at, updated_at FROM chat_session "
         "WHERE user_id = %s ORDER BY updated_at DESC LIMIT %s",
         (user_id, limit),
@@ -27,7 +27,7 @@ def list_sessions(user_id: int, limit: int = 100) -> List[Dict[str, Any]]:
 
 
 def get_session_for_user(session_id: int, user_id: int) -> Optional[Dict[str, Any]]:
-    return fetch_one(
+    return app_fetch_one(
         "SELECT id, title, created_at, updated_at, user_id FROM chat_session "
         "WHERE id = %s AND user_id = %s",
         (session_id, user_id),
@@ -35,14 +35,14 @@ def get_session_for_user(session_id: int, user_id: int) -> Optional[Dict[str, An
 
 
 def update_session_title(session_id: int, user_id: int, title: str) -> None:
-    execute(
+    app_execute(
         "UPDATE chat_session SET title = %s WHERE id = %s AND user_id = %s",
         (title, session_id, user_id),
     )
 
 
 def touch_session(session_id: int, user_id: int) -> None:
-    execute(
+    app_execute(
         "UPDATE chat_session SET updated_at = CURRENT_TIMESTAMP(6) "
         "WHERE id = %s AND user_id = %s",
         (session_id, user_id),
@@ -50,7 +50,7 @@ def touch_session(session_id: int, user_id: int) -> None:
 
 
 def delete_session(session_id: int, user_id: int) -> None:
-    execute(
+    app_execute(
         "DELETE FROM chat_session WHERE id = %s AND user_id = %s",
         (session_id, user_id),
     )
@@ -60,7 +60,7 @@ def list_messages_for_llm(
     session_id: int, max_messages: int = 20
 ) -> List[Dict[str, str]]:
     """Return recent turns as role/content pairs for LLM (text only, chronological)."""
-    rows = fetch_all(
+    rows = app_fetch_all(
         "SELECT m.role, m.content FROM chat_message m "
         "INNER JOIN (SELECT id FROM chat_message WHERE session_id = %s "
         "ORDER BY id DESC LIMIT %s) t ON m.id = t.id ORDER BY m.id ASC",
@@ -100,7 +100,7 @@ def insert_message(
 
 
 def load_messages_ui(session_id: int) -> List[Dict[str, Any]]:
-    rows = fetch_all(
+    rows = app_fetch_all(
         "SELECT id, role, content, payload_json FROM chat_message "
         "WHERE session_id = %s ORDER BY id ASC",
         (session_id,),

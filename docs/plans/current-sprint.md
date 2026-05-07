@@ -83,6 +83,15 @@
 - 涉及文件：`backend/routes/*`、`backend/session_repo.py`、`backend/db_mysql.py`、`frontend/src/pages/*`、`database/init.sql`
 - 复杂度：高
 
+### 任务 9：数据仪表盘
+- 状态：✅ 已完成
+- 验收标准：
+  - [x] `GET /dashboard/overview` 基于生效业务库（与 Skill 相同的连接解析）只读聚合 `sales_order`、`customer_profile` 及语义层表行数
+  - [x] 前端左侧导航「仪表盘」，路由 `/dashboard`：KPI 卡片、区域饼图、按月柱状图、客户活跃度柱状图、语义层资产列表；Vite 代理 `/dashboard`
+  - [x] `tests/test_dashboard_overview.py`、`frontend` Vitest `dashboardCharts.test.ts`
+- 涉及文件：`backend/business_db.py`、`backend/dashboard_overview.py`、`backend/routes/dashboard_route.py`、`frontend/src/pages/DashboardPage.tsx`、`frontend/src/lib/dashboardCharts.ts`、`frontend/vitest.config.ts`
+- 复杂度：中
+
 ## Gap 追踪（每次执行后更新）
 | 轮次 | 完成内容 | 发现问题 | 下一步 |
 |------|---------|---------|-------|

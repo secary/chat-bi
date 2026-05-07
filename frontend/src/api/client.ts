@@ -6,6 +6,7 @@ import type {
   LlmSettingsView,
   SessionRow,
 } from '../types/admin';
+import type { DashboardOverview } from '../types/dashboard';
 
 export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 const CHAT_URL = `${API_BASE_URL}/chat`;
@@ -110,6 +111,10 @@ export async function uploadFile(file: File, traceId = newTraceId()): Promise<Up
   }
 
   return (await response.json()) as UploadedFile;
+}
+
+export async function getDashboardOverview(): Promise<DashboardOverview> {
+  return requestJson<DashboardOverview>('/dashboard/overview');
 }
 
 export async function listSessionsApi(): Promise<SessionRow[]> {

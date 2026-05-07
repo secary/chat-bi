@@ -15,6 +15,7 @@ from backend.routes.admin_db_route import router as admin_db_router
 from backend.routes.admin_llm_route import router as admin_llm_router
 from backend.routes.admin_skills_route import router as admin_skills_router
 from backend.routes.chat_route import router as chat_router
+from backend.routes.dashboard_route import router as dashboard_router
 from backend.routes.sessions_route import router as sessions_router
 from backend.trace import log_event
 
@@ -32,6 +33,7 @@ app.add_middleware(
 )
 
 app.include_router(chat_router)
+app.include_router(dashboard_router)
 app.include_router(sessions_router)
 app.include_router(admin_llm_router)
 app.include_router(admin_db_router)

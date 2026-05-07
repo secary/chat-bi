@@ -14,7 +14,9 @@ export default defineConfig({
       '/health': proxyTarget,
       '/upload': proxyTarget,
       '/sessions': proxyTarget,
+      '/dashboard': proxyTarget,
       '/admin': proxyTarget,
+      '/auth': proxyTarget,
     },
   },
 })

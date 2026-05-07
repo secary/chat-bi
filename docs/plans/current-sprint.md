@@ -83,6 +83,27 @@
 - 涉及文件：`backend/routes/*`、`backend/session_repo.py`、`backend/db_mysql.py`、`frontend/src/pages/*`、`database/init.sql`
 - 复杂度：高
 
+### 任务 9：数据仪表盘
+- 状态：✅ 已完成
+- 验收标准：
+  - [x] `GET /dashboard/overview` 基于生效业务库（与 Skill 相同的连接解析）只读聚合 `sales_order`、`customer_profile` 及语义层表行数
+  - [x] 前端左侧导航「仪表盘」，路由 `/dashboard`：KPI 卡片、区域饼图、按月柱状图、客户活跃度柱状图、语义层资产列表；Vite 代理 `/dashboard`
+  - [x] `tests/test_dashboard_overview.py`、`frontend` Vitest `dashboardCharts.test.ts`
+- 涉及文件：`backend/business_db.py`、`backend/dashboard_overview.py`、`backend/routes/dashboard_route.py`、`frontend/src/pages/DashboardPage.tsx`、`frontend/src/lib/dashboardCharts.ts`、`frontend/vitest.config.ts`
+- 复杂度：中
+
+### 任务 10：用户鉴权与长短期记忆（OpenClaw 风格 MVP）
+- 状态：✅ 已完成
+- 验收标准：
+  - [x] `database/init.sql` 与 `database/migrations/002_users_and_memory.sql`：`app_user`、`chat_session.user_id`、`user_memory`；种子管理员 `admin` / `admin123`（部署后请改密）
+  - [x] JWT：`POST /auth/login`、`GET /auth/me`；`/sessions`、`/chat`、`/dashboard`、`/upload` 需 `Authorization: Bearer`；`/admin/*` 需 `admin` 角色
+  - [x] `GET /sessions` 返回 `{ sessions, suggested_prompts }`；`chat_session` 按 `user_id` 隔离
+  - [x] 记忆：对话前注入长期偏好 + 近期会话摘要；回合结束后异步 LLM 摘要并合并长期记忆；环境变量 `CHATBI_MEMORY_DISABLED` 可关闭记忆链路
+  - [x] 前端：登录页与 `RequireAuth`；管理员侧栏「用户管理」；对话区展示记忆快捷 chip；Vite 代理 `/auth`
+  - [x] 测试：`tests/test_auth_password.py`、`tests/test_auth_tokens.py`、`tests/test_memory_service_off.py`；`npm run build` 通过
+- 涉及文件：`backend/auth_deps.py`、`backend/auth_tokens.py`、`backend/user_repo.py`、`backend/memory_repo.py`、`backend/memory_service.py`、`backend/routes/auth_route.py`、`backend/routes/admin_users_route.py`、`frontend/src/api/client.ts`、`frontend/src/pages/ChatPage.tsx`
+- 复杂度：高
+
 ## Gap 追踪（每次执行后更新）
 | 轮次 | 完成内容 | 发现问题 | 下一步 |
 |------|---------|---------|-------|
@@ -129,4 +150,5 @@
 | 40 | 会话标题改为随聊天内容动态更新：`POST /chat` 在落库用户消息后，每轮都按最新问题生成并写入 `chat_session.title`（空白折叠、去换行、80 字截断） | 若用户希望“手工重命名后不再自动覆盖”，当前逻辑尚未区分该场景 | 发送多轮消息并观察左侧会话列表，标题应始终跟随最近一次用户输入 |
 | 41 | 聊天输入区视觉优化：`ChatInput` 改为更圆润风格（外层 `rounded-2xl`，按钮与输入框 `rounded-full`，统一高度与留白）以匹配整体页面气质 | 当前仅调整输入区组件样式，未改全局色板与阴影体系 | 刷新聊天页确认输入区不再“方块感”，交互功能保持不变 |
 | 42 | 在 PR 分支 `dev03/memoryAndFrontend` 合并 `origin/main` 并解决冲突：保留 ReAct/会话数据源覆盖、多步查询建议、SSE 不可变更新和文件导入测试；同时保留 `chatbi-comparison` 迭代记录 | 尚需本机执行 `git add`、`git commit`、`git push origin dev03/memoryAndFrontend` 完成 PR 分支更新 | 推送 PR 分支后刷新 GitHub PR，确认冲突提示消失 |
-| 43 | 将 `chatbi-decision-advisor` 改为按问题中的指标/维度定向生成建议：拆分脚本为 `decision_advisor_core.py` + 轻量入口，新增 `focus_metrics` 解析，建议规则按指标与维度过滤；补充 `test_decision_advisor_focus` 覆盖毛利率定向建议，并修正 `test_query_advice_dimension_flow` 的轻量依赖 stub | 本机当前无法连接 `127.0.0.1:3307`，未完成真实数据库场景回归；若问题未显式包含指标或维度，技能仍会返回综合经营建议 | 启动/连通本地 MySQL 后复测 `各渠道毛利率经营建议`、`华东销售额经营建议`、`客户留存经营建议`，确认建议主题随数据需求变化 |
+| 43 | 完成任务 10：应用用户表 + JWT + 用户管理页 + `user_memory` 与会话归属；Agent 注入记忆块与异步摘要；旧库需执行 `002` 迁移或重建数据卷 | `tests/test_agent_workflow.py` 等仍因历史 `build_execution_steps` 导入错误无法收集；与本任务无关，需单独修复或移除过时导入 | 旧环境执行 `database/migrations/002_users_and_memory.sql`；浏览器用 admin 登录验证会话隔离与记忆 chip；可选修复失效测试文件导入 |
+| 44 | 将 `chatbi-decision-advisor` 改为按问题中的指标/维度定向生成建议：拆分脚本为 `decision_advisor_core.py` + 轻量入口，新增 `focus_metrics` 解析，建议规则按指标与维度过滤；补充 `test_decision_advisor_focus` 覆盖毛利率定向建议，并修正 `test_query_advice_dimension_flow` 的轻量依赖 stub | 本机当前无法连接 `127.0.0.1:3307`，未完成真实数据库场景回归；若问题未显式包含指标或维度，技能仍会返回综合经营建议 | 启动/连通本地 MySQL 后复测 `各渠道毛利率经营建议`、`华东销售额经营建议`、`客户留存经营建议`，确认建议主题随数据需求变化 |

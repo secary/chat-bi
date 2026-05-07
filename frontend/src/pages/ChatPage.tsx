@@ -13,6 +13,7 @@ import { logger } from '../lib/logger';
 export function ChatPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
+  const [suggestedPrompts, setSuggestedPrompts] = useState<string[]>([]);
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [dbConnId, setDbConnId] = useState<number | null>(null);
   const [booting, setBooting] = useState(true);
@@ -25,9 +26,10 @@ export function ChatPage() {
 
   const refreshSessions = useCallback(async () => {
     try {
-      const list = await listSessionsApi();
-      setSessions(list);
-      return list;
+      const data = await listSessionsApi();
+      setSessions(data.sessions);
+      setSuggestedPrompts(data.suggested_prompts);
+      return data.sessions;
     } catch (e) {
       logger.error('list sessions', e);
       return [];
@@ -41,6 +43,7 @@ export function ChatPage() {
         try {
           const created = await createSessionApi();
           setSessionId(created.id);
+          setSuggestedPrompts(created.suggested_prompts);
           await refreshSessions();
         } catch (e) {
           logger.error('create session', e);
@@ -56,6 +59,7 @@ export function ChatPage() {
     try {
       const created = await createSessionApi();
       setSessionId(created.id);
+      setSuggestedPrompts(created.suggested_prompts);
       await refreshSessions();
     } catch (e) {
       logger.error('new session', e);
@@ -71,6 +75,7 @@ export function ChatPage() {
         if (!list.length) {
           const created = await createSessionApi();
           setSessionId(created.id);
+          setSuggestedPrompts(created.suggested_prompts);
           await refreshSessions();
         }
       }
@@ -157,6 +162,23 @@ export function ChatPage() {
         </div>
 
         <div className="mx-auto w-full max-w-3xl px-4 pb-4">
+          {suggestedPrompts.length > 0 ? (
+            <div className="mb-3 flex flex-wrap gap-2">
+              <span className="w-full text-xs text-gray-500">记忆提示 · 可快捷继续：</span>
+              {suggestedPrompts.map((p, idx) => (
+                <button
+                  key={`${idx}-${p.slice(0, 40)}`}
+                  type="button"
+                  onClick={() => void sendMessage(p)}
+                  disabled={loading || booting || sessionId == null}
+                  className="max-w-full truncate rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-left text-xs text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+                  title={p}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          ) : null}
           <ChatInput onSend={sendMessage} loading={loading} disabled={booting || sessionId == null} />
         </div>
       </div>

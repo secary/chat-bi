@@ -5,7 +5,12 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 from backend.config import settings
-from backend.db_mysql import app_connection, execute, fetch_all, fetch_one
+from backend.db_mysql import (
+    admin_connection,
+    admin_execute,
+    admin_fetch_all,
+    admin_fetch_one,
+)
 
 
 def skill_env_from_row(row: Dict[str, Any]) -> Dict[str, str]:
@@ -20,23 +25,23 @@ def skill_env_from_row(row: Dict[str, Any]) -> Dict[str, str]:
 
 def clear_other_defaults(except_id: Optional[int] = None) -> None:
     if except_id is None:
-        execute("UPDATE app_db_connection SET is_default = 0")
+        admin_execute("UPDATE app_db_connection SET is_default = 0")
     else:
-        execute(
+        admin_execute(
             "UPDATE app_db_connection SET is_default = 0 WHERE id <> %s",
             (except_id,),
         )
 
 
 def list_connections() -> List[Dict[str, Any]]:
-    return fetch_all(
+    return admin_fetch_all(
         "SELECT id, name, host, port, username, database_name, is_default, created_at "
         "FROM app_db_connection ORDER BY is_default DESC, id ASC"
     )
 
 
 def get_connection(conn_id: int) -> Optional[Dict[str, Any]]:
-    return fetch_one(
+    return admin_fetch_one(
         "SELECT id, name, host, port, username, password, database_name, is_default "
         "FROM app_db_connection WHERE id = %s",
         (conn_id,),
@@ -44,7 +49,7 @@ def get_connection(conn_id: int) -> Optional[Dict[str, Any]]:
 
 
 def get_default_connection() -> Optional[Dict[str, Any]]:
-    return fetch_one(
+    return admin_fetch_one(
         "SELECT id, name, host, port, username, password, database_name, is_default "
         "FROM app_db_connection WHERE is_default = 1 LIMIT 1"
     )
@@ -103,7 +108,7 @@ def insert_connection(
 ) -> int:
     if is_default:
         clear_other_defaults()
-    with app_connection() as conn:
+    with admin_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "INSERT INTO app_db_connection "
@@ -127,13 +132,13 @@ def update_connection(
     if is_default:
         clear_other_defaults(except_id=conn_id)
     if password is None:
-        execute(
+        admin_execute(
             "UPDATE app_db_connection SET name=%s, host=%s, port=%s, username=%s, "
             "database_name=%s, is_default=%s WHERE id=%s",
             (name, host, port, username, database_name, int(is_default), conn_id),
         )
     else:
-        execute(
+        admin_execute(
             "UPDATE app_db_connection SET name=%s, host=%s, port=%s, username=%s, "
             "password=%s, database_name=%s, is_default=%s WHERE id=%s",
             (
@@ -150,4 +155,4 @@ def update_connection(
 
 
 def delete_connection(conn_id: int) -> None:
-    execute("DELETE FROM app_db_connection WHERE id = %s", (conn_id,))
+    admin_execute("DELETE FROM app_db_connection WHERE id = %s", (conn_id,))

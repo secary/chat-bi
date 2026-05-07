@@ -1,4 +1,4 @@
-"""Minimal MySQL helpers for app tables (chatbi_demo)."""
+"""Minimal MySQL helpers for app/user tables and admin/config tables."""
 
 from __future__ import annotations
 
@@ -11,14 +11,21 @@ from pymysql.cursors import DictCursor
 from backend.config import settings
 
 
+def target_db_config(target: str) -> Dict[str, str]:
+    if target == "admin":
+        return settings.admin_db_config
+    return settings.app_db_config
+
+
 @contextmanager
-def app_connection() -> Iterator[pymysql.connections.Connection]:
+def _connection_for(target: str) -> Iterator[pymysql.connections.Connection]:
+    cfg = target_db_config(target)
     conn = pymysql.connect(
-        host=settings.db_host,
-        port=int(settings.db_port),
-        user=settings.db_user,
-        password=settings.db_password,
-        database=settings.db_name,
+        host=cfg["host"],
+        port=int(cfg["port"]),
+        user=cfg["user"],
+        password=cfg["password"],
+        database=cfg["database"],
         charset="utf8mb4",
         cursorclass=DictCursor,
         autocommit=True,
@@ -29,7 +36,19 @@ def app_connection() -> Iterator[pymysql.connections.Connection]:
         conn.close()
 
 
-def fetch_one(
+@contextmanager
+def app_connection() -> Iterator[pymysql.connections.Connection]:
+    with _connection_for("app") as conn:
+        yield conn
+
+
+@contextmanager
+def admin_connection() -> Iterator[pymysql.connections.Connection]:
+    with _connection_for("admin") as conn:
+        yield conn
+
+
+def app_fetch_one(
     sql: str, args: Optional[tuple[Any, ...]] = None
 ) -> Optional[Dict[str, Any]]:
     with app_connection() as conn:
@@ -38,15 +57,41 @@ def fetch_one(
             return cur.fetchone()
 
 
-def fetch_all(sql: str, args: Optional[tuple[Any, ...]] = None) -> List[Dict[str, Any]]:
+def app_fetch_all(
+    sql: str, args: Optional[tuple[Any, ...]] = None
+) -> List[Dict[str, Any]]:
     with app_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(sql, args or ())
             return list(cur.fetchall())
 
 
-def execute(sql: str, args: Optional[tuple[Any, ...]] = None) -> int:
+def app_execute(sql: str, args: Optional[tuple[Any, ...]] = None) -> int:
     with app_connection() as conn:
+        with conn.cursor() as cur:
+            return cur.execute(sql, args or ())
+
+
+def admin_fetch_one(
+    sql: str, args: Optional[tuple[Any, ...]] = None
+) -> Optional[Dict[str, Any]]:
+    with admin_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, args or ())
+            return cur.fetchone()
+
+
+def admin_fetch_all(
+    sql: str, args: Optional[tuple[Any, ...]] = None
+) -> List[Dict[str, Any]]:
+    with admin_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, args or ())
+            return list(cur.fetchall())
+
+
+def admin_execute(sql: str, args: Optional[tuple[Any, ...]] = None) -> int:
+    with admin_connection() as conn:
         with conn.cursor() as cur:
             return cur.execute(sql, args or ())
 

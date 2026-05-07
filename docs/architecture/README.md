@@ -9,7 +9,7 @@ flowchart TD
     agent --> skillDocs["skills/*/SKILL.md"]
     agent --> scripts["Skill scripts"]
     scripts --> skillResult["统一 SkillResult 协议"]
-    scripts --> mysql["MySQL 8.0 chatbi_demo"]
+    scripts --> mysql["MySQL 8.0 business/app/admin/logs"]
     mysql --> scripts
     skillResult --> agent
     agent --> renderers["结果整理与图表/KPI 构造"]
@@ -29,6 +29,11 @@ flowchart TD
 - `backend/renderers/`：将结构化结果转换为 ECharts option 和 KPI 卡片数据。
 - `skills/`：Agent Skill 目录，每个 Skill 由 `SKILL.md` 和可选 `scripts/` 组成。
 - `database/`：MySQL 表结构、业务数据和语义层元数据初始化。
+- 数据库按职责拆分：
+  - `chatbi_demo`：业务事实表 + 语义层
+  - `chatbi_app`：应用用户 + 会话 + 记忆
+  - `chatbi_admin`：前端配置 + Skill 开关 + 数据源连接
+  - `chatbi_logs`：trace 日志
 
 ## 模块边界
 - `main.py` 只负责 HTTP/SSE 协议层和路由注册。

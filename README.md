@@ -195,12 +195,21 @@ chat-bi/
 | `CHATBI_DB_USER` | 业务库用户（默认 `demo_user`） |
 | `CHATBI_DB_PASSWORD` | 业务库密码（默认 `demo_pass`） |
 | `CHATBI_DB_NAME` | 业务库库名（默认 `chatbi_demo`） |
+| `CHATBI_APP_DB_HOST/PORT/USER/PASSWORD/NAME` | 前端用户与会话库（默认 `chatbi_app`） |
+| `CHATBI_ADMIN_DB_HOST/PORT/USER/PASSWORD/NAME` | 前端配置与技能开关库（默认 `chatbi_admin`） |
 | `CHATBI_LOG_DB_HOST` | 日志库主机（未配置时回退到业务库） |
 | `CHATBI_LOG_DB_PORT` | 日志库端口 |
 | `CHATBI_LOG_DB_USER` | 日志库用户 |
 | `CHATBI_LOG_DB_PASSWORD` | 日志库密码 |
 | `CHATBI_LOG_DB_NAME` | 日志库库名（默认 `chatbi_logs`） |
 | `FRONTEND_API_BASE_URL` | 前端指向的后端地址（默认 `http://localhost:8000`） |
+
+数据库职责建议：
+
+- `chatbi_demo`：演示业务数据与语义层元数据
+- `chatbi_app`：前端用户、会话、消息、记忆
+- `chatbi_admin`：数据源连接、LLM 设置、Skill 开关
+- `chatbi_logs`：链路日志
 
 环境文件建议：
 

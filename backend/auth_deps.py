@@ -75,7 +75,6 @@ def get_current_user(
 
     return _fallback_dev_user()
 
-
 def require_admin(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
     if user.get("role") != "admin":
         raise HTTPException(

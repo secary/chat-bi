@@ -124,6 +124,14 @@ class Settings:
     jwt_exp_hours: int = field(
         default_factory=lambda: max(1, int(os.getenv("CHATBI_JWT_EXP_HOURS", "168")))
     )
+    # 生产默认开启；本地开发可在 env.dev / compose 中设为 0/false 跳过登录
+    auth_enabled: bool = field(
+        default_factory=lambda: os.getenv("CHATBI_AUTH_ENABLED", "1").strip().lower()
+        not in ("0", "false", "no", "off")
+    )
+    auth_dev_user_id: int = field(
+        default_factory=lambda: max(1, int(os.getenv("CHATBI_AUTH_DEV_USER_ID", "1")))
+    )
 
     project_root: Path = Path(__file__).resolve().parent.parent
     skills_dir: Path = field(init=False)

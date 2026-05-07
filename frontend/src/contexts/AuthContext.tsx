@@ -9,6 +9,8 @@ import {
 } from 'react';
 import type { AppUser } from '../types/auth';
 import { getMeApi, getStoredToken, loginApi, setStoredToken } from '../api/client';
+import { authEnabled } from '../lib/authFlags';
+import { devAuthFallbackAdmin } from '../lib/devAuthDefaults';
 
 interface AuthState {
   user: AppUser | null;
@@ -24,6 +26,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    if (!authEnabled) {
+      void getMeApi()
+        .then(setUser)
+        .catch(() => setUser(devAuthFallbackAdmin))
+        .finally(() => setReady(true));
+      return;
+    }
     const token = getStoredToken();
     if (!token) {
       setReady(true);

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { authEnabled } from '../lib/authFlags';
 import { logger } from '../lib/logger';
 
 export function LoginPage() {
@@ -9,6 +10,10 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  if (!authEnabled) {
+    return <Navigate to="/" replace />;
+  }
 
   if (user) {
     return <Navigate to="/" replace />;

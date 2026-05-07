@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { authEnabled } from '../lib/authFlags';
 
 const linkCls = ({ isActive }: { isActive: boolean }) =>
   `block rounded-md px-3 py-2 text-sm ${
@@ -47,16 +48,20 @@ export function AppLayout() {
           ) : null}
         </nav>
         <div className="mt-auto border-t border-gray-100 px-3 pt-3">
-          <button
-            type="button"
-            onClick={() => {
-              logout();
-              window.location.assign('/login');
-            }}
-            className="w-full rounded-md border border-gray-200 px-3 py-2 text-xs text-gray-600 hover:bg-gray-50"
-          >
-            退出登录
-          </button>
+          {authEnabled ? (
+            <button
+              type="button"
+              onClick={() => {
+                logout();
+                window.location.assign('/login');
+              }}
+              className="w-full rounded-md border border-gray-200 px-3 py-2 text-xs text-gray-600 hover:bg-gray-50"
+            >
+              退出登录
+            </button>
+          ) : (
+            <p className="text-xs text-amber-700">开发环境：用户登录已关闭</p>
+          )}
         </div>
       </aside>
       <main className="min-h-0 min-w-0 flex-1 overflow-hidden">

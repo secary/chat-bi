@@ -281,7 +281,6 @@ VALUES
 -- ============================================================
 
 USE chatbi_app;
-
 DROP TABLE IF EXISTS user_memory;
 DROP TABLE IF EXISTS chat_message;
 DROP TABLE IF EXISTS chat_session;
@@ -348,7 +347,6 @@ CREATE TABLE user_memory (
 -- ============================================================
 
 USE chatbi_admin;
-
 DROP TABLE IF EXISTS skill_registry;
 
 CREATE TABLE skill_registry (

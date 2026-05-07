@@ -7,8 +7,14 @@ import unittest
 litellm_stub = types.ModuleType("litellm")
 litellm_stub.acompletion = None
 sys.modules.setdefault("litellm", litellm_stub)
+pymysql_stub = types.ModuleType("pymysql")
+pymysql_stub.connect = None
+sys.modules.setdefault("pymysql", pymysql_stub)
+cursors_stub = types.ModuleType("pymysql.cursors")
+cursors_stub.DictCursor = object
+sys.modules.setdefault("pymysql.cursors", cursors_stub)
 
-from backend.agent.runner import infer_primary_dimension
+from backend.agent.runner import _infer_primary_dimension
 
 
 class QueryAdviceDimensionFlowTest(unittest.TestCase):
@@ -22,7 +28,7 @@ class QueryAdviceDimensionFlowTest(unittest.TestCase):
             }
         }
 
-        self.assertEqual(infer_primary_dimension(result), "区域")
+        self.assertEqual(_infer_primary_dimension(result), "区域")
 
 
 if __name__ == "__main__":

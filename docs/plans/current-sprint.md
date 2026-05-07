@@ -129,3 +129,4 @@
 | 40 | 会话标题改为随聊天内容动态更新：`POST /chat` 在落库用户消息后，每轮都按最新问题生成并写入 `chat_session.title`（空白折叠、去换行、80 字截断） | 若用户希望“手工重命名后不再自动覆盖”，当前逻辑尚未区分该场景 | 发送多轮消息并观察左侧会话列表，标题应始终跟随最近一次用户输入 |
 | 41 | 聊天输入区视觉优化：`ChatInput` 改为更圆润风格（外层 `rounded-2xl`，按钮与输入框 `rounded-full`，统一高度与留白）以匹配整体页面气质 | 当前仅调整输入区组件样式，未改全局色板与阴影体系 | 刷新聊天页确认输入区不再“方块感”，交互功能保持不变 |
 | 42 | 在 PR 分支 `dev03/memoryAndFrontend` 合并 `origin/main` 并解决冲突：保留 ReAct/会话数据源覆盖、多步查询建议、SSE 不可变更新和文件导入测试；同时保留 `chatbi-comparison` 迭代记录 | 尚需本机执行 `git add`、`git commit`、`git push origin dev03/memoryAndFrontend` 完成 PR 分支更新 | 推送 PR 分支后刷新 GitHub PR，确认冲突提示消失 |
+| 43 | 将 `chatbi-decision-advisor` 改为按问题中的指标/维度定向生成建议：拆分脚本为 `decision_advisor_core.py` + 轻量入口，新增 `focus_metrics` 解析，建议规则按指标与维度过滤；补充 `test_decision_advisor_focus` 覆盖毛利率定向建议，并修正 `test_query_advice_dimension_flow` 的轻量依赖 stub | 本机当前无法连接 `127.0.0.1:3307`，未完成真实数据库场景回归；若问题未显式包含指标或维度，技能仍会返回综合经营建议 | 启动/连通本地 MySQL 后复测 `各渠道毛利率经营建议`、`华东销售额经营建议`、`客户留存经营建议`，确认建议主题随数据需求变化 |

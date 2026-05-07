@@ -66,6 +66,13 @@ class Settings:
         default_factory=lambda: max(1, int(os.getenv("CHATBI_AGENT_MAX_STEPS", "8")))
     )
 
+    jwt_secret: str = field(
+        default_factory=lambda: os.getenv("CHATBI_JWT_SECRET", "chatbi-dev-change-me")
+    )
+    jwt_exp_hours: int = field(
+        default_factory=lambda: max(1, int(os.getenv("CHATBI_JWT_EXP_HOURS", "168")))
+    )
+
     project_root: Path = Path(__file__).resolve().parent.parent
     skills_dir: Path = field(init=False)
 

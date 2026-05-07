@@ -7,15 +7,17 @@ import re
 from time import perf_counter
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
 from backend.agent.runner import stream_chat
+from backend.auth_deps import get_current_user
 from backend.connection_repo import resolve_skill_db_env
 from backend.http_utils import request_trace_id
+from backend.memory_service import format_memory_for_prompt, refresh_memory_after_turn
 from backend.session_repo import (
-    get_session,
+    get_session_for_user,
     insert_message,
     list_messages_for_llm,
     touch_session,
@@ -66,15 +68,21 @@ def _session_title_from_message(message: str) -> str:
 
 
 @router.post("/chat")
-async def chat(req: ChatRequest, request: Request):
+async def chat(
+    req: ChatRequest,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    user: dict = Depends(get_current_user),
+):
     trace_id = request_trace_id(request)
     skill_db = resolve_skill_db_env(req.db_connection_id)
+    memory_block = format_memory_for_prompt(int(user["id"]))
 
     messages: List[Dict[str, str]]
     persist_sid: Optional[int] = None
 
     if req.session_id is not None:
-        sess = get_session(req.session_id)
+        sess = get_session_for_user(req.session_id, int(user["id"]))
         if not sess:
             raise HTTPException(status_code=404, detail="会话不存在")
         prior = list_messages_for_llm(req.session_id)
@@ -82,7 +90,11 @@ async def chat(req: ChatRequest, request: Request):
         persist_sid = req.session_id
         try:
             insert_message(persist_sid, "user", req.message)
-            update_session_title(persist_sid, _session_title_from_message(req.message))
+            update_session_title(
+                persist_sid,
+                int(user["id"]),
+                _session_title_from_message(req.message),
+            )
         except Exception as exc:
             log_event(
                 trace_id,
@@ -116,6 +128,7 @@ async def chat(req: ChatRequest, request: Request):
                 messages,
                 trace_id=trace_id,
                 skill_db_overrides=skill_db,
+                memory_block=memory_block or None,
             ):
                 if await request.is_disconnected():
                     log_event(
@@ -163,7 +176,15 @@ async def chat(req: ChatRequest, request: Request):
                         acc.get("content") or "",
                         _assistant_payload(acc) if _assistant_payload(acc) else None,
                     )
-                    touch_session(persist_sid)
+                    touch_session(persist_sid, int(user["id"]))
+                    background_tasks.add_task(
+                        refresh_memory_after_turn,
+                        trace_id,
+                        int(user["id"]),
+                        persist_sid,
+                        req.message,
+                        acc.get("content") or "",
+                    )
                 except Exception as exc:
                     log_event(
                         trace_id,

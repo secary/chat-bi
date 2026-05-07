@@ -75,17 +75,24 @@ async def stream_chat(
     messages: List[Dict[str, str]],
     trace_id: str = "",
     skill_db_overrides: Optional[Dict[str, str]] = None,
+    memory_block: Optional[str] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """Agent loop: ReAct multi-step or legacy single-plan Skill execution."""
     if settings.agent_react:
         async for event in stream_chat_react(
-            messages, trace_id=trace_id, skill_db_overrides=skill_db_overrides
+            messages,
+            trace_id=trace_id,
+            skill_db_overrides=skill_db_overrides,
+            memory_block=memory_block,
         ):
             yield event
         return
 
     async for event in _stream_chat_legacy(
-        messages, trace_id=trace_id, skill_db_overrides=skill_db_overrides
+        messages,
+        trace_id=trace_id,
+        skill_db_overrides=skill_db_overrides,
+        memory_block=memory_block,
     ):
         yield event
 
@@ -94,6 +101,7 @@ async def _stream_chat_legacy(
     messages: List[Dict[str, str]],
     trace_id: str = "",
     skill_db_overrides: Optional[Dict[str, str]] = None,
+    memory_block: Optional[str] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """Single LLM JSON plan with optional two-step query and advice execution."""
     log_event(
@@ -104,6 +112,8 @@ async def _stream_chat_legacy(
     )
     skills = scan_skills_enabled(settings.skills_dir)
     system_prompt = build_system_prompt(skills)
+    if memory_block and memory_block.strip():
+        system_prompt = memory_block.strip() + "\n\n" + system_prompt
 
     yield {"type": "thinking", "content": "正在分析您的问题，理解业务语义..."}
     log_event(

@@ -8,44 +8,52 @@ from typing import Any, Dict, List, Optional
 from backend.db_mysql import app_connection, execute, fetch_all, fetch_one
 
 
-def create_session(title: str = "新对话") -> int:
+def create_session(user_id: int, title: str = "新对话") -> int:
     with app_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute("INSERT INTO chat_session (title) VALUES (%s)", (title,))
+            cur.execute(
+                "INSERT INTO chat_session (title, user_id) VALUES (%s, %s)",
+                (title, user_id),
+            )
             return int(cur.lastrowid)
 
 
-def list_sessions(limit: int = 100) -> List[Dict[str, Any]]:
+def list_sessions(user_id: int, limit: int = 100) -> List[Dict[str, Any]]:
     return fetch_all(
         "SELECT id, title, created_at, updated_at FROM chat_session "
-        "ORDER BY updated_at DESC LIMIT %s",
-        (limit,),
+        "WHERE user_id = %s ORDER BY updated_at DESC LIMIT %s",
+        (user_id, limit),
     )
 
 
-def get_session(session_id: int) -> Optional[Dict[str, Any]]:
+def get_session_for_user(session_id: int, user_id: int) -> Optional[Dict[str, Any]]:
     return fetch_one(
-        "SELECT id, title, created_at, updated_at FROM chat_session WHERE id = %s",
-        (session_id,),
+        "SELECT id, title, created_at, updated_at, user_id FROM chat_session "
+        "WHERE id = %s AND user_id = %s",
+        (session_id, user_id),
     )
 
 
-def update_session_title(session_id: int, title: str) -> None:
+def update_session_title(session_id: int, user_id: int, title: str) -> None:
     execute(
-        "UPDATE chat_session SET title = %s WHERE id = %s",
-        (title, session_id),
+        "UPDATE chat_session SET title = %s WHERE id = %s AND user_id = %s",
+        (title, session_id, user_id),
     )
 
 
-def touch_session(session_id: int) -> None:
+def touch_session(session_id: int, user_id: int) -> None:
     execute(
-        "UPDATE chat_session SET updated_at = CURRENT_TIMESTAMP(6) WHERE id = %s",
-        (session_id,),
+        "UPDATE chat_session SET updated_at = CURRENT_TIMESTAMP(6) "
+        "WHERE id = %s AND user_id = %s",
+        (session_id, user_id),
     )
 
 
-def delete_session(session_id: int) -> None:
-    execute("DELETE FROM chat_session WHERE id = %s", (session_id,))
+def delete_session(session_id: int, user_id: int) -> None:
+    execute(
+        "DELETE FROM chat_session WHERE id = %s AND user_id = %s",
+        (session_id, user_id),
+    )
 
 
 def list_messages_for_llm(

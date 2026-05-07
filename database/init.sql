@@ -250,15 +250,39 @@ VALUES
 -- 应用表：会话、管理配置（与演示业务数据同库，便于 Demo）
 -- ============================================================
 
+DROP TABLE IF EXISTS user_memory;
 DROP TABLE IF EXISTS chat_message;
 DROP TABLE IF EXISTS chat_session;
+DROP TABLE IF EXISTS app_user;
+
+CREATE TABLE app_user (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  username VARCHAR(120) NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  role VARCHAR(32) NOT NULL DEFAULT 'user',
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  UNIQUE KEY uq_app_user_username (username)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 默认管理员 admin / admin123（部署后请修改）
+INSERT INTO app_user (username, password_hash, role, is_active)
+VALUES (
+  'admin',
+  '$2b$12$iXi5Jzd4MR2HPoWaaai6pOmuDcivD9AF05G.knPmpp7Gp5drrSVYG',
+  'admin',
+  1
+);
 
 CREATE TABLE chat_session (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   title VARCHAR(255) NOT NULL DEFAULT '新对话',
+  user_id BIGINT NOT NULL,
   created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-  KEY idx_chat_session_updated (updated_at)
+  CONSTRAINT fk_chat_session_user FOREIGN KEY (user_id) REFERENCES app_user (id),
+  KEY idx_chat_session_updated (updated_at),
+  KEY idx_chat_session_user_updated (user_id, updated_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE chat_message (
@@ -271,6 +295,20 @@ CREATE TABLE chat_message (
   CONSTRAINT fk_chat_message_session FOREIGN KEY (session_id)
     REFERENCES chat_session(id) ON DELETE CASCADE,
   KEY idx_chat_message_session (session_id, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE user_memory (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  user_id BIGINT NOT NULL,
+  kind VARCHAR(32) NOT NULL,
+  title VARCHAR(512) NULL,
+  content LONGTEXT NOT NULL,
+  source_session_id BIGINT NULL,
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  CONSTRAINT fk_user_memory_user FOREIGN KEY (user_id) REFERENCES app_user (id) ON DELETE CASCADE,
+  CONSTRAINT fk_user_memory_session FOREIGN KEY (source_session_id) REFERENCES chat_session (id) ON DELETE SET NULL,
+  KEY idx_user_memory_user_kind (user_id, kind, updated_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 DROP TABLE IF EXISTS skill_registry;

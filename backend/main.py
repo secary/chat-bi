@@ -6,14 +6,17 @@ from pathlib import Path
 from time import perf_counter
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from backend.auth_deps import get_current_user, require_admin
 from backend.http_utils import request_trace_id
 from backend.routes.admin_db_route import router as admin_db_router
 from backend.routes.admin_llm_route import router as admin_llm_router
 from backend.routes.admin_skills_route import router as admin_skills_router
+from backend.routes.admin_users_route import router as admin_users_router
+from backend.routes.auth_route import router as auth_router
 from backend.routes.chat_route import router as chat_router
 from backend.routes.dashboard_route import router as dashboard_router
 from backend.routes.sessions_route import router as sessions_router
@@ -32,12 +35,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth_router)
 app.include_router(chat_router)
-app.include_router(dashboard_router)
+app.include_router(
+    dashboard_router,
+    dependencies=[Depends(get_current_user)],
+)
 app.include_router(sessions_router)
-app.include_router(admin_llm_router)
-app.include_router(admin_db_router)
-app.include_router(admin_skills_router)
+app.include_router(admin_llm_router, dependencies=[Depends(require_admin)])
+app.include_router(admin_db_router, dependencies=[Depends(require_admin)])
+app.include_router(admin_skills_router, dependencies=[Depends(require_admin)])
+app.include_router(admin_users_router)
 
 
 class UploadResult(BaseModel):
@@ -53,7 +61,11 @@ async def health():
 
 
 @app.post("/upload")
-async def upload(request: Request, file: UploadFile = File(...)):
+async def upload(
+    request: Request,
+    file: UploadFile = File(...),
+    _user: dict = Depends(get_current_user),
+):
     trace_id = request_trace_id(request)
     started_at = perf_counter()
     original_name = file.filename or "upload"

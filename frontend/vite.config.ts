@@ -16,6 +16,7 @@ export default defineConfig({
       '/sessions': proxyTarget,
       '/dashboard': proxyTarget,
       '/admin': proxyTarget,
+      '/auth': proxyTarget,
     },
   },
 })

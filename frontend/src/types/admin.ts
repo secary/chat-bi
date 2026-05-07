@@ -5,6 +5,11 @@ export interface SessionRow {
   updated_at: string;
 }
 
+export interface SessionListApi {
+  sessions: SessionRow[];
+  suggested_prompts: string[];
+}
+
 export interface AdminSkillRow {
   slug: string;
   name: string;

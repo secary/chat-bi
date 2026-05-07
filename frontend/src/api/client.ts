@@ -4,22 +4,54 @@ import type {
   CurrentDbConnectionView,
   DbConnectionRow,
   LlmSettingsView,
-  SessionRow,
+  SessionListApi,
 } from '../types/admin';
+import type { AppUser, AppUserRow } from '../types/auth';
 import type { DashboardOverview } from '../types/dashboard';
 
 export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 const CHAT_URL = `${API_BASE_URL}/chat`;
 const UPLOAD_URL = `${API_BASE_URL}/upload`;
+const TOKEN_KEY = 'chatbi_token';
+
+export function getStoredToken(): string | null {
+  try {
+    return sessionStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredToken(token: string | null): void {
+  try {
+    if (token) sessionStorage.setItem(TOKEN_KEY, token);
+    else sessionStorage.removeItem(TOKEN_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+function authHeaders(extra?: Record<string, string>): Record<string, string> {
+  const h: Record<string, string> = { ...(extra || {}) };
+  const t = getStoredToken();
+  if (t) h.Authorization = `Bearer ${t}`;
+  return h;
+}
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const headers: Record<string, string> = {
-    ...(init?.headers as Record<string, string> | undefined),
-  };
+  const headers: Record<string, string> = authHeaders(
+    init?.headers as Record<string, string> | undefined,
+  );
   if (init?.body && !headers['Content-Type']) {
     headers['Content-Type'] = 'application/json';
   }
   const res = await fetch(`${API_BASE_URL}${path}`, { ...init, headers });
+  if (res.status === 401 && !path.startsWith('/auth/login')) {
+    setStoredToken(null);
+    if (typeof window !== 'undefined' && !window.location.pathname.endsWith('/login')) {
+      window.location.assign('/login');
+    }
+  }
   if (!res.ok) {
     const text = await res.text();
     throw new Error(text || `请求失败: ${res.status}`);
@@ -50,9 +82,21 @@ export async function* streamChat(
 ): AsyncGenerator<SseEvent> {
   const response = await fetch(CHAT_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Trace-Id': traceId },
+    headers: authHeaders({
+      'Content-Type': 'application/json',
+      'X-Trace-Id': traceId,
+    }),
     body: JSON.stringify(req),
   });
+
+  if (response.status === 401) {
+    setStoredToken(null);
+    if (typeof window !== 'undefined' && !window.location.pathname.endsWith('/login')) {
+      window.location.assign('/login');
+    }
+    yield { type: 'error', content: '未登录或会话已过期' };
+    return;
+  }
 
   if (!response.ok) {
     yield { type: 'error', content: `请求失败: ${response.status}` };
@@ -95,9 +139,17 @@ export async function uploadFile(file: File, traceId = newTraceId()): Promise<Up
 
   const response = await fetch(UPLOAD_URL, {
     method: 'POST',
-    headers: { 'X-Trace-Id': traceId },
+    headers: authHeaders({ 'X-Trace-Id': traceId }),
     body: formData,
   });
+
+  if (response.status === 401) {
+    setStoredToken(null);
+    if (typeof window !== 'undefined' && !window.location.pathname.endsWith('/login')) {
+      window.location.assign('/login');
+    }
+    throw new Error('未登录或会话已过期');
+  }
 
   if (!response.ok) {
     let detail = `上传失败: ${response.status}`;
@@ -117,15 +169,64 @@ export async function getDashboardOverview(): Promise<DashboardOverview> {
   return requestJson<DashboardOverview>('/dashboard/overview');
 }
 
-export async function listSessionsApi(): Promise<SessionRow[]> {
-  return requestJson<SessionRow[]>('/sessions');
+export async function listSessionsApi(): Promise<SessionListApi> {
+  return requestJson<SessionListApi>('/sessions');
 }
 
-export async function createSessionApi(title = '新对话'): Promise<{ id: number }> {
-  return requestJson<{ id: number }>('/sessions', {
+export async function createSessionApi(
+  title = '新对话',
+): Promise<{ id: number; suggested_prompts: string[] }> {
+  return requestJson<{ id: number; suggested_prompts: string[] }>('/sessions', {
     method: 'POST',
     body: JSON.stringify({ title }),
   });
+}
+
+export async function loginApi(username: string, password: string): Promise<string> {
+  const res = await fetch(`${API_BASE_URL}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || '登录失败');
+  }
+  const data = (await res.json()) as { access_token: string };
+  return data.access_token;
+}
+
+export async function getMeApi(): Promise<AppUser> {
+  return requestJson<AppUser>('/auth/me');
+}
+
+export async function listUsersApi(): Promise<AppUserRow[]> {
+  return requestJson<AppUserRow[]>('/admin/users');
+}
+
+export async function createUserApi(payload: {
+  username: string;
+  password: string;
+  role: string;
+}): Promise<{ id: number }> {
+  return requestJson<{ id: number }>('/admin/users', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function patchUserApi(
+  id: number,
+  payload: { password?: string; role?: string; is_active?: boolean },
+): Promise<void> {
+  await requestJson(`/admin/users/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deactivateUserApi(id: number): Promise<void> {
+  await requestJson(`/admin/users/${id}`, { method: 'DELETE' });
 }
 
 export async function deleteSessionApi(id: number): Promise<void> {

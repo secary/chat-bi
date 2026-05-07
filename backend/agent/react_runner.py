@@ -27,6 +27,7 @@ async def stream_chat_react(
     messages: List[Dict[str, str]],
     trace_id: str = "",
     skill_db_overrides: Optional[Dict[str, str]] = None,
+    memory_block: Optional[str] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     log_event(
         trace_id,
@@ -36,6 +37,8 @@ async def stream_chat_react(
     )
     skills = scan_skills_enabled(settings.skills_dir)
     system_prompt = build_react_system_prompt(skills)
+    if memory_block and memory_block.strip():
+        system_prompt = memory_block.strip() + "\n\n" + system_prompt
 
     working = [dict(m) for m in messages]
     last_skill_name: Optional[str] = None

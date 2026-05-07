@@ -22,7 +22,11 @@ def find_skill(skills: List[SkillDoc], name: str) -> Optional[SkillDoc]:
 def skill_args_for_execution(
     skill_name: str, args: List[str], messages: List[Dict[str, str]]
 ) -> List[str]:
-    if skill_name in {"chatbi-semantic-query", "chatbi-decision-advisor"}:
+    if skill_name in {
+        "chatbi-semantic-query",
+        "chatbi-decision-advisor",
+        "chatbi-semantic-processing",
+    }:
         latest_user = latest_user_content(messages)
         if latest_user:
             return [latest_user]
@@ -46,7 +50,14 @@ def run_script(
     if not script_dir.is_dir():
         raise RuntimeError(f"脚本目录不存在：{script_dir}")
 
-    scripts = list(script_dir.glob("*.py"))
+    scripts = sorted(
+        script_dir.glob("*.py"),
+        key=lambda path: (
+            path.name.startswith("_"),
+            "core" in path.stem.lower(),
+            path.name,
+        ),
+    )
     if not scripts:
         raise RuntimeError(f"未找到 Python 脚本：{script_dir}")
 
@@ -71,6 +82,44 @@ def run_script(
         return normalize_skill_result(json.loads(output), skill.name)
     except json.JSONDecodeError:
         return {"kind": "text", "text": output, "data": {}}
+
+
+def skill_result_log_payload(result: Dict[str, Any]) -> Dict[str, Any]:
+    payload: Dict[str, Any] = {
+        "kind": result.get("kind"),
+        "text_preview": str(result.get("text") or "")[:160],
+    }
+    data = result.get("data")
+    if not isinstance(data, dict):
+        return payload
+    rows = data.get("rows")
+    if isinstance(rows, list):
+        payload["row_count"] = len(rows)
+        if rows and isinstance(rows[0], dict):
+            payload["row_keys"] = list(rows[0].keys())[:8]
+    query_intent = data.get("query_intent")
+    if isinstance(query_intent, dict):
+        payload["query_intent"] = {
+            "status": query_intent.get("status"),
+            "business_line": query_intent.get("business_line"),
+            "intent_type": query_intent.get("intent_type"),
+            "metric_ids": [
+                item.get("metric_id")
+                for item in query_intent.get("metrics", [])
+                if isinstance(item, dict)
+            ][:5],
+            "dimension_ids": [
+                item.get("dimension_id")
+                for item in query_intent.get("dimensions", [])
+                if isinstance(item, dict)
+            ][:5],
+            "missing_slots": query_intent.get("missing_slots", [])[:5],
+        }
+    if isinstance(data.get("facts"), dict):
+        payload["has_facts"] = True
+    if isinstance(data.get("advices"), list):
+        payload["advice_count"] = len(data["advices"])
+    return payload
 
 
 def skill_env(

@@ -7,12 +7,14 @@ import shutil
 from pathlib import Path
 from typing import List
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from backend.agent.prompt_builder import scan_skills
 from backend.config import settings
+from backend.http_utils import request_trace_id
 from backend.skill_registry_repo import disabled_slugs, set_enabled
+from backend.trace import log_event
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -58,7 +60,7 @@ def _default_skill_md(slug: str, body: str) -> str:
 
 
 @router.get("/skills")
-def admin_list_skills() -> List[dict]:
+def admin_list_skills(request: Request) -> List[dict]:
     blocked = disabled_slugs()
     docs = scan_skills(settings.skills_dir)
     rows = []
@@ -72,14 +74,29 @@ def admin_list_skills() -> List[dict]:
                 "enabled": slug not in blocked,
             }
         )
+    log_event(
+        request_trace_id(request),
+        "admin.skills",
+        "listed",
+        payload={"count": len(rows), "disabled_count": len(blocked)},
+    )
     return rows
 
 
 @router.post("/skills")
-def admin_create_skill(body: SkillCreate) -> dict:
+def admin_create_skill(body: SkillCreate, request: Request) -> dict:
+    trace_id = request_trace_id(request)
     slug = body.slug.strip()
     base = _skill_path(slug)
     if base.exists():
+        log_event(
+            trace_id,
+            "admin.skills",
+            "create_failed",
+            "skill directory exists",
+            payload={"slug": slug},
+            level="WARN",
+        )
         raise HTTPException(status_code=409, detail="技能目录已存在")
     base.mkdir(parents=True)
     (base / "SKILL.md").write_text(
@@ -87,37 +104,95 @@ def admin_create_skill(body: SkillCreate) -> dict:
     )
     scripts = base / "scripts"
     scripts.mkdir(exist_ok=True)
+    log_event(
+        trace_id,
+        "admin.skills",
+        "created",
+        payload={"slug": slug, "path": str(base)},
+    )
     return {"slug": slug, "path": str(base)}
 
 
 @router.put("/skills/{slug}")
-def admin_put_skill(slug: str, body: SkillPut) -> dict:
+def admin_put_skill(slug: str, body: SkillPut, request: Request) -> dict:
+    trace_id = request_trace_id(request)
     skill_md = _skill_path(slug) / "SKILL.md"
     if not skill_md.is_file():
+        log_event(
+            trace_id,
+            "admin.skills",
+            "update_failed",
+            "skill file not found",
+            payload={"slug": slug},
+            level="WARN",
+        )
         raise HTTPException(status_code=404, detail="SKILL.md 不存在")
     skill_md.write_text(body.markdown, encoding="utf-8")
+    log_event(
+        trace_id,
+        "admin.skills",
+        "updated",
+        payload={"slug": slug, "markdown_length": len(body.markdown)},
+    )
     return {"ok": True}
 
 
 @router.patch("/skills/{slug}")
-def admin_patch_skill(slug: str, body: SkillPatch) -> dict:
+def admin_patch_skill(slug: str, body: SkillPatch, request: Request) -> dict:
     _skill_path(slug)  # validate slug path
     set_enabled(slug, body.enabled)
+    log_event(
+        request_trace_id(request),
+        "admin.skills",
+        "toggled",
+        payload={"slug": slug, "enabled": body.enabled},
+    )
     return {"ok": True}
 
 
 @router.delete("/skills/{slug}")
-def admin_delete_skill(slug: str) -> dict:
+def admin_delete_skill(slug: str, request: Request) -> dict:
+    trace_id = request_trace_id(request)
     base = _skill_path(slug)
     if not base.is_dir():
+        log_event(
+            trace_id,
+            "admin.skills",
+            "delete_failed",
+            "skill not found",
+            payload={"slug": slug},
+            level="WARN",
+        )
         raise HTTPException(status_code=404, detail="技能不存在")
     shutil.rmtree(base)
+    log_event(
+        trace_id,
+        "admin.skills",
+        "deleted",
+        payload={"slug": slug, "path": str(base)},
+    )
     return {"ok": True}
 
 
 @router.get("/skills/{slug}/file")
-def admin_get_skill_file(slug: str) -> dict:
+def admin_get_skill_file(slug: str, request: Request) -> dict:
+    trace_id = request_trace_id(request)
     skill_md = _skill_path(slug) / "SKILL.md"
     if not skill_md.is_file():
+        log_event(
+            trace_id,
+            "admin.skills",
+            "file_view_failed",
+            "skill file not found",
+            payload={"slug": slug},
+            level="WARN",
+        )
         raise HTTPException(status_code=404, detail="SKILL.md 不存在")
-    return {"markdown": skill_md.read_text(encoding="utf-8")}
+    content = skill_md.read_text(encoding="utf-8")
+    log_event(
+        trace_id,
+        "admin.skills",
+        "file_viewed",
+        payload={"slug": slug, "markdown_length": len(content)},
+    )
+    return {"markdown": content}

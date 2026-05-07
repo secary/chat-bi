@@ -1,10 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useChat } from '../hooks/useChat';
+import {
+  readMultiAgentsPreference,
+  readSidebarOpenPreference,
+  useChat,
+  writeMultiAgentsPreference,
+  writeSidebarOpenPreference,
+} from '../hooks/useChat';
 import { MessageBubble } from '../components/MessageBubble';
 import { ChatInput } from '../components/ChatInput';
+import { Switch } from '../components/Switch';
 import {
   createSessionApi,
   deleteSessionApi,
+  downloadSessionReportPdf,
   listSessionsApi,
 } from '../api/client';
 import type { SessionRow } from '../types/admin';
@@ -17,8 +25,23 @@ export function ChatPage() {
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [dbConnId, setDbConnId] = useState<number | null>(null);
   const [booting, setBooting] = useState(true);
+  const [multiAgents, setMultiAgents] = useState(() => readMultiAgentsPreference());
+  const [sidebarOpen, setSidebarOpen] = useState(() => readSidebarOpenPreference());
+  const [pdfExporting, setPdfExporting] = useState(false);
 
-  const { messages, loading, sendMessage } = useChat(sessionId, dbConnId);
+  const { messages, loading, sendMessage } = useChat(
+    sessionId,
+    dbConnId,
+    multiAgents,
+  );
+
+  useEffect(() => {
+    writeMultiAgentsPreference(multiAgents);
+  }, [multiAgents]);
+
+  useEffect(() => {
+    writeSidebarOpenPreference(sidebarOpen);
+  }, [sidebarOpen]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -66,6 +89,24 @@ export function ChatPage() {
     }
   };
 
+  const exportPdf = async () => {
+    if (sessionId == null || pdfExporting) return;
+    setPdfExporting(true);
+    try {
+      const blob = await downloadSessionReportPdf(sessionId);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `chatbi-session-${sessionId}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      logger.error('export pdf', e);
+    } finally {
+      setPdfExporting(false);
+    }
+  };
+
   const removeSession = async (id: number) => {
     try {
       await deleteSessionApi(id);
@@ -86,47 +127,119 @@ export function ChatPage() {
 
   return (
     <div className="flex h-full">
-      <aside className="flex w-56 shrink-0 flex-col border-r border-gray-200 bg-white">
-        <div className="flex items-center justify-between border-b border-gray-100 px-3 py-2">
-          <span className="text-xs font-medium text-gray-700">会话</span>
-          <button
-            type="button"
-            onClick={() => void newSession()}
-            className="rounded bg-gray-900 px-2 py-1 text-xs text-white hover:bg-gray-800"
-          >
-            新对话
-          </button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-2">
-          {sessions.map((s) => (
-            <div
-              key={s.id}
-              className={`group mb-1 flex items-center gap-1 rounded px-2 py-1.5 ${
-                sessionId === s.id ? 'bg-gray-100' : 'hover:bg-gray-50'
-              }`}
-            >
-              <button
-                type="button"
-                className="min-w-0 flex-1 truncate text-left text-xs text-gray-800"
-                onClick={() => setSessionId(s.id)}
-              >
-                {s.title || `会话 ${s.id}`}
-              </button>
-              <button
-                type="button"
-                title="删除"
-                className="shrink-0 text-xs text-gray-400 opacity-0 hover:text-red-600 group-hover:opacity-100"
-                onClick={() => void removeSession(s.id)}
-              >
-                ×
-              </button>
+      <aside
+        className={
+          'flex shrink-0 flex-col border-r border-gray-200 bg-white transition-[width] duration-200 ' +
+          (sidebarOpen ? 'w-56' : 'w-10')
+        }
+      >
+        {sidebarOpen ? (
+          <>
+            <div className="flex items-center justify-between gap-1 border-b border-gray-100 px-2 py-2">
+              <span className="truncate text-xs font-medium text-gray-700">会话</span>
+              <div className="flex shrink-0 items-center gap-1">
+                <button
+                  type="button"
+                  title="收起会话列表"
+                  onClick={() => setSidebarOpen(false)}
+                  className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+                >
+                  <span className="sr-only">收起会话列表</span>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    aria-hidden
+                  >
+                    <path d="M15 6l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void newSession()}
+                  className="rounded bg-gray-900 px-2 py-1 text-xs text-white hover:bg-gray-800"
+                >
+                  新对话
+                </button>
+              </div>
             </div>
-          ))}
-        </div>
+            <div className="flex-1 overflow-y-auto p-2">
+              {sessions.map((s) => (
+                <div
+                  key={s.id}
+                  className={`group mb-1 flex items-center gap-1 rounded px-2 py-1.5 ${
+                    sessionId === s.id ? 'bg-gray-100' : 'hover:bg-gray-50'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    className="min-w-0 flex-1 truncate text-left text-xs text-gray-800"
+                    onClick={() => setSessionId(s.id)}
+                  >
+                    {s.title || `会话 ${s.id}`}
+                  </button>
+                  <button
+                    type="button"
+                    title="删除"
+                    className="shrink-0 text-xs text-gray-400 opacity-0 hover:text-red-600 group-hover:opacity-100"
+                    onClick={() => void removeSession(s.id)}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="flex flex-1 flex-col items-center gap-3 py-3">
+            <button
+              type="button"
+              title="展开会话列表"
+              onClick={() => setSidebarOpen(true)}
+              className="rounded p-1.5 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+            >
+              <span className="sr-only">展开会话列表</span>
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                aria-hidden
+              >
+                <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          </div>
+        )}
       </aside>
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <header className="flex flex-wrap items-center gap-3 border-b border-gray-200 bg-white px-4 py-2">
+          <div className="flex items-center gap-2 text-xs text-gray-600">
+            <Switch
+              id="multi-agents-switch"
+              checked={multiAgents}
+              onChange={setMultiAgents}
+              disabled={booting}
+              aria-label="多专线协作"
+            />
+            <label htmlFor="multi-agents-switch" className="cursor-pointer select-none">
+              多专线协作
+            </label>
+          </div>
+          <button
+            type="button"
+            disabled={booting || sessionId == null || pdfExporting}
+            onClick={() => void exportPdf()}
+            className="rounded-full border border-gray-300 bg-white px-3 py-1 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          >
+            {pdfExporting ? '导出中…' : '导出 PDF 报告'}
+          </button>
           <label className="flex items-center gap-2 text-xs text-gray-600">
             数据源连接 ID（可选）
             <input

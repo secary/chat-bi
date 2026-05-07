@@ -56,6 +56,17 @@ def scan_skills_enabled(skills_dir: Path) -> List[SkillDoc]:
     return [s for s in scan_skills(skills_dir) if s.skill_dir.name not in blocked]
 
 
+def scan_skills_for_slugs(skills_dir: Path, slugs: Sequence[str]) -> List[SkillDoc]:
+    """Enabled skills whose directory name is in slugs (order preserved by slug list)."""
+    by_name = {d.skill_dir.name: d for d in scan_skills_enabled(skills_dir)}
+    out: List[SkillDoc] = []
+    for name in slugs:
+        key = str(name).strip()
+        if key in by_name:
+            out.append(by_name[key])
+    return out
+
+
 AGENT_SYSTEM_INSTRUCTION = """你是一个 ChatBI 数据分析助手，帮助用户用自然语言查询业务数据、管理语义别名、生成经营决策建议。
 
 ## 工作方式

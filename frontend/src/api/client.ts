@@ -248,6 +248,26 @@ export async function getSessionMessagesApi(
   return requestJson<Record<string, unknown>[]>(`/sessions/${id}/messages`);
 }
 
+export async function downloadSessionReportPdf(sessionId: number): Promise<Blob> {
+  const res = await fetch(`${API_BASE_URL}/sessions/${sessionId}/report.pdf`, {
+    headers: authHeaders(),
+  });
+  if (
+    authEnabled &&
+    res.status === 401 &&
+    typeof window !== 'undefined' &&
+    !window.location.pathname.endsWith('/login')
+  ) {
+    setStoredToken(null);
+    window.location.assign('/login');
+  }
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `导出失败: ${res.status}`);
+  }
+  return res.blob();
+}
+
 export async function listAdminSkills(): Promise<AdminSkillRow[]> {
   return requestJson<AdminSkillRow[]>('/admin/skills');
 }

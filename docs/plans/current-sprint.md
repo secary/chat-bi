@@ -92,6 +92,17 @@
 - 涉及文件：`backend/business_db.py`、`backend/dashboard_overview.py`、`backend/routes/dashboard_route.py`、`frontend/src/pages/DashboardPage.tsx`、`frontend/src/lib/dashboardCharts.ts`、`frontend/vitest.config.ts`
 - 复杂度：中
 
+### 任务 11：Multi-Agent、多模态与 PDF 报告
+- 状态：✅ 已完成
+- 验收标准：
+  - [x] `skills/_agents/registry.yaml` 定义风控 / 营销 / 分析与 Skill 白名单；路由 LLM 输出专线列表（上限见 registry）；顺序执行专线并按 Observation 汇总输出；`POST /chat` 支持 `multi_agents`
+  - [x] 前端「多专线协作」开关 + `localStorage`；`CHATBI_VISION_DISABLED` 可关闭图像抽取；`/upload` 支持 PNG/JPG/WebP；会话发起前对用户消息中的上传图像路径做 LiteLLM Vision 表格抽取并注入上下文
+  - [x] `GET /sessions/{id}/report.pdf` 导出服务端 PDF（WeasyPrint）；前端「导出 PDF 报告」；镜像安装 Pango/Cairo 与 Noto CJK；`tests/test_multi_agent_*`、`test_vision_extract.py`、`test_report_pdf.py`
+  - [x] PDF 报告：`litellm.completion` 精炼摘要（`CHATBI_PDF_SUMMARY_DISABLED` 时降级为要点摘录）；ECharts 落库 option 经 matplotlib 转 PNG 嵌入 HTML；ReportLab 降级路径含 PNG；`matplotlib`/`pillow` 依赖
+  - [x] 对话页：多专线「iOS 风格」拨动开关（`Switch.tsx`）；会话侧栏可收起/展开（`chatbi_sidebar_open`）
+- 涉及文件：`backend/agent/multi_agent_*.py`、`backend/vision/`、`backend/report/pdf_report.py`、`backend/report/pdf_summary.py`、`backend/report/pdf_chart_png.py`、`backend/routes/sessions_route.py`、`frontend/src/pages/ChatPage.tsx`、`frontend/src/components/Switch.tsx`、`frontend/src/hooks/useChat.ts`、`backend/Dockerfile`、`requirements.txt`
+- 复杂度：高
+
 ### 任务 10：用户鉴权与长短期记忆（OpenClaw 风格 MVP）
 - 状态：✅ 已完成
 - 验收标准：
@@ -157,4 +168,8 @@
 | 47 | 补齐前端用户行为与管理行为日志：`/auth/login`、`/admin/users`、`/sessions`、`/admin/db-connections` 相关接口均接入 `request_trace_id` + `log_event`，记录登录成功/失败、用户创建/修改/禁用、会话创建/重命名/删除、数据源连接 CRUD/测试等行为 | 当前尚未覆盖 `admin_llm_route`、`admin_skills_route`、`auth/me` 等次级管理接口；如果需要完整审计，还可继续扩展 | 在前端分别执行登录、建用户、禁用用户、新建会话、重命名会话、创建数据源连接后，到 `chatbi_logs.chatbi_trace_log` 按 trace_id 查询对应事件 |
 | 48 | 继续补齐剩余前端入口日志：`/admin/llm-settings`、`/admin/skills`、`/dashboard/overview`、`/auth/me` 也已接入 `request_trace_id` + `log_event`；当前 `backend/routes` 下除 `__init__.py` 外均具备 trace 入口 | 路由级别已基本全覆盖，但某些业务内部异常分支仍可能只依赖统一异常返回，未必都有专门事件名；若要更细粒度审计，可继续细分失败原因与字段脱敏策略 | 在前端依次访问管理页、技能页、dashboard、个人信息接口，并在 `chatbi_trace_log` 中确认新增的 `admin.llm_settings`、`admin.skills`、`dashboard.overview`、`auth.me` 事件 |
 | 49 | 重建 `skills/chatbi-semantic-processing`：补回 `scripts/semantic_process.py` + `semantic_processing_core.py`，让当前 Agent 可直接执行并返回标准 `query_intent`；同时补 `tests/test_semantic_processing_skill.py` 覆盖 ready/clarification/trend 三类语义解析输出 | 当前实现为确定性规则版，优先满足 Agent 调度与审计日志契约；尚未接入真实银行 schema 元数据或更细粒度过滤值抽取 | 用 `python -m pytest tests/test_semantic_processing_skill.py tests/test_skill_result_log_payload.py` 验证输出契约；后续如需要可继续补 business filter、comparison period 和 schema hints 细节 |
+| 50 | 完成任务 11：Multi-Agent 编排（registry + 路由 + 专线过滤 Skill + 汇总）、图像上传与 Vision 抽取注入、`GET /sessions/{id}/report.pdf`、前端开关与 PDF 按钮；补充单测；backend Dockerfile 增加 WeasyPrint 系统依赖 | `tests/test_agent_workflow.py` 仍引用已删除符号无法收集；无 GTK 的 Windows 主机上 WeasyPrint PDF 生成会 RuntimeError，PDF 单测降级为跳过 | 重建 backend 镜像后验证 PDF；配置支持 vision 的 LLM；按需修复或移除过时 `test_agent_workflow` |
+| 51 | 修复 PDF 导出 500：`render_session_pdf_bytes` 增加降级链路（WeasyPrint 失败自动回退 ReportLab），并补充 `test_render_session_pdf_bytes_fallback_to_reportlab`；`requirements.txt` 新增 `reportlab` 依赖 | 回退链路为文本型 PDF（可读但不含 HTML 样式）；若要与 WeasyPrint 视觉一致仍建议在容器安装 Cairo/Pango | 重建 backend 依赖后在前端点击“导出 PDF 报告”验证，确认 Windows/本机环境不再 500 |
+| 52 | 修复开发镜像构建失败：`backend/Dockerfile` 将 Debian 不可用包 `libgdk-pixbuf2.0-0` 改为可用包名 `libgdk-pixbuf-2.0-0`，消除 `apt-get install` exit code 100 | 若基础镜像后续继续升级，系统包名仍可能变化；建议锁定基础镜像 digest 或在 CI 增加定期构建探测 | 重新执行 `docker compose --env-file .env.dev -f docker-compose.dev.yml up -d --build` 验证 backend 构建通过 |
+| 53 | 修复 PDF 图表中文乱码：`backend/report/pdf_chart_png.py` 增加运行时字体探测与 CJK 字体优先策略，`matplotlib` 优先使用可用中文字体再回退 DejaVu；补单测 `test_select_sans_fonts_prefers_cjk` | 若运行环境缺少任何 CJK 字体，仍会回退到 DejaVu，中文可能继续显示异常 | 在目标环境安装 Noto/微软雅黑等中文字体并重启后端，重新导出 PDF 验证图表标题和坐标轴中文显示正常 |
 | 50 | 适配 `skills/chatbi-chart-recommendation` 到当前框架：补回 `scripts/recommend_chart.py` + `chart_recommendation_core.py`，输出当前 Agent 可消费的 `charts/kpis`，并为“推荐什么图表/如何可视化”补一条 planner 触发规则 | 当前版本默认优先吃 JSON 输入 `{question, rows}`；如果只有自然语言问题而没有结果行，会返回 `need_clarification`，尚未自动串到查询后置链路 | 用 `env PYTHONPATH=. python3 tests/test_chart_recommendation_skill.py tests/test_agent_skill_protocol.py` 验证；前端可通过技能直调或后续接入 query 后置链路验证图表渲染 |

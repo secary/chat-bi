@@ -25,6 +25,7 @@ export interface ChatRequest {
   history: { role: string; content: string }[];
   session_id?: number;
   db_connection_id?: number;
+  multi_agents?: boolean;
 }
 
 export interface UploadedFile {

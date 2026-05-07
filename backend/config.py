@@ -2,15 +2,10 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
-try:
-    from dotenv import load_dotenv
-except ImportError:
+from backend.env_loader import load_project_env
 
-    def load_dotenv() -> None:
-        return None
-
-
-load_dotenv()
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+load_project_env(_PROJECT_ROOT)
 
 
 @dataclass(frozen=True)
@@ -133,7 +128,7 @@ class Settings:
         default_factory=lambda: max(1, int(os.getenv("CHATBI_AUTH_DEV_USER_ID", "1")))
     )
 
-    project_root: Path = Path(__file__).resolve().parent.parent
+    project_root: Path = _PROJECT_ROOT
     skills_dir: Path = field(init=False)
 
     def __post_init__(self):

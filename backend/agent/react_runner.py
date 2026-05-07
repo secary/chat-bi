@@ -21,15 +21,33 @@ from backend.config import settings
 from backend.trace import log_event
 
 OBS_HEADER = "以下为工具执行后的 Observation（JSON 摘要），请基于事实继续推理：\n"
+_VISUAL_FIRST_SKILLS = {"chart-recommendation", "dashboard-orchestration"}
 
 
 def _merge_finish_result(
-    plan: Dict[str, Any], last_result: Optional[Dict[str, Any]]
+    plan: Dict[str, Any],
+    last_result: Optional[Dict[str, Any]],
+    last_skill_name: Optional[str] = None,
 ) -> Dict[str, Any]:
     merged: Dict[str, Any] = dict(last_result or {})
+    if _should_suppress_finish_text(last_skill_name, merged):
+        merged["text"] = ""
+        return merged
     if plan.get("text"):
         merged["text"] = plan["text"]
     return merged
+
+
+def _should_suppress_finish_text(
+    last_skill_name: Optional[str], result: Optional[Dict[str, Any]]
+) -> bool:
+    if last_skill_name not in _VISUAL_FIRST_SKILLS:
+        return False
+    if not isinstance(result, dict):
+        return False
+    has_charts = bool(result.get("charts"))
+    has_kpis = bool(result.get("kpis"))
+    return has_charts or has_kpis
 
 
 def _sink_write(
@@ -96,7 +114,7 @@ async def stream_chat_react(
         action = str(plan.get("action") or "finish").strip().lower()
         if action in ("finish", "done", "answer"):
             yield {"type": "thinking", "content": "正在整理回答..."}
-            merged = _merge_finish_result(plan, last_result)
+            merged = _merge_finish_result(plan, last_result, last_skill_name)
             skill_label = last_skill_name or "chatbi-semantic-query"
             async for event in stream_result_events(skill_label, plan, merged):
                 yield event
@@ -193,7 +211,7 @@ async def stream_chat_react(
             "kpi_cards": None,
             "text": "已达到最大推理步数，以上为最后一次工具返回的数据摘要。",
         }
-        merged = _merge_finish_result(fallback_plan, last_result)
+        merged = _merge_finish_result(fallback_plan, last_result, last_skill_name)
         async for event in stream_result_events(
             last_skill_name or "skill", fallback_plan, merged
         ):

@@ -5,11 +5,11 @@ import uuid
 from pathlib import Path
 from time import perf_counter
 
-from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from backend.env_loader import load_project_env
 from backend.auth_deps import get_current_user, require_admin
 from backend.http_utils import request_trace_id
 from backend.routes.admin_db_route import router as admin_db_router
@@ -22,7 +22,7 @@ from backend.routes.dashboard_route import router as dashboard_router
 from backend.routes.sessions_route import router as sessions_router
 from backend.trace import log_event
 
-load_dotenv()
+load_project_env(Path(__file__).resolve().parent.parent)
 
 app = FastAPI(title="ChatBI API", version="0.1.0")
 UPLOAD_DIR = Path("/tmp/chatbi-uploads")

@@ -26,6 +26,7 @@ def skill_args_for_execution(
         "chatbi-semantic-query",
         "chatbi-decision-advisor",
         "chatbi-semantic-processing",
+        "chart-recommendation",
     }:
         latest_user = latest_user_content(messages)
         if latest_user:

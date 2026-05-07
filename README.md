@@ -1,6 +1,6 @@
 # 零眸智能 ChatBI
 
-面向银行业务场景的对话式数据分析 Demo，让用户用中文自然语言完成问数、文件导入、语义别名维护和经营决策建议生成。
+面向银行业务场景的对话式数据分析 Demo。用中文自然语言完成问数、环比分析、指标解释、经营决策建议、语义别名维护和文件导入，支持多会话管理与多步 Skill 链式执行。
 
 ## 快速开始（Docker 全栈）
 
@@ -136,6 +136,7 @@ chat-bi/
 │   ├── chatbi-semantic-query/       # 自然语言问数
 │   ├── chatbi-alias-manager/        # 语义别名管理
 │   ├── chatbi-decision-advisor/     # 经营决策建议
+│   ├── chatbi-comparison/           # 环比分析（月对、全年、季度）
 │   └── chatbi-file-ingestion/       # CSV/XLSX 文件导入校验
 └── tests/
     ├── test_agent_skill_protocol.py # SkillResult 协议单测
@@ -148,18 +149,23 @@ chat-bi/
 
 ```
 用户输入（文字 / 文件）
-  → React 前端（透传 X-Trace-Id）
+  → React 前端（透传 X-Trace-Id、session_id）
   ┌─ POST /upload → 文件校验 → 返回预览 JSON（chatbi-file-ingestion Skill）
   └─ POST /chat（SSE）
        → FastAPI → AgentRunner
-           → prompt_builder 读取 skills/*/SKILL.md
-           → planner 生成 Skill 执行计划（LiteLLM）
+           → prompt_builder 读取 skills/*/SKILL.md（仅已启用 Skill）
+           ┌─ ReAct 模式（CHATBI_AGENT_REACT=true）
+           │    → react_runner 多步推理：plan → call_skill → observation → finish
+           └─ Legacy 模式（默认）
+                → planner 生成 Skill 执行计划（LiteLLM）
+                → 复合意图识别：自动组合 query → decision-advisor 双步链
            → executor 执行 Skill 脚本 → MySQL chatbi_demo
            → 统一 SkillResult 协议（kind / text / data / charts / kpis）
            → formatter 转换为 SSE 消息
            → renderers 构造 ECharts option / KPI 卡片
        → SSE 流式返回
   → 前端渲染（thinking / text / chart / kpi_cards / error）
+  → 会话消息落库（chat_session / chat_message）
   → trace.py 将各节点日志写入 MySQL chatbi_logs（best-effort）
 ```
 
@@ -170,6 +176,7 @@ chat-bi/
 | `chatbi-semantic-query` | 将自然语言转换为 SQL，查询 `chatbi_demo` 并返回表格与图表 |
 | `chatbi-alias-manager` | 维护 `alias_mapping`，将业务别名映射到标准字段名 |
 | `chatbi-decision-advisor` | 先计算指标事实，再按确定性规则生成经营决策建议 |
+| `chatbi-comparison` | 环比分析：支持最近两月对比、全年月度趋势、季度汇总三种模式 |
 | `chatbi-file-ingestion` | 读取 CSV/XLSX，识别表头、校验类型并返回预览 JSON |
 
 每个 Skill 的触发条件、工作流和安全边界见 `skills/<skill-name>/SKILL.md`。

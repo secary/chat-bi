@@ -7,6 +7,7 @@ from backend.agent.executor import (
     find_skill,
     latest_user_content,
     run_script,
+    skill_result_log_payload,
     skill_args_for_execution,
 )
 from backend.agent.formatter import stream_result_events
@@ -186,7 +187,7 @@ async def _stream_chat_legacy(
                 trace_id,
                 "agent.skill",
                 "completed",
-                payload={"skill": skill_name, "kind": result.get("kind")},
+                payload={"skill": skill_name, **skill_result_log_payload(result)},
             )
         except Exception as exc:
             log_event(

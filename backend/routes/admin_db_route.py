@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from backend.connection_repo import (
@@ -16,6 +16,8 @@ from backend.connection_repo import (
     update_connection,
 )
 from backend.db_mysql import test_mysql_connection
+from backend.http_utils import request_trace_id
+from backend.trace import log_event
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -41,17 +43,32 @@ class DbConnectionUpdate(BaseModel):
 
 
 @router.get("/db-connections")
-def list_db_connections() -> List[dict]:
-    return list_connections()
+def list_db_connections(request: Request) -> List[dict]:
+    rows = list_connections()
+    log_event(
+        request_trace_id(request),
+        "admin.db_connections",
+        "listed",
+        payload={"count": len(rows)},
+    )
+    return rows
 
 
 @router.get("/db-connections/current")
-def get_current_db_connection() -> dict:
-    return effective_connection_view()
+def get_current_db_connection(request: Request) -> dict:
+    row = effective_connection_view()
+    log_event(
+        request_trace_id(request),
+        "admin.db_connections",
+        "current_viewed",
+        payload={"source": row.get("source"), "database_name": row.get("database_name")},
+    )
+    return row
 
 
 @router.post("/db-connections")
-def create_db_connection(body: DbConnectionCreate) -> dict:
+def create_db_connection(body: DbConnectionCreate, request: Request) -> dict:
+    trace_id = request_trace_id(request)
     cid = insert_connection(
         body.name,
         body.host,
@@ -66,12 +83,34 @@ def create_db_connection(body: DbConnectionCreate) -> dict:
         raise HTTPException(status_code=500, detail="创建失败")
     out = dict(row)
     out.pop("password", None)
+    log_event(
+        trace_id,
+        "admin.db_connections",
+        "created",
+        payload={
+            "connection_id": cid,
+            "name": body.name,
+            "host": body.host,
+            "port": body.port,
+            "database_name": body.database_name,
+            "is_default": body.is_default,
+        },
+    )
     return out
 
 
 @router.put("/db-connections/{conn_id:int}")
-def put_db_connection(conn_id: int, body: DbConnectionUpdate) -> dict:
+def put_db_connection(conn_id: int, body: DbConnectionUpdate, request: Request) -> dict:
+    trace_id = request_trace_id(request)
     if not get_connection(conn_id):
+        log_event(
+            trace_id,
+            "admin.db_connections",
+            "update_failed",
+            "connection not found",
+            payload={"connection_id": conn_id},
+            level="WARN",
+        )
         raise HTTPException(status_code=404, detail="连接不存在")
     update_connection(
         conn_id,
@@ -86,21 +125,59 @@ def put_db_connection(conn_id: int, body: DbConnectionUpdate) -> dict:
     row = get_connection(conn_id)
     if row:
         row.pop("password", None)
+    log_event(
+        trace_id,
+        "admin.db_connections",
+        "updated",
+        payload={
+            "connection_id": conn_id,
+            "name": body.name,
+            "host": body.host,
+            "port": body.port,
+            "database_name": body.database_name,
+            "is_default": body.is_default,
+            "password_changed": body.password is not None,
+        },
+    )
     return row or {}
 
 
 @router.delete("/db-connections/{conn_id:int}")
-def remove_db_connection(conn_id: int) -> dict:
+def remove_db_connection(conn_id: int, request: Request) -> dict:
+    trace_id = request_trace_id(request)
     if not get_connection(conn_id):
+        log_event(
+            trace_id,
+            "admin.db_connections",
+            "delete_failed",
+            "connection not found",
+            payload={"connection_id": conn_id},
+            level="WARN",
+        )
         raise HTTPException(status_code=404, detail="连接不存在")
     delete_connection(conn_id)
+    log_event(
+        trace_id,
+        "admin.db_connections",
+        "deleted",
+        payload={"connection_id": conn_id},
+    )
     return {"ok": True}
 
 
 @router.post("/db-connections/{conn_id:int}/test")
-def test_db_connection(conn_id: int) -> dict:
+def test_db_connection(conn_id: int, request: Request) -> dict:
+    trace_id = request_trace_id(request)
     row = get_connection(conn_id)
     if not row:
+        log_event(
+            trace_id,
+            "admin.db_connections",
+            "test_failed",
+            "connection not found",
+            payload={"connection_id": conn_id},
+            level="WARN",
+        )
         raise HTTPException(status_code=404, detail="连接不存在")
     try:
         test_mysql_connection(
@@ -111,5 +188,19 @@ def test_db_connection(conn_id: int) -> dict:
             str(row["database_name"]),
         )
     except Exception as exc:
+        log_event(
+            trace_id,
+            "admin.db_connections",
+            "test_failed",
+            str(exc),
+            payload={"connection_id": conn_id, "database_name": str(row["database_name"])},
+            level="WARN",
+        )
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    log_event(
+        trace_id,
+        "admin.db_connections",
+        "tested",
+        payload={"connection_id": conn_id, "database_name": str(row["database_name"])},
+    )
     return {"ok": True}

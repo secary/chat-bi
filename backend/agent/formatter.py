@@ -9,7 +9,8 @@ from backend.renderers.kpi import build_kpi_cards
 async def stream_result_events(
     skill_name: str, plan: Dict[str, Any], result: Dict[str, Any]
 ) -> AsyncGenerator[Dict[str, Any], None]:
-    text = result.get("text") or fallback_text(skill_name, result)
+    visual_only = bool(result.get("charts")) or bool(result.get("kpis"))
+    text = result.get("text") or ("" if visual_only else fallback_text(skill_name, result))
     if text:
         yield {"type": "text", "content": text}
 

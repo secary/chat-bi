@@ -26,12 +26,12 @@ export function Switch({
         'relative h-4 w-8 shrink-0 rounded-full border border-transparent transition-colors ' +
         'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 ' +
         'focus-visible:outline-gray-400 disabled:cursor-not-allowed disabled:opacity-50 ' +
-        (checked ? 'bg-[#34c759]' : 'bg-gray-300')
+        (checked ? 'bg-emerald-500' : 'bg-gray-200')
       }
     >
       <span
         className={
-          'pointer-events-none absolute top-0.5 left-0.5 h-3 w-3 rounded-full bg-white shadow-sm ' +
+          'pointer-events-none absolute inset-y-[1px] left-[1px] h-3 w-3 rounded-full bg-white shadow-sm ' +
           'transition-transform duration-200 ease-out ' +
           (checked ? 'translate-x-4' : 'translate-x-0')
         }

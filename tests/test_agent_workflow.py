@@ -8,13 +8,8 @@ litellm_stub = types.ModuleType("litellm")
 litellm_stub.acompletion = None
 sys.modules.setdefault("litellm", litellm_stub)
 
-from backend.agent.runner import (
-    build_execution_steps,
-    deterministic_skill_override,
-    infer_chart_plan,
-    is_query_plus_decision_request,
-    should_run_followup_decision_advice,
-)
+from backend.agent.prompt_builder import AGENT_REACT_INSTRUCTION, AGENT_SYSTEM_INSTRUCTION
+from backend.agent.runner import _build_steps, _is_query_plus_decision
 
 
 class AgentWorkflowTest(unittest.TestCase):
@@ -27,9 +22,9 @@ class AgentWorkflowTest(unittest.TestCase):
             }
         ]
 
-        self.assertTrue(should_run_followup_decision_advice(plan, messages))
+        self.assertTrue(_is_query_plus_decision(messages))
 
-        steps = build_execution_steps(plan, messages)
+        steps = _build_steps(plan, messages)
         self.assertEqual([step["skill"] for step in steps], [
             "chatbi-semantic-query",
             "chatbi-decision-advisor",
@@ -40,10 +35,9 @@ class AgentWorkflowTest(unittest.TestCase):
         plan = {"skill": "chatbi-decision-advisor", "skill_args": ["1-4月销售额排行并给出经营决策建议"]}
         messages = [{"role": "user", "content": "1-4月销售额排行并给出经营决策建议"}]
 
-        self.assertTrue(is_query_plus_decision_request(messages))
-        self.assertTrue(should_run_followup_decision_advice(plan, messages))
+        self.assertTrue(_is_query_plus_decision(messages))
 
-        steps = build_execution_steps(plan, messages)
+        steps = _build_steps(plan, messages)
         self.assertEqual([step["skill"] for step in steps], [
             "chatbi-semantic-query",
             "chatbi-decision-advisor",
@@ -54,10 +48,9 @@ class AgentWorkflowTest(unittest.TestCase):
         plan = {"skill": "chatbi-semantic-query", "skill_args": ["1-4月销售额排行及决策意见"]}
         messages = [{"role": "user", "content": "1-4月销售额排行及决策意见"}]
 
-        self.assertTrue(is_query_plus_decision_request(messages))
-        self.assertTrue(should_run_followup_decision_advice(plan, messages))
+        self.assertTrue(_is_query_plus_decision(messages))
 
-        steps = build_execution_steps(plan, messages)
+        steps = _build_steps(plan, messages)
         self.assertEqual([step["skill"] for step in steps], [
             "chatbi-semantic-query",
             "chatbi-decision-advisor",
@@ -67,24 +60,19 @@ class AgentWorkflowTest(unittest.TestCase):
         plan = {"skill": "chatbi-semantic-query", "skill_args": ["1-4月销售额排行"]}
         messages = [{"role": "user", "content": "1-4月销售额排行"}]
 
-        self.assertFalse(should_run_followup_decision_advice(plan, messages))
-        self.assertFalse(is_query_plus_decision_request(messages))
-        steps = build_execution_steps(plan, messages)
+        self.assertFalse(_is_query_plus_decision(messages))
+        steps = _build_steps(plan, messages)
         self.assertEqual(len(steps), 1)
         self.assertEqual(steps[0]["skill"], "chatbi-semantic-query")
 
-    def test_forces_semantic_query_for_grouped_metric_question(self):
-        messages = [{"role": "user", "content": "按照产品划分销售额"}]
+    def test_prompt_routes_database_overview_questions(self):
+        for prompt in (AGENT_SYSTEM_INSTRUCTION, AGENT_REACT_INSTRUCTION):
+            self.assertIn("chatbi-database-overview", prompt)
+            self.assertIn("当前数据库有哪些表", prompt)
 
-        self.assertEqual(deterministic_skill_override(messages), "chatbi-semantic-query")
-        chart_plan = infer_chart_plan(messages[0]["content"])
-        self.assertEqual(chart_plan["dimension"], "产品类别")
-        self.assertEqual(chart_plan["metrics"], ["销售额"])
-
-    def test_forces_metric_explainer_for_metric_definition_question(self):
-        messages = [{"role": "user", "content": "销售额口径是什么"}]
-
-        self.assertEqual(deterministic_skill_override(messages), "chatbi-metric-explainer")
+    def test_prompt_keeps_semantic_query_and_database_overview_rules(self):
+        self.assertIn("chatbi-semantic-query", AGENT_SYSTEM_INSTRUCTION)
+        self.assertIn("chatbi-database-overview", AGENT_SYSTEM_INSTRUCTION)
 
 
 if __name__ == "__main__":

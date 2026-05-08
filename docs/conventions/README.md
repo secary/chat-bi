@@ -27,6 +27,8 @@
 - 覆盖率目标 ≥ 80%
 - 测试命名：describe('[模块名]') + it('should [行为]')
 - Skill 脚本至少覆盖命令参数、成功输出、异常路径和安全边界
+- Python 测试优先通过 `scripts/run_tests.py` 的模块套件执行，详见 `docs/testing/README.md`
+- 新增 `tests/test_*.py` 必须加入 `scripts/run_tests.py` 的对应 `MODULE_SUITES`
 
 ## API 调用规范
 - 统一通过 apiClient 封装，禁止裸 fetch()

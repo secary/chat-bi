@@ -6,9 +6,9 @@ ChatBI 当前落地的是 CI 自动测试：同事开发前后端功能或修复
 
 `.github/workflows/ci.yml` 会在以下场景触发：
 
-- push 到 `main`、`dev**`、`test**`
-- Pull Request 到 `main`
-- GitHub 手动 `workflow_dispatch`
+- Pull Request 到 `main`（含 draft PR，覆盖所有功能分支）
+- push 到 `main`（合并后验证）
+- GitHub 手动 `workflow_dispatch`（无 PR 时手动触发）
 
 同一分支重复推送会自动取消旧任务，只保留最新一次。
 

@@ -7,8 +7,6 @@ name: ChatBI CI
   push:
     branches:
       - main
-      - "dev**"
-      - "test**"
   workflow_dispatch:
 
 concurrency:

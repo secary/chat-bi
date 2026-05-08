@@ -5,7 +5,6 @@ import sys
 import unittest
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "skills/chatbi-chart-recommendation/scripts/chart_recommendation_core.py"
 SPEC = importlib.util.spec_from_file_location("chart_recommendation_core", SCRIPT)
@@ -45,7 +44,7 @@ class ChartRecommendationSkillTest(unittest.TestCase):
 
     def test_parse_input_supports_natural_language_plus_json(self):
         question, rows = MODULE.parse_input(
-            '请把下面结果用最合适的图表可视化出来：'
+            "请把下面结果用最合适的图表可视化出来："
             '{"question":"2026年1-4月销售额趋势","rows":['
             '{"月份":"2026-01","销售额":"355000"},'
             '{"月份":"2026-02","销售额":"394000"}]}'

@@ -6,7 +6,7 @@ import {
   listUsersApi,
   patchUserApi,
 } from '../api/client';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/useAuth';
 import type { AppUserRow } from '../types/auth';
 import { logger } from '../lib/logger';
 
@@ -32,7 +32,7 @@ export function UserAdminPage() {
   }, []);
 
   useEffect(() => {
-    void refresh();
+    void Promise.resolve().then(refresh);
   }, [refresh]);
 
   if (user?.role !== 'admin') {

@@ -31,9 +31,7 @@ def _format_transcript(messages: List[Dict[str, Any]]) -> str:
 def _fallback_summary(messages: List[Dict[str, Any]]) -> str:
     users = [str(m.get("content") or "").strip() for m in messages if m.get("role") == "user"]
     assistants = [
-        str(m.get("content") or "").strip()
-        for m in messages
-        if m.get("role") == "assistant"
+        str(m.get("content") or "").strip() for m in messages if m.get("role") == "assistant"
     ]
     parts: List[str] = ["【会话摘要（离线/降级）】"]
     if users:

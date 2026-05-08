@@ -39,9 +39,7 @@ class ReactRunnerTest(unittest.TestCase):
                 ) as mock_llm:
                     with patch("backend.agent.react_runner.run_script") as mock_run:
                         events = await _collect(
-                            stream_chat_react(
-                                [{"role": "user", "content": "你好"}], trace_id="t0"
-                            )
+                            stream_chat_react([{"role": "user", "content": "你好"}], trace_id="t0")
                         )
                         mock_llm.assert_not_awaited()
                         mock_run.assert_not_called()
@@ -118,9 +116,7 @@ class ReactRunnerTest(unittest.TestCase):
                         mock_llm.assert_awaited_once()
                         mock_run.assert_not_called()
                         texts = [e for e in events if e.get("type") == "text"]
-                        self.assertTrue(
-                            any("助手" in str(e.get("content")) for e in texts)
-                        )
+                        self.assertTrue(any("助手" in str(e.get("content")) for e in texts))
 
         asyncio.run(run())
 
@@ -172,6 +168,103 @@ class ReactRunnerTest(unittest.TestCase):
                         self.assertEqual(len(chart_events), 1)
                         self.assertEqual(chart_events[0]["content"]["series"][0]["type"], "line")
                         self.assertEqual(text_events, [])
+
+        asyncio.run(run())
+
+    def test_query_plus_decision_auto_runs_followup_advice(self):
+        first = {
+            "action": "call_skill",
+            "skill": "chatbi-semantic-query",
+            "skill_args": [],
+            "thought": "先查询数据",
+        }
+        second = {
+            "action": "finish",
+            "text": "整理完成。",
+            "chart_plan": None,
+            "kpi_cards": [],
+        }
+        query_result = {
+            "kind": "table",
+            "text": "查询完成",
+            "data": {"rows": [{"区域": "华东", "销售额": "1"}]},
+        }
+        advice_result = {
+            "kind": "decision",
+            "text": "建议继续深耕华东。",
+            "data": {"advices": [{"title": "深耕华东"}]},
+            "charts": [],
+            "kpis": [],
+        }
+
+        async def run():
+            cfg = replace(settings, agent_react=True, agent_max_steps=6)
+            with patch("backend.agent.react_runner.settings", cfg):
+                with patch(
+                    "backend.agent.react_runner.call_llm_for_react_step",
+                    new_callable=AsyncMock,
+                ) as mock_llm:
+                    mock_llm.side_effect = [first, second]
+                    with patch("backend.agent.react_runner.run_script") as mock_run:
+                        with patch("backend.agent.react_followup.run_script") as mock_followup:
+                            mock_run.return_value = query_result
+                            mock_followup.return_value = advice_result
+                            events = await _collect(
+                                stream_chat_react(
+                                    [
+                                        {
+                                            "role": "user",
+                                            "content": "1-4月各区域销售额排行，并给出经营建议",
+                                        }
+                                    ],
+                                    trace_id="t4",
+                                )
+                            )
+                            self.assertEqual(mock_run.call_count, 1)
+                            self.assertEqual(mock_followup.call_count, 1)
+                            thinking = "\n".join(
+                                str(e.get("content")) for e in events if e.get("type") == "thinking"
+                            )
+                            self.assertIn("Skill「chatbi-decision-advisor」", thinking)
+                            self.assertTrue(
+                                any("深耕华东" in str(e.get("content")) for e in events)
+                            )
+
+        asyncio.run(run())
+
+    def test_invalid_finish_json_falls_back_to_last_skill_result(self):
+        first = {
+            "action": "call_skill",
+            "skill": "chatbi-semantic-query",
+            "skill_args": [],
+            "thought": "需要查询",
+        }
+        script_result = {
+            "kind": "table",
+            "text": "查询完成",
+            "chart_plan": {"chart_type": "line", "dimension": "月份", "metrics": ["销售额"]},
+            "data": {"rows": [{"月份": "2026-01", "销售额": "100"}]},
+        }
+
+        async def run():
+            cfg = replace(settings, agent_react=True, agent_max_steps=6)
+            with patch("backend.agent.react_runner.settings", cfg):
+                with patch(
+                    "backend.agent.react_runner.call_llm_for_react_step",
+                    new_callable=AsyncMock,
+                ) as mock_llm:
+                    mock_llm.side_effect = [first, ValueError("bad json")]
+                    with patch("backend.agent.react_runner.run_script") as mock_run:
+                        mock_run.return_value = script_result
+                        events = await _collect(
+                            stream_chat_react(
+                                [{"role": "user", "content": "2026年销售额按月趋势"}],
+                                trace_id="t5",
+                            )
+                        )
+                        self.assertFalse([e for e in events if e.get("type") == "error"])
+                        self.assertTrue([e for e in events if e.get("type") == "chart"])
+                        self.assertEqual(events[-1].get("type"), "done")
 
         asyncio.run(run())
 

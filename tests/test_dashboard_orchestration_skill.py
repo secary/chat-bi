@@ -5,7 +5,6 @@ import sys
 import unittest
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "skills/chatbi-dashboard-orchestration/scripts/dashboard_orchestration_core.py"
 SPEC = importlib.util.spec_from_file_location("dashboard_orchestration_core", SCRIPT)
@@ -46,7 +45,7 @@ class DashboardOrchestrationSkillTest(unittest.TestCase):
 
     def test_parse_input_supports_natural_language_plus_json(self):
         question, payload = MODULE.parse_input(
-            '请帮我生成一个经营概览看板，并直接给出可视化结果：'
+            "请帮我生成一个经营概览看板，并直接给出可视化结果："
             '{"question":"经营概览","kpis":{"total_sales":1653000,"row_count":16,'
             '"min_date":"2026-01-05","max_date":"2026-04-24","region_count":4},'
             '"sales_by_region":[{"region":"华东","sales_amount":613000}],'

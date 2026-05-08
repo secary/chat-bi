@@ -27,7 +27,7 @@ _MEMORY_OFF = os.getenv("CHATBI_MEMORY_DISABLED", "").strip().lower() in (
 
 def _title_from_user_message(message: str) -> str:
     collapsed = re.sub(r"\s+", " ", message).strip()
-    return (collapsed[:80] or "对话摘要")
+    return collapsed[:80] or "对话摘要"
 
 
 def format_memory_for_prompt(user_id: int) -> str:

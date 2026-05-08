@@ -66,8 +66,7 @@ flowchart TD
 - LLM 禁止替代确定性脚本计算指标事实。
 
 ## Agent 运行时与演进说明
-- 验收清单（默认 ReAct + 可选 Legacy）：[`docs/design/agent-runtime-acceptance.md`](../design/agent-runtime-acceptance.md)。
-- ReAct 设计与扩展点：[`docs/design/agent-react-evolution.md`](../design/agent-react-evolution.md)。
+- 验收清单与 ReAct 扩展设计：[`docs/design/agent-runtime.md`](../design/agent-runtime.md)。
 - 编排：`backend/agent/runner.py` 按配置分发到 `react_runner`（多轮）或 `_stream_chat_legacy`（单次规划）。
 
 ## 关键技术决策

@@ -25,10 +25,7 @@ class SkillProtocolTest(unittest.TestCase):
 
         async def collect():
             return [
-                event
-                async for event in stream_result_events(
-                    "chatbi-decision-advisor", {}, result
-                )
+                event async for event in stream_result_events("chatbi-decision-advisor", {}, result)
             ]
 
         events = asyncio.run(collect())
@@ -46,10 +43,15 @@ class SkillProtocolTest(unittest.TestCase):
                 "metrics": ["销售额"],
             },
         }
-        llm_plan = {"chart_plan": {"chart_type": "line", "dimension": "月份", "metrics": ["销售额"]}}
+        llm_plan = {
+            "chart_plan": {"chart_type": "line", "dimension": "月份", "metrics": ["销售额"]}
+        }
 
         async def collect():
-            return [event async for event in stream_result_events("chatbi-semantic-query", llm_plan, result)]
+            return [
+                event
+                async for event in stream_result_events("chatbi-semantic-query", llm_plan, result)
+            ]
 
         events = asyncio.run(collect())
         chart_events = [event for event in events if event.get("type") == "chart"]

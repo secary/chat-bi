@@ -37,7 +37,10 @@ def plan_to_option(
             series.append(_build_series(chart_type, key, values))
 
     option: Dict[str, Any] = {
-        "tooltip": {"trigger": "axis", "axisPointer": {"type": "shadow" if chart_type == "bar" else "cross"}},
+        "tooltip": {
+            "trigger": "axis",
+            "axisPointer": {"type": "shadow" if chart_type == "bar" else "cross"},
+        },
         "legend": {"type": "scroll", "bottom": 0},
         "grid": {"left": 60, "right": 24, "bottom": 48, "top": 40, "containLabel": True},
     }
@@ -61,19 +64,32 @@ def plan_to_option(
         option["xAxis"] = {"type": "category", "data": categories, "axisLabel": {"rotate": 30}}
         option["yAxis"] = {"type": "value"}
         option["dataZoom"] = [{"type": "inside", "start": 0, "end": 100}]
-        option["series"] = [{**s, "type": "line", "smooth": True} if "type" not in s else s for s in series]
+        option["series"] = [
+            {**s, "type": "line", "smooth": True} if "type" not in s else s for s in series
+        ]
 
     elif chart_type == "pie":
         if series:
-            pie_data = [{"name": categories[i], "value": series[0]["data"][i]} for i in range(len(categories))]
-            option["series"] = [{
-                "type": "pie",
-                "radius": ["0%", "70%"],
-                "center": ["50%", "55%"],
-                "data": pie_data,
-                "emphasis": {"itemStyle": {"shadowBlur": 10, "shadowOffsetX": 0, "shadowColor": "rgba(0,0,0,0.5)"}},
-                "label": {"formatter": "{b}: {d}%"},
-            }]
+            pie_data = [
+                {"name": categories[i], "value": series[0]["data"][i]}
+                for i in range(len(categories))
+            ]
+            option["series"] = [
+                {
+                    "type": "pie",
+                    "radius": ["0%", "70%"],
+                    "center": ["50%", "55%"],
+                    "data": pie_data,
+                    "emphasis": {
+                        "itemStyle": {
+                            "shadowBlur": 10,
+                            "shadowOffsetX": 0,
+                            "shadowColor": "rgba(0,0,0,0.5)",
+                        }
+                    },
+                    "label": {"formatter": "{b}: {d}%"},
+                }
+            ]
             del option["tooltip"]["axisPointer"]
 
     return option

@@ -4,7 +4,6 @@ import sys
 import types
 import unittest
 
-
 litellm_stub = types.ModuleType("litellm")
 litellm_stub.acompletion = None
 sys.modules.setdefault("litellm", litellm_stub)
@@ -31,9 +30,7 @@ class SkillResultLogPayloadTest(unittest.TestCase):
         payload = skill_result_log_payload(result)
         self.assertEqual(payload["kind"], "semantic_intent")
         self.assertEqual(payload["query_intent"]["status"], "ready")
-        self.assertEqual(
-            payload["query_intent"]["metric_ids"], ["corporate_deposit_balance"]
-        )
+        self.assertEqual(payload["query_intent"]["metric_ids"], ["corporate_deposit_balance"])
 
 
 if __name__ == "__main__":

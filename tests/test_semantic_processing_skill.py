@@ -6,7 +6,6 @@ import unittest
 from datetime import date
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "skills/chatbi-semantic-processing/scripts/semantic_processing_core.py"
 SPEC = importlib.util.spec_from_file_location("semantic_processing_core", SCRIPT)
@@ -18,7 +17,9 @@ SPEC.loader.exec_module(MODULE)
 
 class SemanticProcessingSkillTest(unittest.TestCase):
     def test_ready_ranking_query(self):
-        result = MODULE.parse_question("2026年4月对公存款余额按支行排名前10", today=date(2026, 5, 7))
+        result = MODULE.parse_question(
+            "2026年4月对公存款余额按支行排名前10", today=date(2026, 5, 7)
+        )
 
         self.assertEqual(result["status"], "ready")
         self.assertEqual(result["business_line"], "corporate")

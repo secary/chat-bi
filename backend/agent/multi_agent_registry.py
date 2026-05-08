@@ -15,6 +15,21 @@ def _registry_path() -> Path:
     return settings.skills_dir / "_agents" / "registry.yaml"
 
 
+def write_registry_dict(raw: Dict[str, Any]) -> None:
+    """Atomically write registry YAML; callers must supply a valid dict shape."""
+    path = _registry_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    text = yaml.safe_dump(
+        raw,
+        allow_unicode=True,
+        sort_keys=False,
+        default_flow_style=False,
+    )
+    tmp = path.parent / f".{path.name}.tmp"
+    tmp.write_text(text, encoding="utf-8")
+    tmp.replace(path)
+
+
 def load_registry_dict() -> Dict[str, Any]:
     path = _registry_path()
     if not path.is_file():

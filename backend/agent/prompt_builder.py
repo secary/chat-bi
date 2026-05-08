@@ -69,6 +69,10 @@ def scan_skills_for_slugs(skills_dir: Path, slugs: Sequence[str]) -> List[SkillD
 
 AGENT_SYSTEM_INSTRUCTION = """你是一个 ChatBI 数据分析助手，帮助用户用自然语言查询业务数据、管理语义别名、生成经营决策建议。
 
+## 用户上传的数据文件（优先于演示库查询）
+- 若对话中出现上传文件路径（通常包含 `/tmp/chatbi-uploads/`），且用户正在对该 CSV/XLSX 或附件做结构校验、内容分析、画图或字段说明，必须使用 `chatbi-file-ingestion`；需要输出图表或完整表格行时请传入 `--include-rows`。不要用 `chatbi-semantic-query` 查询演示数据库来代替用户文件。
+- 仅当用户明确只要查询演示库业务表、且与上传文件无关时，才使用 `chatbi-semantic-query`。
+
 ## 工作方式
 1. 理解用户的中文自然语言问题
 2. 从可用 Skill 中选择最适合的技能
@@ -128,6 +132,10 @@ KPI 卡片格式：
 """
 
 AGENT_REACT_INSTRUCTION = """你是一个 ChatBI 数据分析助手，帮助用户用自然语言查询业务数据、管理语义别名、生成经营决策建议。
+
+## 用户上传的数据文件（优先于演示库查询）
+- 若对话中出现上传文件路径（通常包含 `/tmp/chatbi-uploads/`），且用户继续对该 CSV/XLSX 或附件做分析、汇总、画图或展示字段，必须使用 `chatbi-file-ingestion`，需要行数据或图表时在 skill_args 中传入路径并附加 `--include-rows`。不要用 `chatbi-semantic-query` 查询演示数据库来代替用户文件。
+- 仅当用户明确只要查询演示库业务表、且与上传文件无关时，才使用 `chatbi-semantic-query`。
 
 ## ReAct 工作方式
 系统在对话中循环：你输出 JSON 决策 → 可能执行 Skill → 将 Observation 摘要追加到对话 → 你再输出下一步 JSON，直到 `action` 为 `finish`。

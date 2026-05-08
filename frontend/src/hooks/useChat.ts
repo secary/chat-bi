@@ -1,9 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ChatMessage } from '../types/message';
 import { getSessionMessagesApi, streamChat } from '../api/client';
+import { isWaitingForAssistantMessage } from '../lib/chatPending';
 import { logger } from '../lib/logger';
 
 let nextId = 1;
+
+const POLL_PENDING_MS = 1000;
+/** ~3 minutes at 1s interval */
+const POLL_PENDING_MAX_ATTEMPTS = 180;
 
 function mapRow(row: Record<string, unknown>): ChatMessage {
   return {
@@ -20,6 +25,8 @@ function mapRow(row: Record<string, unknown>): ChatMessage {
 export interface UseChatReturn {
   messages: ChatMessage[];
   loading: boolean;
+  /** Last loaded message is user — assistant row not yet in DB (e.g. navigated away mid-stream). */
+  assistantPending: boolean;
   sendMessage: (text: string, traceId?: string) => Promise<void>;
 }
 
@@ -63,6 +70,54 @@ export function useChat(
       cancelled = true;
     };
   }, [sessionId]);
+
+  const assistantPending = isWaitingForAssistantMessage(sessionId, messages);
+
+  useEffect(() => {
+    if (!assistantPending || sessionId == null) return;
+
+    const sid = sessionId;
+    let cancelled = false;
+    let attempts = 0;
+    let intervalId = 0;
+
+    const finishIfAssistant = (rows: Record<string, unknown>[]): boolean => {
+      const lastRow = rows[rows.length - 1];
+      return Boolean(lastRow && String(lastRow.role) === 'assistant');
+    };
+
+    const tick = async () => {
+      if (cancelled) return;
+      attempts += 1;
+      if (attempts > POLL_PENDING_MAX_ATTEMPTS) {
+        window.clearInterval(intervalId);
+        return;
+      }
+      try {
+        const rows = await getSessionMessagesApi(sid);
+        if (cancelled) return;
+        const maxId = rows.reduce(
+          (m, r) => Math.max(m, Number(r.id) || 0),
+          0,
+        );
+        nextId = maxId + 1;
+        setMessages(rows.map(mapRow));
+        if (finishIfAssistant(rows)) {
+          window.clearInterval(intervalId);
+        }
+      } catch (err: unknown) {
+        logger.error('poll session messages', err);
+      }
+    };
+
+    intervalId = window.setInterval(() => void tick(), POLL_PENDING_MS);
+    void tick();
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [sessionId, assistantPending]);
 
   const sendMessage = useCallback(
     async (text: string, traceId?: string) => {
@@ -153,7 +208,7 @@ export function useChat(
     [loading, sessionId, dbConnectionId, multiAgents],
   );
 
-  return { messages, loading, sendMessage };
+  return { messages, loading, assistantPending, sendMessage };
 }
 
 export function readMultiAgentsPreference(): boolean {

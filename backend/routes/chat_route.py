@@ -15,6 +15,7 @@ from backend.agent.runner import stream_chat
 from backend.auth_deps import get_current_user
 from backend.connection_repo import resolve_skill_db_env
 from backend.http_utils import request_trace_id
+from backend.agent.upload_context import augment_messages_for_upload_followup
 from backend.memory_service import format_memory_for_prompt, refresh_memory_after_turn
 from backend.session_repo import (
     get_session_for_user,
@@ -130,6 +131,7 @@ async def chat(
     )
 
     messages = await enrich_last_user_message_with_vision(messages, trace_id)
+    messages = augment_messages_for_upload_followup(messages)
 
     async def event_gen() -> AsyncGenerator[dict, None]:
         started_at = perf_counter()

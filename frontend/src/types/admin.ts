@@ -39,6 +39,18 @@ export interface CurrentDbConnectionView {
   is_default: boolean;
 }
 
+/** 多专线（Multi-Agent）registry 与 PUT /admin/multi-agents 请求体 */
+export interface MultiAgentLineEntry {
+  label: string;
+  role_prompt: string;
+  skills: string[];
+}
+
+export interface MultiAgentsRegistryPayload {
+  max_agents_per_round: number;
+  agents: Record<string, MultiAgentLineEntry>;
+}
+
 export interface LlmSettingsView {
   model: string | null;
   api_base: string | null;

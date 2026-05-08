@@ -18,6 +18,8 @@ from backend.agent.prompt_builder import (
     build_react_system_prompt,
     scan_skills_enabled,
 )
+from backend.agent.query_decision import is_query_plus_decision_text
+from backend.agent.react_followup import run_decision_followup
 from backend.config import settings
 from backend.trace import log_event
 
@@ -33,6 +35,8 @@ def _merge_finish_result(
     merged: Dict[str, Any] = dict(last_result or {})
     if _should_suppress_finish_text(last_skill_name, merged):
         merged["text"] = ""
+        return merged
+    if last_skill_name == "chatbi-decision-advisor" and merged.get("text"):
         return merged
     # skill 已生成图表时，保留 skill 自带文本，不被 LLM finish 文本覆盖
     if merged.get("chart_plan") or merged.get("charts"):
@@ -101,6 +105,7 @@ async def stream_chat_react(
     working = [dict(m) for m in messages]
     last_skill_name: Optional[str] = None
     last_result: Optional[Dict[str, Any]] = None
+    called_skills: list[str] = []
 
     yield {"type": "thinking", "content": "正在分析您的问题（ReAct 多步推理）..."}
 
@@ -111,9 +116,33 @@ async def stream_chat_react(
             "react.step",
             payload={"step": step + 1, "max_steps": settings.agent_max_steps},
         )
-        plan = await call_llm_for_react_step(system_prompt, working)
+        try:
+            plan = await call_llm_for_react_step(system_prompt, working)
+        except Exception as exc:
+            if last_result:
+                yield {
+                    "type": "thinking",
+                    "content": f"模型收尾失败，展示最后一次工具结果：{exc}",
+                }
+                async for event in stream_result_events(
+                    last_skill_name or "skill", {}, last_result
+                ):
+                    yield event
+                _sink_write(result_sink, last_result, last_skill_name)
+                yield {"type": "done", "content": None}
+                return
+            raise
         if not plan:
-            _sink_write(result_sink, last_result, last_skill_name)
+            if last_result:
+                yield {"type": "thinking", "content": "模型未返回有效 JSON，展示最后一次工具结果。"}
+                async for event in stream_result_events(
+                    last_skill_name or "skill", {}, last_result
+                ):
+                    yield event
+                _sink_write(result_sink, last_result, last_skill_name)
+                yield {"type": "done", "content": None}
+                return
+            _sink_write(result_sink, None, None)
             yield {"type": "error", "content": "模型未返回有效 JSON。"}
             yield {"type": "done", "content": None}
             return
@@ -191,6 +220,7 @@ async def stream_chat_react(
             )
             last_skill_name = skill_name
             last_result = result
+            called_skills.append(skill_name)
             obs = summarize_observation(skill_name, result)
         except Exception as exc:
             log_event(
@@ -209,6 +239,32 @@ async def stream_chat_react(
         working.append({"role": "assistant", "content": assistant_note})
         working.append({"role": "user", "content": OBS_HEADER + obs})
         yield {"type": "thinking", "content": "已收到 Observation，继续推理..."}
+
+        if (
+            skill_name == "chatbi-semantic-query"
+            and is_query_plus_decision_text(user_text)
+            and "chatbi-decision-advisor" not in called_skills
+        ):
+            advice_doc = find_skill(skills, "chatbi-decision-advisor")
+            if advice_doc:
+                try:
+                    followup_events, advice_result, followup_messages = run_decision_followup(
+                        advice_doc,
+                        messages,
+                        user_text,
+                        trace_id,
+                        skill_db_overrides,
+                    )
+                    for event in followup_events:
+                        yield event
+                    last_skill_name = "chatbi-decision-advisor"
+                    last_result = advice_result
+                    called_skills.append("chatbi-decision-advisor")
+                    working.extend(followup_messages)
+                except Exception as exc:
+                    yield {"type": "error", "content": f"决策建议执行失败：{exc}"}
+                    yield {"type": "done", "content": None}
+                    return
 
     if last_result:
         yield {

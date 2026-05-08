@@ -9,6 +9,7 @@ import { DataSourcesPage } from './pages/DataSourcesPage';
 import { LlmConfigPage } from './pages/LlmConfigPage';
 import { LoginPage } from './pages/LoginPage';
 import { UserAdminPage } from './pages/UserAdminPage';
+import { MultiAgentsAdminPage } from './pages/MultiAgentsAdminPage';
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
             <Route element={<AppLayout />}>
               <Route path="/" element={<ChatPage />} />
               <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/multi-agents" element={<MultiAgentsAdminPage />} />
               <Route path="/skills" element={<SkillAdminPage />} />
               <Route path="/data-sources" element={<DataSourcesPage />} />
               <Route path="/llm" element={<LlmConfigPage />} />

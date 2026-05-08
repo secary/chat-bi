@@ -6,6 +6,7 @@ import {
   writeMultiAgentsPreference,
   writeSidebarOpenPreference,
 } from '../hooks/useChat';
+import { AssistantPendingNotice } from '../components/AssistantPendingNotice';
 import { MessageBubble } from '../components/MessageBubble';
 import { ChatInput } from '../components/ChatInput';
 import { Switch } from '../components/Switch';
@@ -17,6 +18,11 @@ import {
 } from '../api/client';
 import type { SessionRow } from '../types/admin';
 import { logger } from '../lib/logger';
+import {
+  readLastSessionId,
+  resolveInitialSessionId,
+  writeLastSessionId,
+} from '../lib/sessionSelection';
 
 export function ChatPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -29,11 +35,12 @@ export function ChatPage() {
   const [sidebarOpen, setSidebarOpen] = useState(() => readSidebarOpenPreference());
   const [pdfExporting, setPdfExporting] = useState(false);
 
-  const { messages, loading, sendMessage } = useChat(
+  const { messages, loading, assistantPending, sendMessage } = useChat(
     sessionId,
     dbConnId,
     multiAgents,
   );
+  const inputBusy = loading || assistantPending;
 
   useEffect(() => {
     writeMultiAgentsPreference(multiAgents);
@@ -44,8 +51,12 @@ export function ChatPage() {
   }, [sidebarOpen]);
 
   useEffect(() => {
+    if (sessionId != null) writeLastSessionId(sessionId);
+  }, [sessionId]);
+
+  useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, assistantPending]);
 
   const refreshSessions = useCallback(async () => {
     try {
@@ -72,7 +83,7 @@ export function ChatPage() {
           logger.error('create session', e);
         }
       } else {
-        setSessionId(list[0].id);
+        setSessionId(resolveInitialSessionId(list, readLastSessionId()));
       }
       setBooting(false);
     })();
@@ -269,6 +280,7 @@ export function ChatPage() {
               {messages.map((msg) => (
                 <MessageBubble key={msg.id} message={msg} />
               ))}
+              {assistantPending ? <AssistantPendingNotice /> : null}
               <div ref={bottomRef} />
             </div>
           )}
@@ -283,7 +295,7 @@ export function ChatPage() {
                   key={`${idx}-${p.slice(0, 40)}`}
                   type="button"
                   onClick={() => void sendMessage(p)}
-                  disabled={loading || booting || sessionId == null}
+                  disabled={inputBusy || booting || sessionId == null}
                   className="max-w-full truncate rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-left text-xs text-amber-900 hover:bg-amber-100 disabled:opacity-50"
                   title={p}
                 >
@@ -292,7 +304,11 @@ export function ChatPage() {
               ))}
             </div>
           ) : null}
-          <ChatInput onSend={sendMessage} loading={loading} disabled={booting || sessionId == null} />
+          <ChatInput
+            onSend={sendMessage}
+            loading={inputBusy}
+            disabled={booting || sessionId == null}
+          />
         </div>
       </div>
     </div>

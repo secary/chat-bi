@@ -4,6 +4,7 @@ import type {
   CurrentDbConnectionView,
   DbConnectionRow,
   LlmSettingsView,
+  MultiAgentsRegistryPayload,
   SessionListApi,
 } from '../types/admin';
 import type { AppUser, AppUserRow } from '../types/auth';
@@ -270,6 +271,19 @@ export async function downloadSessionReportPdf(sessionId: number): Promise<Blob>
 
 export async function listAdminSkills(): Promise<AdminSkillRow[]> {
   return requestJson<AdminSkillRow[]>('/admin/skills');
+}
+
+export async function getMultiAgentsRegistry(): Promise<MultiAgentsRegistryPayload> {
+  return requestJson<MultiAgentsRegistryPayload>('/admin/multi-agents');
+}
+
+export async function putMultiAgentsRegistry(
+  payload: MultiAgentsRegistryPayload,
+): Promise<MultiAgentsRegistryPayload> {
+  return requestJson<MultiAgentsRegistryPayload>('/admin/multi-agents', {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function getSkillFile(slug: string): Promise<{ markdown: string }> {

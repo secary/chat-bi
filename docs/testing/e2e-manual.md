@@ -19,6 +19,9 @@ python scripts/e2e_smoke.py --token "Bearer xxx"
 
 # 指定后端地址（默认 8001）
 python scripts/e2e_smoke.py --url http://localhost:8000
+
+# 也可以用环境变量，便于临时接入 CI 或同事机器
+CHATBI_E2E_URL=http://localhost:8001 python scripts/e2e_smoke.py --cases S1,S4,E1
 ```
 
 脚本会逐条打印 ✓ / ✗，最终输出通过率。用例覆盖范围见下方各节。
@@ -42,7 +45,7 @@ python scripts/e2e_smoke.py --url http://localhost:8000
 | S3 | `华东4月毛利率` | `chatbi-semantic-query` | KPI 卡片 |
 | S4 | `当前数据库有哪些表可以查` | `chatbi-database-overview` | 表清单 + 字段说明文本 |
 | S5 | `销售额和上月相比怎么样` | `chatbi-comparison` | 环比表格 + 分组柱状图 |
-| S6 | `营收是什么意思` | `chatbi-metric-explainer` | 指标说明文本 |
+| S6 | `销售额口径是什么` | `chatbi-metric-explainer` | 指标说明文本 |
 | S7 | `把"营收"设为"销售额"的别名` | `chatbi-alias-manager` | 确认别名写入的文字回复 |
 
 ---
@@ -88,8 +91,6 @@ python scripts/e2e_smoke.py --url http://localhost:8000
 # 在能连接目标 MySQL 的环境中执行（本机 3306 或容器内）
 mysql -h 127.0.0.1 -P 3306 -u root -p < database/external_bank_bootstrap.sql
 mysql -h 127.0.0.1 -P 3306 -u root -p < database/external_bank_demo.sql
-mysql -h 127.0.0.1 -P 3306 -u root -p < database/external_bank_business.sql
-mysql -h 127.0.0.1 -P 3306 -u root -p < database/external_bank_semantic.sql
 ```
 
 数据库用户：`demo_user` / `demo_pass`，库名：`chatbi_bank_external`

@@ -16,6 +16,19 @@ PYTHONPATH=. .venv/bin/python scripts/run_tests.py quick -- -q
 cd frontend && npm run lint && npm run test && npm run build
 ```
 
+## E2E 烟雾测试
+
+E2E smoke 用于后端和 LLM 已运行时的链路验收，不放进默认 CI。它会直接请求 `/chat` SSE，验证典型问法的 Skill 路由、图表事件和边界场景。
+
+```bash
+docker compose -f docker-compose.dev.yml up -d
+python scripts/e2e_smoke.py
+python scripts/e2e_smoke.py --cases S1,S4,E1
+CHATBI_E2E_URL=http://localhost:8001 python scripts/e2e_smoke.py
+```
+
+详细手动验证清单见 [e2e-manual.md](e2e-manual.md)。
+
 ## 统一入口
 
 ```bash
@@ -65,7 +78,7 @@ uv pip --python .venv/bin/python install -r requirements.txt
 
 ## 具体用例索引
 
-当前 Python 全量收集为 83 个用例。下面按功能域列出核心保护点，精确用例名可用 `PYTHONPATH=. .venv/bin/python -m pytest --collect-only -q tests` 查看。
+当前 Python 全量用例数以 pytest 收集结果为准。下面按功能域列出核心保护点，精确用例名可用 `PYTHONPATH=. .venv/bin/python -m pytest --collect-only -q tests` 查看。
 
 ### Foundation
 
@@ -77,6 +90,7 @@ uv pip --python .venv/bin/python install -r requirements.txt
 - `test_agent_skill_protocol.py::SkillProtocolTest::test_normalizes_legacy_table_rows`：旧表格行归一化为 SkillResult。
 - `test_agent_skill_protocol.py::SkillProtocolTest::test_prefers_skill_chart_plan_over_llm_plan`：Skill 返回图表计划优先于 LLM 计划。
 - `test_agent_skill_protocol.py::SkillProtocolTest::test_streams_structured_decision_result`：决策结果输出 text 与 KPI。
+- `test_e2e_smoke_script.py::*`：E2E smoke 用例注册与文本断言逻辑。
 - `test_run_tests_script.py::*`：模块套件路径存在、全量发现、归属覆盖、重复去重。
 
 ### Skills
@@ -97,7 +111,7 @@ uv pip --python .venv/bin/python install -r requirements.txt
 - `test_multi_agent_registry.py::*`：按 slug 顺序过滤已启用 Skill。
 - `test_multi_agent_router.py::*`：路由 LLM JSON 调用和专线数量上限。
 - `test_query_advice_dimension_flow.py::*`：从查询结果首列推断建议关注维度。
-- `test_react_runner.py::*`：ReAct 两轮调用、无 skill finish、寒暄短路、可视化优先 Skill 保图表。
+- `test_react_runner.py::*`：ReAct 两轮调用、无 skill finish、寒暄短路、可视化优先 Skill 保图表、查询+建议自动补跑 decision-advisor、模型收尾 JSON 异常时回退最后一次 Skill 结果。
 - `test_upload_context.py::*`：历史上传文件路径注入上下文，纯数据库问题不注入。
 
 ### Admin / Auth / Memory

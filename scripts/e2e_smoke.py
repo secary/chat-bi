@@ -14,20 +14,21 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import socket
 import sys
 import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
-from typing import List, Optional
 
 # ── ANSI ─────────────────────────────────────────────────────────────────────
-GREEN = "\033[32m"
-RED = "\033[31m"
-YELLOW = "\033[33m"
-GRAY = "\033[90m"
-BOLD = "\033[1m"
-RESET = "\033[0m"
+USE_COLOR = sys.stdout.isatty() and os.getenv("NO_COLOR") is None
+GREEN = "\033[32m" if USE_COLOR else ""
+RED = "\033[31m" if USE_COLOR else ""
+GRAY = "\033[90m" if USE_COLOR else ""
+BOLD = "\033[1m" if USE_COLOR else ""
+RESET = "\033[0m" if USE_COLOR else ""
 
 # ── 测试用例定义 ──────────────────────────────────────────────────────────────
 
@@ -37,14 +38,15 @@ class Case:
     id: str
     label: str
     message: str
-    expect_skills: List[str] = field(default_factory=list)  # thinking 中必须出现的 skill
+    expect_skills: list[str] = field(default_factory=list)  # thinking 中必须出现的 skill
     no_skill_call: bool = False  # thinking 中不应出现任何 Skill 调用
-    expect_no_text: List[str] = field(default_factory=list)  # text 事件中不应出现的字符串
+    expect_text: list[str] = field(default_factory=list)  # text 事件中必须出现的字符串
+    expect_no_text: list[str] = field(default_factory=list)  # text 事件中不应出现的字符串
     expect_chart: bool = False  # 必须有 chart 事件
     multi_agents: bool = False
 
 
-CASES: List[Case] = [
+CASES: list[Case] = [
     # ── 单 Skill ──────────────────────────────────────────────────────────────
     Case("S1", "区域销售额排行", "1-4月各区域销售额排行",
          expect_skills=["chatbi-semantic-query"], expect_chart=True),
@@ -56,13 +58,18 @@ CASES: List[Case] = [
          expect_skills=["chatbi-database-overview"]),
     Case("S5", "环比对比", "销售额和上月相比怎么样",
          expect_skills=["chatbi-comparison"]),
+    Case("S6", "指标口径解释", "销售额口径是什么",
+         expect_skills=["chatbi-metric-explainer"], expect_text=["销售额口径"]),
     # ── 多步 Skill ────────────────────────────────────────────────────────────
     Case("M1", "查询+建议（区域）", "1-4月各区域销售额排行，并给出经营建议",
-         expect_skills=["chatbi-semantic-query", "chatbi-decision-advisor"]),
+         expect_skills=["chatbi-semantic-query", "chatbi-decision-advisor"],
+         expect_text=["决策"]),
     Case("M2", "查询+建议（毛利率）", "各渠道毛利率经营建议",
-         expect_skills=["chatbi-semantic-query", "chatbi-decision-advisor"]),
+         expect_skills=["chatbi-semantic-query", "chatbi-decision-advisor"],
+         expect_text=["决策"]),
     Case("M3", "查询+建议（区域焦点）", "华东销售额建议",
-         expect_skills=["chatbi-semantic-query", "chatbi-decision-advisor"]),
+         expect_skills=["chatbi-semantic-query", "chatbi-decision-advisor"],
+         expect_text=["决策"]),
     # ── 图表渲染修复 ──────────────────────────────────────────────────────────
     Case(
         "C1", "图表无原始 JSON",
@@ -84,7 +91,7 @@ CASES: List[Case] = [
 # ── SSE 读取 ──────────────────────────────────────────────────────────────────
 
 
-def _stream_events(url: str, message: str, token: Optional[str],
+def _stream_events(url: str, message: str, token: str | None,
                    multi_agents: bool, timeout: int):
     payload = json.dumps({
         "message": message,
@@ -113,12 +120,13 @@ def _stream_events(url: str, message: str, token: Optional[str],
 # ── 断言 ──────────────────────────────────────────────────────────────────────
 
 
-def _run_case(case: Case, base_url: str, token: Optional[str], timeout: int):
+def _run_case(case: Case, base_url: str, token: str | None, timeout: int):
     url = base_url.rstrip("/") + "/chat"
     thinking_text = ""
     all_text = ""
     has_chart = False
-    errors: List[str] = []
+    got_done = False
+    errors: list[str] = []
 
     try:
         for event in _stream_events(url, case.message, token, case.multi_agents, timeout):
@@ -126,14 +134,25 @@ def _run_case(case: Case, base_url: str, token: Optional[str], timeout: int):
             content = event.get("content", "")
             if t == "thinking" and isinstance(content, str):
                 thinking_text += content + "\n"
-            elif t == "text" and isinstance(content, str):
-                all_text += content
+            elif t == "text":
+                all_text += content if isinstance(content, str) else json.dumps(content, ensure_ascii=False)
             elif t == "chart":
                 has_chart = True
+            elif t == "error":
+                errors.append(f"SSE error：{content}")
+            elif t == "done":
+                got_done = True
+                break
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode("utf-8", errors="replace")[:300]
+        return False, [f"HTTP {e.code}：{detail or e.reason}"]
     except urllib.error.URLError as e:
         return False, [f"连接失败：{e}"]
-    except TimeoutError:
+    except (TimeoutError, socket.timeout):
         return False, [f"超时（>{timeout}s）"]
+
+    if not got_done:
+        errors.append("未收到 done 事件")
 
     # 断言 skill 出现
     for skill in case.expect_skills:
@@ -142,9 +161,13 @@ def _run_case(case: Case, base_url: str, token: Optional[str], timeout: int):
 
     # 断言无 skill 调用
     if case.no_skill_call and "Skill「" in thinking_text:
-        errors.append("期望无 Skill 调用，但 thinking 中出现了 Skill「」")
+        errors.append("期望无 Skill 调用，但 thinking 中出现了 Skill 调用")
 
     # 断言 text 中不含特定字符串
+    for s in case.expect_text:
+        if s not in all_text:
+            errors.append(f"text 事件中应出现 {s!r}")
+
     for s in case.expect_no_text:
         if s in all_text:
             errors.append(f"text 事件中不应出现 {s!r}")
@@ -161,13 +184,24 @@ def _run_case(case: Case, base_url: str, token: Optional[str], timeout: int):
 
 def main():
     parser = argparse.ArgumentParser(description="ChatBI E2E smoke test")
-    parser.add_argument("--url", default="http://localhost:8001")
-    parser.add_argument("--token", default=None, help='如开启鉴权，传 "Bearer xxx"')
+    parser.add_argument("--url", default=os.getenv("CHATBI_E2E_URL", "http://localhost:8001"))
+    parser.add_argument(
+        "--token",
+        default=os.getenv("CHATBI_E2E_TOKEN"),
+        help='如开启鉴权，传 "Bearer xxx"；也可用 CHATBI_E2E_TOKEN',
+    )
     parser.add_argument("--cases", default=None, help="逗号分隔的用例 ID，如 S1,M1,C1")
     parser.add_argument("--timeout", type=int, default=120, help="每条用例超时秒数")
     args = parser.parse_args()
 
-    filter_ids = set(args.cases.split(",")) if args.cases else None
+    filter_ids = {item.strip() for item in args.cases.split(",") if item.strip()} if args.cases else None
+    known_ids = {case.id for case in CASES}
+    unknown_ids = sorted(filter_ids - known_ids) if filter_ids else []
+    if unknown_ids:
+        print(f"{RED}未知用例 ID：{', '.join(unknown_ids)}{RESET}")
+        print(f"可用用例：{', '.join(sorted(known_ids))}")
+        sys.exit(2)
+
     cases = [c for c in CASES if filter_ids is None or c.id in filter_ids]
 
     print(f"\n{BOLD}ChatBI E2E Smoke Test{RESET}  →  {args.url}")

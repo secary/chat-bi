@@ -223,6 +223,7 @@ chat-bi/
 | 主题 | 路径 |
 |------|------|
 | Agent 规则与工作方式 | [AGENTS.md](AGENTS.md) |
+| 技术与使用指南（功能与页面） | [docs/user-guide.md](docs/user-guide.md) |
 | 系统架构与模块边界 | [docs/architecture/README.md](docs/architecture/README.md) |
 | 编码规范 | [docs/conventions/README.md](docs/conventions/README.md) |
 | 当前迭代任务 | [docs/plans/current-sprint.md](docs/plans/current-sprint.md) |

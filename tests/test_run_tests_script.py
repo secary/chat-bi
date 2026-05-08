@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -32,6 +35,16 @@ class RunTestsScriptTest(unittest.TestCase):
         tests = MODULE.tests_for_groups(["quick", "data-sources"])
 
         self.assertEqual(tests.count("tests/test_database_overview_skill.py"), 1)
+
+    def test_python_executable_falls_back_to_current_interpreter(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with mock.patch.object(MODULE, "ROOT", Path(temp_dir)):
+                with mock.patch.dict(os.environ, {}, clear=True):
+                    self.assertEqual(MODULE.python_executable(), sys.executable)
+
+    def test_python_executable_uses_configured_interpreter(self):
+        with mock.patch.dict(os.environ, {"CHATBI_PYTHON": "/tmp/custom-python"}):
+            self.assertEqual(MODULE.python_executable(), "/tmp/custom-python")
 
 
 if __name__ == "__main__":

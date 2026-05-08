@@ -10,7 +10,16 @@ from typing import Sequence
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PYTHON = Path(os.getenv("CHATBI_PYTHON", ROOT / ".venv/bin/python"))
+
+
+def python_executable() -> str:
+    configured = os.getenv("CHATBI_PYTHON")
+    if configured:
+        return configured
+    project_python = ROOT / ".venv/bin/python"
+    if project_python.exists():
+        return str(project_python)
+    return sys.executable
 
 MODULE_SUITES: dict[str, list[str]] = {
     "foundation": [
@@ -137,7 +146,7 @@ def run_pytest(groups: Sequence[str], extra_args: Sequence[str], dry_run: bool) 
     tests = tests_for_groups(groups)
     env = os.environ.copy()
     env["PYTHONPATH"] = "."
-    cmd = [str(PYTHON), "-m", "pytest", *tests, *extra_args]
+    cmd = [python_executable(), "-m", "pytest", *tests, *extra_args]
     return run_command(cmd, env, dry_run)
 
 

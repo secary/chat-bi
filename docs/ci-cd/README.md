@@ -1,16 +1,16 @@
 # CI/CD
 
-ChatBI 当前落地的是 CI 自动测试：同事开发前后端功能或修复 bug 时，PR 和指定分支 push 会自动跑后端、前端检查。
+ChatBI 当前落地的是 CI 自动测试：同事开发前后端功能或修复 bug 时，push 到功能分支或提 PR 会自动跑后端、前端检查。
 
 ## 触发条件
 
 `.github/workflows/ci.yml` 会在以下场景触发：
 
-- Pull Request 到 `main`
-- push 到 `main`
-- GitHub 手动 `workflow_dispatch`
+- Pull Request 到 `main`（含 draft PR，覆盖所有功能分支）
+- push 到 `main`（合并后验证）
+- GitHub 手动 `workflow_dispatch`（无 PR 时手动触发）
 
-同一个 PR 或分支重复推送会自动取消旧任务，只保留最新一次。
+同一分支重复推送会自动取消旧任务，只保留最新一次。
 
 ## 后端 CI
 
@@ -18,15 +18,15 @@ ChatBI 当前落地的是 CI 自动测试：同事开发前后端功能或修复
 
 - Ubuntu latest
 - Python 3.11
-- `requirements.txt`
+- `requirements.txt`（pip 缓存加速）
+- 系统依赖：`libpango-1.0-0`、`libpangoft2-1.0-0`（WeasyPrint PDF 生成）
 
-执行命令：
+执行步骤：
 
-```bash
-python scripts/run_tests.py all -- -q
-```
+1. **Lint**：`ruff check` + `black --check`，规则配置见 `pyproject.toml`
+2. **pytest**：`python scripts/run_tests.py all -- -q`
 
-CI 环境默认关闭或降级外部依赖：
+CI 环境关闭或降级外部依赖：
 
 ```text
 CHATBI_AUTH_ENABLED=false
@@ -41,35 +41,13 @@ CHATBI_PDF_SUMMARY_DISABLED=1
 
 - Ubuntu latest
 - Node.js 22
-- `frontend/package-lock.json`
+- `frontend/package-lock.json`（npm 缓存加速）
 
-执行命令：
-
-```bash
-cd frontend
-npm ci
-npm run lint
-npm run test
-npm run build
-```
+执行步骤：`npm run lint` → `npm run test` → `npm run build`
 
 ## 本地提交前建议
 
-后端：
-
-```bash
-PYTHONPATH=. .venv/bin/python scripts/run_tests.py quick -- -q
-PYTHONPATH=. .venv/bin/python scripts/run_tests.py all -- -q
-```
-
-前端：
-
-```bash
-cd frontend
-npm run lint
-npm run test
-npm run build
-```
+与 CI 保持一致的完整检查命令见 [docs/testing/README.md](../testing/README.md#提交前本地检查)。
 
 ## CD 预留
 

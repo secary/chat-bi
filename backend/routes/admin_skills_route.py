@@ -99,9 +99,7 @@ def admin_create_skill(body: SkillCreate, request: Request) -> dict:
         )
         raise HTTPException(status_code=409, detail="技能目录已存在")
     base.mkdir(parents=True)
-    (base / "SKILL.md").write_text(
-        _default_skill_md(slug, body.markdown), encoding="utf-8"
-    )
+    (base / "SKILL.md").write_text(_default_skill_md(slug, body.markdown), encoding="utf-8")
     scripts = base / "scripts"
     scripts.mkdir(exist_ok=True)
     log_event(

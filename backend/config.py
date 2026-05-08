@@ -10,34 +10,22 @@ load_project_env(_PROJECT_ROOT)
 
 @dataclass(frozen=True)
 class Settings:
-    llm_model: str = field(
-        default_factory=lambda: os.getenv("LLM_MODEL", "gpt-4o-mini")
-    )
+    llm_model: str = field(default_factory=lambda: os.getenv("LLM_MODEL", "gpt-4o-mini"))
     openai_api_key: str = field(default_factory=lambda: os.getenv("OPENAI_API_KEY", ""))
     api_base: str = field(default_factory=lambda: os.getenv("API_BASE", ""))
 
-    db_host: str = field(
-        default_factory=lambda: os.getenv("CHATBI_DB_HOST", "127.0.0.1")
-    )
+    db_host: str = field(default_factory=lambda: os.getenv("CHATBI_DB_HOST", "127.0.0.1"))
     db_port: str = field(default_factory=lambda: os.getenv("CHATBI_DB_PORT", "3307"))
-    db_user: str = field(
-        default_factory=lambda: os.getenv("CHATBI_DB_USER", "demo_user")
-    )
-    db_password: str = field(
-        default_factory=lambda: os.getenv("CHATBI_DB_PASSWORD", "demo_pass")
-    )
-    db_name: str = field(
-        default_factory=lambda: os.getenv("CHATBI_DB_NAME", "chatbi_demo")
-    )
+    db_user: str = field(default_factory=lambda: os.getenv("CHATBI_DB_USER", "demo_user"))
+    db_password: str = field(default_factory=lambda: os.getenv("CHATBI_DB_PASSWORD", "demo_pass"))
+    db_name: str = field(default_factory=lambda: os.getenv("CHATBI_DB_NAME", "chatbi_demo"))
     app_db_host: str = field(
         default_factory=lambda: os.getenv(
             "CHATBI_APP_DB_HOST", os.getenv("CHATBI_DB_HOST", "127.0.0.1")
         )
     )
     app_db_port: str = field(
-        default_factory=lambda: os.getenv(
-            "CHATBI_APP_DB_PORT", os.getenv("CHATBI_DB_PORT", "3307")
-        )
+        default_factory=lambda: os.getenv("CHATBI_APP_DB_PORT", os.getenv("CHATBI_DB_PORT", "3307"))
     )
     app_db_user: str = field(
         default_factory=lambda: os.getenv(
@@ -49,9 +37,7 @@ class Settings:
             "CHATBI_APP_DB_PASSWORD", os.getenv("CHATBI_DB_PASSWORD", "demo_pass")
         )
     )
-    app_db_name: str = field(
-        default_factory=lambda: os.getenv("CHATBI_APP_DB_NAME", "chatbi_app")
-    )
+    app_db_name: str = field(default_factory=lambda: os.getenv("CHATBI_APP_DB_NAME", "chatbi_app"))
     admin_db_host: str = field(
         default_factory=lambda: os.getenv(
             "CHATBI_ADMIN_DB_HOST",
@@ -73,9 +59,7 @@ class Settings:
     admin_db_password: str = field(
         default_factory=lambda: os.getenv(
             "CHATBI_ADMIN_DB_PASSWORD",
-            os.getenv(
-                "CHATBI_APP_DB_PASSWORD", os.getenv("CHATBI_DB_PASSWORD", "demo_pass")
-            ),
+            os.getenv("CHATBI_APP_DB_PASSWORD", os.getenv("CHATBI_DB_PASSWORD", "demo_pass")),
         )
     )
     admin_db_name: str = field(
@@ -87,9 +71,7 @@ class Settings:
         )
     )
     log_db_port: str = field(
-        default_factory=lambda: os.getenv(
-            "CHATBI_LOG_DB_PORT", os.getenv("CHATBI_DB_PORT", "3307")
-        )
+        default_factory=lambda: os.getenv("CHATBI_LOG_DB_PORT", os.getenv("CHATBI_DB_PORT", "3307"))
     )
     log_db_user: str = field(
         default_factory=lambda: os.getenv(
@@ -101,9 +83,7 @@ class Settings:
             "CHATBI_LOG_DB_PASSWORD", os.getenv("CHATBI_DB_PASSWORD", "demo_pass")
         )
     )
-    log_db_name: str = field(
-        default_factory=lambda: os.getenv("CHATBI_LOG_DB_NAME", "chatbi_logs")
-    )
+    log_db_name: str = field(default_factory=lambda: os.getenv("CHATBI_LOG_DB_NAME", "chatbi_logs"))
 
     agent_react: bool = field(
         default_factory=lambda: os.getenv("CHATBI_AGENT_REACT", "1").strip().lower()

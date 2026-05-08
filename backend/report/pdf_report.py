@@ -57,7 +57,7 @@ def messages_to_html_document(messages: List[Dict[str, Any]], title: str) -> str
     if kpis:
         rows = "".join(_kpi_table_row(k) for k in kpis)
         kpi_block = (
-            "<h2 class=\"sec\">关键指标</h2>"
+            '<h2 class="sec">关键指标</h2>'
             "<table class='kpi'><thead><tr><th>指标</th><th>数值</th><th>单位</th></tr></thead>"
             f"<tbody>{rows}</tbody></table>"
         )
@@ -84,9 +84,7 @@ def messages_to_html_document(messages: List[Dict[str, Any]], title: str) -> str
         )
 
     charts_html = "\n".join(chart_sections)
-    now = html.escape(
-        datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    )
+    now = html.escape(datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"))
 
     return f"""<!DOCTYPE html>
 <html lang="zh-CN">
@@ -132,9 +130,7 @@ def render_session_pdf_bytes(messages: List[Dict[str, Any]], session_title: str)
         return _render_pdf_with_reportlab(messages, session_title or "ChatBI 会话报告")
 
 
-def _render_pdf_with_reportlab(
-    messages: List[Dict[str, Any]], session_title: str
-) -> bytes:
+def _render_pdf_with_reportlab(messages: List[Dict[str, Any]], session_title: str) -> bytes:
     try:
         from PIL import Image as PILImage
         from reportlab.lib.pagesizes import A4
@@ -195,9 +191,7 @@ def _render_pdf_with_reportlab(
     if kpis:
         story.append(Paragraph(html.escape("关键指标"), title_style))
         for card in kpis:
-            line = (
-                f"{card.get('label', '')}: {card.get('value', '')}{card.get('unit', '')}"
-            )
+            line = f"{card.get('label', '')}: {card.get('value', '')}{card.get('unit', '')}"
             story.append(Paragraph(html.escape(line), style))
         story.append(Spacer(1, 12))
 

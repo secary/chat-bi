@@ -46,9 +46,7 @@ class MultiAgentRouterTest(unittest.TestCase):
 
         async def run():
             mock_resp = MagicMock()
-            mock_resp.choices = [
-                MagicMock(message=MagicMock(content=json.dumps(payload)))
-            ]
+            mock_resp.choices = [MagicMock(message=MagicMock(content=json.dumps(payload)))]
             with patch(
                 "backend.agent.multi_agent_router.acompletion",
                 new_callable=AsyncMock,

@@ -55,9 +55,7 @@ class AgentRunnerContractTest(unittest.TestCase):
                     "backend.agent.runner.call_llm_for_plan", new_callable=AsyncMock
                 ) as mock_llm:
                     with patch("backend.agent.runner.run_script") as mock_run:
-                        events = await _collect_events(
-                            [{"role": "user", "content": "谢谢"}]
-                        )
+                        events = await _collect_events([{"role": "user", "content": "谢谢"}])
                         mock_llm.assert_not_awaited()
                         mock_run.assert_not_called()
                         texts = [e for e in events if e.get("type") == "text"]

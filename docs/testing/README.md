@@ -2,6 +2,20 @@
 
 ChatBI 的测试先按功能模块组织执行入口，暂时保留 `tests/` 扁平文件结构，避免一次性搬迁造成大量路径 churn。
 
+## 提交前本地检查
+
+```bash
+# 代码格式与 lint
+.venv/bin/ruff check backend/ scripts/ tests/
+.venv/bin/black --check backend/ scripts/ tests/
+
+# 后端测试（快速套件）
+PYTHONPATH=. .venv/bin/python scripts/run_tests.py quick -- -q
+
+# 前端
+cd frontend && npm run lint && npm run test && npm run build
+```
+
 ## 统一入口
 
 ```bash

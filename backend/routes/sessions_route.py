@@ -44,9 +44,7 @@ class SessionCreateResponse(BaseModel):
 
 
 @router.get("", response_model=SessionListResponse)
-def get_session_list(
-    request: Request, user: Dict[str, Any] = Depends(get_current_user)
-) -> dict:
+def get_session_list(request: Request, user: Dict[str, Any] = Depends(get_current_user)) -> dict:
     sessions = list_sessions(user["id"])
     prompts = suggested_prompts_for_user(user["id"])
     log_event(
@@ -102,9 +100,7 @@ def get_session_report_pdf(
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={
-            "Content-Disposition": f'attachment; filename="chatbi-session-{session_id}.pdf"'
-        },
+        headers={"Content-Disposition": f'attachment; filename="chatbi-session-{session_id}.pdf"'},
     )
 
 

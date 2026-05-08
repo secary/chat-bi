@@ -67,7 +67,7 @@ def _assistant_payload(acc: Dict[str, Any]) -> Dict[str, Any]:
 
 def _session_title_from_message(message: str) -> str:
     collapsed = re.sub(r"\s+", " ", message).strip()
-    return (collapsed[:80] or "新对话")
+    return collapsed[:80] or "新对话"
 
 
 def _next_disconnect_state(disconnected: bool, request_disconnected: bool) -> bool:
@@ -149,9 +149,7 @@ async def chat(
                     disconnected, await request.is_disconnected()
                 )
                 if next_disconnected and not disconnected:
-                    log_event(
-                        trace_id, "http.chat", "request.disconnected", level="WARN"
-                    )
+                    log_event(trace_id, "http.chat", "request.disconnected", level="WARN")
                 disconnected = next_disconnected
                 _accumulate_assistant(acc, event)
                 if disconnected:
@@ -176,15 +174,11 @@ async def chat(
             log_event(trace_id, "http.chat", "request.failed", str(exc), level="ERROR")
             yield {
                 "event": "message",
-                "data": json.dumps(
-                    {"type": "error", "content": str(exc)}, ensure_ascii=False
-                ),
+                "data": json.dumps({"type": "error", "content": str(exc)}, ensure_ascii=False),
             }
             yield {
                 "event": "message",
-                "data": json.dumps(
-                    {"type": "done", "content": None}, ensure_ascii=False
-                ),
+                "data": json.dumps({"type": "done", "content": None}, ensure_ascii=False),
             }
             return
         finally:

@@ -1,6 +1,5 @@
 from pathlib import Path
 
-
 SQL_FILES = (
     Path("database/external_bank_bootstrap.sql"),
     Path("database/external_bank_demo.sql"),

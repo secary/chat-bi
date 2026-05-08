@@ -8,7 +8,6 @@ import sys
 from pathlib import Path
 from typing import Sequence
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -20,6 +19,7 @@ def python_executable() -> str:
     if project_python.exists():
         return str(project_python)
     return sys.executable
+
 
 MODULE_SUITES: dict[str, list[str]] = {
     "foundation": [
@@ -94,9 +94,7 @@ SUITE_ALIASES: dict[str, list[str]] = {
 
 def discover_python_tests() -> list[str]:
     return sorted(
-        str(path.relative_to(ROOT))
-        for path in (ROOT / "tests").glob("test_*.py")
-        if path.is_file()
+        str(path.relative_to(ROOT)) for path in (ROOT / "tests").glob("test_*.py") if path.is_file()
     )
 
 

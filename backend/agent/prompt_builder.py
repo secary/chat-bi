@@ -41,9 +41,7 @@ def scan_skills(skills_dir: Path) -> List[SkillDoc]:
         name = meta.get("name", path.parent.name)
         description = meta.get("description", "")
         docs.append(
-            SkillDoc(
-                name=name, description=description, content=body, skill_dir=path.parent
-            )
+            SkillDoc(name=name, description=description, content=body, skill_dir=path.parent)
         )
     return docs
 

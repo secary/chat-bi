@@ -17,7 +17,8 @@ def _router_system_prompt() -> str:
     ids = list_registry_agent_ids()
     lines = "\n".join(f"- `{a}`" for a in ids)
     return f"""你是 ChatBI 多专线编排路由。根据用户最新需求，选择需要参与回答的专线（可多个，顺序有意义）。
-registry 内专线 id 只能是：{",".join(ids) if ids else "（空）"}
+registry 内专线 id 只能是：
+{lines if lines else "（空）"}
 
 ## 输出 JSON（仅此一个对象）
 {{

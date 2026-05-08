@@ -13,6 +13,7 @@ from matplotlib import font_manager
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
+
 def _select_sans_fonts(installed: Optional[set[str]] = None) -> List[str]:
     names = installed
     if names is None:

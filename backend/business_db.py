@@ -54,9 +54,7 @@ def business_fetch_one(
             return cur.fetchone()
 
 
-def business_fetch_all(
-    sql: str, args: Optional[tuple[Any, ...]] = None
-) -> List[Dict[str, Any]]:
+def business_fetch_all(sql: str, args: Optional[tuple[Any, ...]] = None) -> List[Dict[str, Any]]:
     with business_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(sql, args or ())

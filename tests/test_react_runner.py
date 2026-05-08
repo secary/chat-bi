@@ -39,9 +39,7 @@ class ReactRunnerTest(unittest.TestCase):
                 ) as mock_llm:
                     with patch("backend.agent.react_runner.run_script") as mock_run:
                         events = await _collect(
-                            stream_chat_react(
-                                [{"role": "user", "content": "你好"}], trace_id="t0"
-                            )
+                            stream_chat_react([{"role": "user", "content": "你好"}], trace_id="t0")
                         )
                         mock_llm.assert_not_awaited()
                         mock_run.assert_not_called()
@@ -118,9 +116,7 @@ class ReactRunnerTest(unittest.TestCase):
                         mock_llm.assert_awaited_once()
                         mock_run.assert_not_called()
                         texts = [e for e in events if e.get("type") == "text"]
-                        self.assertTrue(
-                            any("助手" in str(e.get("content")) for e in texts)
-                        )
+                        self.assertTrue(any("助手" in str(e.get("content")) for e in texts))
 
         asyncio.run(run())
 

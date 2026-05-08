@@ -5,7 +5,6 @@ import sys
 import unittest
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "skills/chatbi-metric-explainer/scripts/explain_metric.py"
 SPEC = importlib.util.spec_from_file_location("metric_explainer", SCRIPT)

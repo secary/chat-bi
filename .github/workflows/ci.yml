@@ -29,8 +29,9 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt
+          PYTHON=$([ -f .venv/bin/python ] && echo ".venv/bin/python" || echo "python")
+          $PYTHON -m pip install --upgrade pip
+          $PYTHON -m pip install -r requirements.txt
 
       - name: Run Python tests
         env:

@@ -2,10 +2,10 @@ from pathlib import Path
 
 
 SQL_FILES = (
-    Path("data/external_bank_bootstrap.sql"),
-    Path("data/external_bank_demo.sql"),
-    Path("data/external_bank_business.sql"),
-    Path("data/external_bank_semantic.sql"),
+    Path("database/external_bank_bootstrap.sql"),
+    Path("database/external_bank_demo.sql"),
+    Path("database/external_bank_business.sql"),
+    Path("database/external_bank_semantic.sql"),
 )
 SQL = "\n".join(path.read_text(encoding="utf-8") for path in SQL_FILES)
 

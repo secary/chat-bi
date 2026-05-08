@@ -115,6 +115,15 @@
 - 涉及文件：`backend/auth_deps.py`、`backend/auth_tokens.py`、`backend/user_repo.py`、`backend/memory_repo.py`、`backend/memory_service.py`、`backend/routes/auth_route.py`、`backend/routes/admin_users_route.py`、`frontend/src/api/client.ts`、`frontend/src/pages/ChatPage.tsx`
 - 复杂度：高
 
+### 任务 12：多 Agents 注册表管理（管理员）
+- 状态：✅ 已完成
+- 验收标准：
+  - [x] `GET/PUT /admin/multi-agents` 读写 `skills/_agents/registry.yaml`（原子写入），校验专线 id、至少一条专线、技能 slug 须存在于 `scan_skills`
+  - [x] 前端管理员侧栏「多Agents管理」、路由 `/multi-agents`：每轮上限、专线增删、`label`/`role_prompt`、技能多选（结合 `/admin/skills` 列表）
+  - [x] `tests/test_admin_multi_agents.py`、`frontend/src/lib/multiAgentsRegistryUi.test.ts`；`npm run build` 通过
+- 涉及文件：`backend/routes/admin_multi_agents_route.py`、`backend/agent/multi_agent_registry.py`、`backend/main.py`、`frontend/src/pages/MultiAgentsAdminPage.tsx`、`frontend/src/lib/multiAgentsRegistryUi.ts`、`frontend/src/App.tsx`、`frontend/src/components/AppLayout.tsx`
+- 复杂度：中
+
 ## Gap 追踪（每次执行后更新）
 | 轮次 | 完成内容 | 发现问题 | 下一步 |
 |------|---------|---------|-------|
@@ -179,3 +188,4 @@
 | 58 | 适配 `skills/chatbi-dashboard-orchestration` 到当前框架：补回 `scripts/orchestrate_dashboard.py` + `dashboard_orchestration_core.py`，让技能可直接消费 dashboard overview 数据并返回 `dashboard_spec + charts + kpis`；同时为“生成看板/仪表盘编排”补 planner 触发规则 | 当前版本优先吃现有 `/dashboard/overview` 的数据形状；尚未真正接管前端 `/dashboard` 页面，也未自动串联 query/chart recommendation 的多技能结果 | 用 `env PYTHONPATH=. python3 tests/test_dashboard_orchestration_skill.py tests/test_agent_skill_protocol.py` 验证；后续如需要可再把 dashboard 页面改成消费 `dashboard_spec` |
 | 59 | 统一测试环境优先级：新增 `backend/env_loader.py`，运行时按 `.env` → `.env.dev` → `env.dev` 顺序加载，让本地测试默认优先走 dev 数据库；同时将“测试优先使用项目内 `.venv`、优先读取 `.env.dev`、包导入测试优先用 `PYTHONPATH=. .venv/bin/python -m pytest`”写入 `AGENTS.md` 作为项目约定 | 当前若手工直接写 `python3 -m pytest`，解释器仍取决于调用者 shell；约定层面已统一，但执行时仍应显式使用 `.venv/bin/python` | 用 `PYTHONPATH=. .venv/bin/python -m pytest tests/test_env_loader.py` 验证 `.env.dev` 覆盖 `.env`，并确认测试进程解释器来自项目内 `.venv` |
 | 60 | 为当前 Python 依赖补齐 `pytest`：`requirements.txt` 新增 `pytest>=8,<9`，便于项目内 `.venv` 直接使用 `-m pytest` 跑测试 | 当前仅补齐依赖声明；若本地 `.venv` 尚未重新安装依赖，`pytest` 模块仍不会立即出现 | 执行 `.venv/bin/python -m pip install -r requirements.txt` 后，用 `PYTHONPATH=. .venv/bin/python -m pytest tests/test_env_loader.py` 验证 |
+| 61 | 完成任务 12：管理员 `GET/PUT /admin/multi-agents` + 前端「多Agents管理」页与 Vitest/Pytest | 无 | 管理员账号下打开 `/multi-agents` 保存后确认 `skills/_agents/registry.yaml` 与多专线对话行为一致 |

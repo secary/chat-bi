@@ -22,6 +22,8 @@ output
 .Ds_Store
 *.zip
 *.xlsx
+csv
+*.csv
 
 
 

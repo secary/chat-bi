@@ -34,6 +34,9 @@ def _merge_finish_result(
     if _should_suppress_finish_text(last_skill_name, merged):
         merged["text"] = ""
         return merged
+    # skill 已生成图表时，保留 skill 自带文本，不被 LLM finish 文本覆盖
+    if merged.get("chart_plan") or merged.get("charts"):
+        return merged
     if plan.get("text"):
         merged["text"] = plan["text"]
     return merged

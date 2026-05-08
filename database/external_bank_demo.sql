@@ -6,5 +6,5 @@ CREATE DATABASE IF NOT EXISTS chatbi_bank_external
 
 GRANT ALL PRIVILEGES ON chatbi_bank_external.* TO 'demo_user'@'%';
 
-SOURCE data/external_bank_business.sql;
-SOURCE data/external_bank_semantic.sql;
+SOURCE database/external_bank_business.sql;
+SOURCE database/external_bank_semantic.sql;

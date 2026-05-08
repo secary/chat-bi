@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from backend.agent.executor import (
@@ -18,6 +17,7 @@ from backend.agent.prompt_builder import (
     build_system_prompt,
     scan_skills_enabled,
 )
+from backend.agent.query_decision import is_query_plus_decision_text
 from backend.agent.react_runner import stream_chat_react
 from backend.config import settings
 from backend.trace import log_event
@@ -34,16 +34,8 @@ def _legacy_sink_write(
     sink["last_skill_name"] = last_skill_name
 
 
-_DECISION_RE = re.compile(r"(决策建议|决策意见|经营建议|经营意见|管理建议|管理意见|建议|意见)")
-_QUERY_RE = re.compile(
-    r"(排行|排名|对比|趋势|汇总|查询|销售额|毛利|毛利率|目标完成率|留存率|客户数|订单数|"
-    r"各区域|按区域|按月|按照.{0,10}划分|按.{0,10}划分|产品|渠道|部门|客户类型)"
-)
-
-
 def _is_query_plus_decision(messages: List[Dict[str, str]]) -> bool:
-    text = latest_user_content(messages)
-    return bool(text and _QUERY_RE.search(text) and _DECISION_RE.search(text))
+    return is_query_plus_decision_text(latest_user_content(messages))
 
 
 def _infer_primary_dimension(result: Dict[str, Any]) -> str:

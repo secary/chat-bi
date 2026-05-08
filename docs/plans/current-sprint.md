@@ -192,3 +192,4 @@
 | 62 | 修复上传 CSV 后轮对话丢失上下文：`upload_context` 从会话中提取 `/tmp/chatbi-uploads/` 路径并在跟进回合注入提示；System/ReAct prompt 明确「上传文件优先于 semantic-query」 | 无 | 浏览器：首轮上传校验后轮「分析 CSV 并画图」应走 `chatbi-file-ingestion --include-rows`，而非演示库查询 |
 | 63 | 修复导航离开对话页再返回时会话与助手消息「丢失」：`sessionStorage` 持久化当前 `session_id`，挂载时用 `resolveInitialSessionId` 恢复选中会话（不再无脑 `list[0]`）；`useChat` 在消息末尾为 `user`（后端仍在生成、助手尚未落库）时轮询 `GET /sessions/:id/messages` 直至出现助手消息；`assistantPending` + `AssistantPendingNotice` + 输入区「处理中」避免空白等待感；轮询间隔 1s | 轮询最长约 3 分钟（180×1s）；极端长时间生成仍会停止轮询 | 浏览器：在非第一条会话中提问 → 切到仪表盘再回对话，仍应保持同一会话；应立刻看到「助手正在生成回复」提示直至内容出现 |
 | 64 | 新增用户向技术与使用文档 `docs/user-guide.md`：产品能力、启动方式概要、登录与角色、各路由页面功能、对话区与会话/上传/PDF/多专线、仪表盘与各管理页说明、典型问法与限制 | 无 | 后续若路由或菜单变更，同步更新该文档 |
+| 65 | 新增开发者向 `docs/tech-guide.md`：单 Agent（ReAct/Legacy）与 Multi-Agent 编排、System/User 消息拼装、记忆读写、四库表职责、上传路径与 Skill 调用、各 Skill 职责表 | 无 | Agent 或 registry 行为变更时同步更新 |

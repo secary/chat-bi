@@ -229,6 +229,7 @@
 | 文档                                                        | 内容                            |
 | --------------------------------------------------------- | ----------------------------- |
 | `[README.md](../README.md)`                               | 启动命令、端口、默认账号、目录结构             |
+| `[docs/tech-guide.md](tech-guide.md)`                     | 技术实现：Agent、Prompt、记忆、数据库与 Skill   |
 | `[docs/architecture/README.md](architecture/README.md)`   | 分层、模块边界、Skill 约束              |
 | `[docs/goal.md](goal.md)`                                 | 项目目标与 MVP 验收口径（部分目标可能被后续迭代覆盖） |
 | `[docs/plans/current-sprint.md](plans/current-sprint.md)` | 当前迭代任务与进度                     |

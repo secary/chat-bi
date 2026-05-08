@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/useAuth';
 import { authEnabled } from '../lib/authFlags';
 
 const linkCls = ({ isActive }: { isActive: boolean }) =>

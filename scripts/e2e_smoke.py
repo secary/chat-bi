@@ -48,32 +48,59 @@ class Case:
 
 CASES: list[Case] = [
     # ── 单 Skill ──────────────────────────────────────────────────────────────
-    Case("S1", "区域销售额排行", "1-4月各区域销售额排行",
-         expect_skills=["chatbi-semantic-query"], expect_chart=True),
-    Case("S2", "按月趋势", "2026年销售额按月趋势",
-         expect_skills=["chatbi-semantic-query"], expect_chart=True),
-    Case("S3", "单值 KPI", "华东4月毛利率",
-         expect_skills=["chatbi-semantic-query"]),
-    Case("S4", "数据库概览", "当前数据库有哪些表可以查",
-         expect_skills=["chatbi-database-overview"]),
-    Case("S5", "环比对比", "销售额和上月相比怎么样",
-         expect_skills=["chatbi-comparison"]),
-    Case("S6", "指标口径解释", "销售额口径是什么",
-         expect_skills=["chatbi-metric-explainer"], expect_text=["销售额口径"]),
+    Case(
+        "S1",
+        "区域销售额排行",
+        "1-4月各区域销售额排行",
+        expect_skills=["chatbi-semantic-query"],
+        expect_chart=True,
+    ),
+    Case(
+        "S2",
+        "按月趋势",
+        "2026年销售额按月趋势",
+        expect_skills=["chatbi-semantic-query"],
+        expect_chart=True,
+    ),
+    Case("S3", "单值 KPI", "华东4月毛利率", expect_skills=["chatbi-semantic-query"]),
+    Case(
+        "S4", "数据库概览", "当前数据库有哪些表可以查", expect_skills=["chatbi-database-overview"]
+    ),
+    Case("S5", "环比对比", "销售额和上月相比怎么样", expect_skills=["chatbi-comparison"]),
+    Case(
+        "S6",
+        "指标口径解释",
+        "销售额口径是什么",
+        expect_skills=["chatbi-metric-explainer"],
+        expect_text=["销售额口径"],
+    ),
     # ── 多步 Skill ────────────────────────────────────────────────────────────
-    Case("M1", "查询+建议（区域）", "1-4月各区域销售额排行，并给出经营建议",
-         expect_skills=["chatbi-semantic-query", "chatbi-decision-advisor"],
-         expect_text=["决策"]),
-    Case("M2", "查询+建议（毛利率）", "各渠道毛利率经营建议",
-         expect_skills=["chatbi-semantic-query", "chatbi-decision-advisor"],
-         expect_text=["决策"]),
-    Case("M3", "查询+建议（区域焦点）", "华东销售额建议",
-         expect_skills=["chatbi-semantic-query", "chatbi-decision-advisor"],
-         expect_text=["决策"]),
+    Case(
+        "M1",
+        "查询+建议（区域）",
+        "1-4月各区域销售额排行，并给出经营建议",
+        expect_skills=["chatbi-semantic-query", "chatbi-decision-advisor"],
+        expect_text=["决策"],
+    ),
+    Case(
+        "M2",
+        "查询+建议（毛利率）",
+        "各渠道毛利率经营建议",
+        expect_skills=["chatbi-semantic-query", "chatbi-decision-advisor"],
+        expect_text=["决策"],
+    ),
+    Case(
+        "M3",
+        "查询+建议（区域焦点）",
+        "华东销售额建议",
+        expect_skills=["chatbi-semantic-query", "chatbi-decision-advisor"],
+        expect_text=["决策"],
+    ),
     # ── 图表渲染修复 ──────────────────────────────────────────────────────────
     Case(
-        "C1", "图表无原始 JSON",
-        '请把下面结果用最合适的图表可视化出来：'
+        "C1",
+        "图表无原始 JSON",
+        "请把下面结果用最合适的图表可视化出来："
         '{"question":"2026年1-4月销售额趋势","rows":['
         '{"月份":"2026-01","销售额":355000},'
         '{"月份":"2026-02","销售额":378000},'
@@ -84,20 +111,20 @@ CASES: list[Case] = [
     ),
     # ── 边界场景 ──────────────────────────────────────────────────────────────
     Case("E1", "小聊天不调 Skill", "你好", no_skill_call=True),
-    Case("E2", "不存在年份", "2024年销售额",
-         expect_skills=["chatbi-semantic-query"]),
+    Case("E2", "不存在年份", "2024年销售额", expect_skills=["chatbi-semantic-query"]),
 ]
 
 # ── SSE 读取 ──────────────────────────────────────────────────────────────────
 
 
-def _stream_events(url: str, message: str, token: str | None,
-                   multi_agents: bool, timeout: int):
-    payload = json.dumps({
-        "message": message,
-        "history": [],
-        "multi_agents": multi_agents,
-    }).encode()
+def _stream_events(url: str, message: str, token: str | None, multi_agents: bool, timeout: int):
+    payload = json.dumps(
+        {
+            "message": message,
+            "history": [],
+            "multi_agents": multi_agents,
+        }
+    ).encode()
     headers = {
         "Content-Type": "application/json",
         "Accept": "text/event-stream",
@@ -135,7 +162,9 @@ def _run_case(case: Case, base_url: str, token: str | None, timeout: int):
             if t == "thinking" and isinstance(content, str):
                 thinking_text += content + "\n"
             elif t == "text":
-                all_text += content if isinstance(content, str) else json.dumps(content, ensure_ascii=False)
+                all_text += (
+                    content if isinstance(content, str) else json.dumps(content, ensure_ascii=False)
+                )
             elif t == "chart":
                 has_chart = True
             elif t == "error":
@@ -194,7 +223,9 @@ def main():
     parser.add_argument("--timeout", type=int, default=120, help="每条用例超时秒数")
     args = parser.parse_args()
 
-    filter_ids = {item.strip() for item in args.cases.split(",") if item.strip()} if args.cases else None
+    filter_ids = (
+        {item.strip() for item in args.cases.split(",") if item.strip()} if args.cases else None
+    )
     known_ids = {case.id for case in CASES}
     unknown_ids = sorted(filter_ids - known_ids) if filter_ids else []
     if unknown_ids:

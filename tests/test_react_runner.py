@@ -223,9 +223,7 @@ class ReactRunnerTest(unittest.TestCase):
                             self.assertEqual(mock_run.call_count, 1)
                             self.assertEqual(mock_followup.call_count, 1)
                             thinking = "\n".join(
-                                str(e.get("content"))
-                                for e in events
-                                if e.get("type") == "thinking"
+                                str(e.get("content")) for e in events if e.get("type") == "thinking"
                             )
                             self.assertIn("Skill「chatbi-decision-advisor」", thinking)
                             self.assertTrue(

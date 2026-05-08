@@ -21,4 +21,5 @@ agents:
       - chatbi-semantic-query
       - chatbi-comparison
       - chatbi-metric-explainer
+      - chatbi-database-overview
       - chatbi-file-ingestion

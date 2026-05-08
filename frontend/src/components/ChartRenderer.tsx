@@ -10,7 +10,7 @@ export function ChartRenderer({ option }: ChartRendererProps) {
   }
 
   return (
-    <div className="my-3 rounded-lg border border-gray-200 bg-white p-4">
+    <div className="my-3 rounded-xl border border-gray-200 bg-surface p-5 shadow-card transition-shadow hover:shadow-card-hover">
       <ReactECharts
         option={option}
         style={{ height: 320, width: '100%' }}

@@ -68,8 +68,8 @@ export function ChatInput({ onSend, loading, disabled = false }: ChatInputProps)
         setDragging(false);
         handleFiles(e.dataTransfer.files);
       }}
-      className={`rounded-2xl border p-4 shadow-sm transition ${
-        dragging ? 'border-blue-300 bg-blue-50/80' : 'border-gray-200 bg-white'
+      className={`rounded-2xl border p-4 shadow-card transition-shadow focus-within:shadow-card-hover ${
+        dragging ? 'border-accent bg-accent-light' : 'border-gray-200 bg-surface'
       }`}
     >
       <div className="flex items-center gap-2">
@@ -87,7 +87,7 @@ export function ChatInput({ onSend, loading, disabled = false }: ChatInputProps)
           type="button"
           disabled={loading || uploading || disabled}
           onClick={() => fileInputRef.current?.click()}
-          className="h-11 shrink-0 rounded-full border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400"
+          className="h-11 shrink-0 rounded-xl border border-gray-200 bg-white px-4 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50 disabled:bg-gray-100"
           title="上传 CSV、Excel 或图像"
         >
           {uploading ? '上传中' : '附件'}
@@ -99,19 +99,19 @@ export function ChatInput({ onSend, loading, disabled = false }: ChatInputProps)
           onChange={(e) => setMessage(e.target.value)}
           placeholder="输入业务问题，或拖入 CSV/Excel/图像..."
           disabled={loading || uploading || disabled}
-          className="h-11 min-w-0 flex-1 rounded-full border border-gray-300 bg-white px-5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+          className="h-11 min-w-0 flex-1 rounded-xl border border-gray-200 bg-surface px-4 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-50 disabled:bg-gray-100"
         />
         <button
           type="submit"
           disabled={loading || uploading || !message.trim() || disabled}
-          className="h-11 shrink-0 rounded-full bg-blue-600 px-6 text-sm font-medium text-white hover:bg-blue-700 disabled:bg-gray-400"
+          className="h-11 shrink-0 rounded-xl bg-accent px-5 text-sm font-medium text-white transition-colors hover:bg-accent-hover active:scale-[0.97] disabled:opacity-50 disabled:bg-gray-300"
         >
           {loading ? '处理中' : '发送'}
         </button>
       </div>
       <div
         className={`mt-2 text-xs ${
-          uploadError ? 'text-red-600' : dragging ? 'text-blue-700' : 'text-gray-500'
+          uploadError ? 'text-red-600' : dragging ? 'text-accent' : 'text-gray-400'
         }`}
       >
         {uploadError ||

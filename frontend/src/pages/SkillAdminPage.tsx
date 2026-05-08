@@ -108,24 +108,24 @@ export function SkillAdminPage() {
   };
 
   return (
-    <div className="flex h-full flex-col gap-4 overflow-auto p-6">
-      <h2 className="text-lg font-semibold text-gray-900">技能管理</h2>
+    <div className="flex h-full flex-col gap-4 overflow-auto p-6 lg:p-8">
+      <h2 className="text-lg font-semibold tracking-tight text-gray-900">技能管理</h2>
       <div className="flex flex-wrap gap-4">
-        <div className="min-w-[240px] rounded-lg border border-gray-200 bg-white p-3">
-          <p className="mb-2 text-xs font-medium text-gray-600">技能列表</p>
-          <ul className="max-h-64 space-y-1 overflow-y-auto text-sm">
+        <div className="min-w-[240px] rounded-xl border border-gray-200 bg-surface p-3 shadow-card">
+          <p className="mb-2 text-xs font-medium tracking-wide text-gray-500">技能列表</p>
+          <ul className="max-h-64 space-y-0.5 overflow-y-auto text-sm">
             {skills.map((s) => (
               <li key={s.slug} className="flex items-center gap-2">
                 <button
                   type="button"
-                  className={`flex-1 truncate rounded px-2 py-1 text-left hover:bg-gray-50 ${
-                    slug === s.slug ? 'bg-gray-100 font-medium' : ''
+                  className={`flex-1 truncate rounded-lg px-2.5 py-1.5 text-left transition-colors hover:bg-gray-50 ${
+                    slug === s.slug ? 'bg-gray-100 font-medium text-gray-900' : ''
                   }`}
                   onClick={() => void selectSkill(s.slug)}
                 >
                   {s.name || s.slug}
                 </button>
-                <label className="flex items-center gap-1 text-xs text-gray-600">
+                <label className="flex items-center gap-1 text-xs text-gray-500">
                   <input
                     type="checkbox"
                     checked={s.enabled}
@@ -138,14 +138,14 @@ export function SkillAdminPage() {
           </ul>
           <div className="mt-3 flex gap-2 border-t border-gray-100 pt-3">
             <input
-              className="flex-1 rounded border border-gray-300 px-2 py-1 text-xs"
+              className="flex-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs transition-all focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
               placeholder="新技能 slug"
               value={newSlug}
               onChange={(e) => setNewSlug(e.target.value)}
             />
             <button
               type="button"
-              className="rounded bg-gray-900 px-2 py-1 text-xs text-white disabled:bg-gray-400"
+              className="rounded-lg bg-accent px-3 py-1.5 text-xs text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
               disabled={busy || !newSlug.trim()}
               onClick={() => void create()}
             >
@@ -154,15 +154,15 @@ export function SkillAdminPage() {
           </div>
         </div>
 
-        <div className="min-h-[320px] min-w-[320px] flex-1 rounded-lg border border-gray-200 bg-white p-3">
+        <div className="min-h-[320px] min-w-[320px] flex-1 rounded-xl border border-gray-200 bg-surface p-3 shadow-card">
           <div className="mb-2 flex items-center justify-between">
-            <span className="text-xs text-gray-600">
+            <span className="text-xs text-gray-500">
               {slug ? `编辑：${slug}` : '请选择左侧技能'}
             </span>
             <div className="flex gap-2">
               <button
                 type="button"
-                className="rounded border border-red-200 px-2 py-1 text-xs text-red-700 disabled:opacity-50"
+                className="rounded-lg border border-red-200 px-3 py-1.5 text-xs text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
                 disabled={busy || !slug}
                 onClick={() => void remove()}
               >
@@ -170,7 +170,7 @@ export function SkillAdminPage() {
               </button>
               <button
                 type="button"
-                className="rounded bg-blue-600 px-3 py-1 text-xs text-white disabled:bg-gray-400"
+                className="rounded-lg bg-accent px-4 py-1.5 text-xs text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
                 disabled={busy || !slug}
                 onClick={() => void save()}
               >
@@ -179,7 +179,7 @@ export function SkillAdminPage() {
             </div>
           </div>
           <textarea
-            className="h-[calc(100%-2rem)] min-h-[280px] w-full resize-none rounded border border-gray-300 p-2 font-mono text-xs"
+            className="h-[calc(100%-2rem)] min-h-[280px] w-full resize-none rounded-lg border border-gray-200 p-3 font-mono text-xs transition-all focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
             value={markdown}
             onChange={(e) => setMarkdown(e.target.value)}
             disabled={busy || !slug}

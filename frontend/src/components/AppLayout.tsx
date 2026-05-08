@@ -3,8 +3,8 @@ import { useAuth } from '../contexts/useAuth';
 import { authEnabled } from '../lib/authFlags';
 
 const linkCls = ({ isActive }: { isActive: boolean }) =>
-  `block rounded-md px-3 py-2 text-sm ${
-    isActive ? 'bg-gray-200 font-medium text-gray-900' : 'text-gray-600 hover:bg-gray-100'
+  `block rounded-lg px-3 py-2 text-sm transition-colors duration-150 ${
+    isActive ? 'bg-gray-100 font-medium text-gray-900' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-800'
   }`;
 
 export function AppLayout() {
@@ -13,16 +13,17 @@ export function AppLayout() {
   return (
     <div className="flex h-screen bg-gray-100">
       <aside className="flex h-full min-h-0 w-52 shrink-0 flex-col border-r border-gray-200 bg-white py-4">
-        <div className="px-3 pb-3">
-          <h1 className="text-sm font-semibold text-gray-900">零眸智能 ChatBI</h1>
-          <p className="text-xs text-gray-500">对话式数据分析</p>
+        <div className="px-3 pb-4">
+          <h1 className="text-sm font-semibold tracking-tight text-gray-900">零眸智能 ChatBI</h1>
+          <p className="text-xs tracking-wide text-gray-500">对话式数据分析</p>
           {user ? (
-            <p className="mt-2 truncate text-xs text-gray-600" title={user.username}>
+            <p className="mt-2 truncate text-xs text-gray-500" title={user.username}>
               {user.username}
               <span className="text-gray-400"> · {user.role}</span>
             </p>
           ) : null}
         </div>
+        <div className="mx-3 h-px bg-gray-100" />
         <nav className="flex flex-col gap-1 px-2">
           <NavLink to="/" end className={linkCls}>
             对话
@@ -58,7 +59,7 @@ export function AppLayout() {
                 logout();
                 window.location.assign('/login');
               }}
-              className="w-full rounded-md border border-gray-200 px-3 py-2 text-xs text-gray-600 hover:bg-gray-50"
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-600 transition-colors hover:bg-gray-100"
             >
               退出登录
             </button>

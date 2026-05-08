@@ -7,9 +7,12 @@ import {
   writeSidebarOpenPreference,
 } from '../hooks/useChat';
 import { AssistantPendingNotice } from '../components/AssistantPendingNotice';
+import { ChatComposerDock } from '../components/ChatComposerDock';
+import { ChatSessionSidebar } from '../components/ChatSessionSidebar';
 import { MessageBubble } from '../components/MessageBubble';
-import { ChatInput } from '../components/ChatInput';
+import { ChatWelcomeHero } from '../components/ChatWelcomeHero';
 import { Switch } from '../components/Switch';
+import { shouldShowChatWelcomeView } from '../lib/chatWelcomeView';
 import {
   createSessionApi,
   deleteSessionApi,
@@ -41,6 +44,7 @@ export function ChatPage() {
     multiAgents,
   );
   const inputBusy = loading || assistantPending;
+  const showWelcome = shouldShowChatWelcomeView(booting, messages.length);
 
   useEffect(() => {
     writeMultiAgentsPreference(multiAgents);
@@ -138,96 +142,15 @@ export function ChatPage() {
 
   return (
     <div className="flex h-full">
-      <aside
-        className={
-          'flex shrink-0 flex-col border-r border-gray-200 bg-white transition-all duration-300 ' +
-          (sidebarOpen ? 'w-56' : 'w-10')
-        }
-      >
-        {sidebarOpen ? (
-          <>
-            <div className="flex items-center justify-between gap-1 border-b border-gray-100 px-3 py-2.5">
-              <span className="text-xs font-medium tracking-wide text-gray-500">会话</span>
-              <div className="flex shrink-0 items-center gap-1">
-                <button
-                  type="button"
-                  title="收起会话列表"
-                  onClick={() => setSidebarOpen(false)}
-                  className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
-                >
-                  <span className="sr-only">收起会话列表</span>
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    aria-hidden
-                  >
-                    <path d="M15 6l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void newSession()}
-                  className="rounded-lg bg-gray-900 px-2.5 py-1 text-xs text-white transition-colors hover:bg-gray-800"
-                >
-                  新对话
-                </button>
-              </div>
-            </div>
-            <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
-              {sessions.map((s) => (
-                <div
-                  key={s.id}
-                  className={`group flex items-center gap-1 rounded-lg px-2 py-1.5 transition-colors ${
-                    sessionId === s.id ? 'bg-gray-100' : 'hover:bg-gray-50'
-                  }`}
-                >
-                  <button
-                    type="button"
-                    className="min-w-0 flex-1 truncate text-left text-xs text-gray-700"
-                    onClick={() => setSessionId(s.id)}
-                  >
-                    {s.title || `会话 ${s.id}`}
-                  </button>
-                  <button
-                    type="button"
-                    title="删除"
-                    className="shrink-0 text-xs text-gray-400 opacity-0 transition-opacity hover:text-red-500 group-hover:opacity-100"
-                    onClick={() => void removeSession(s.id)}
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
-          </>
-        ) : (
-          <div className="flex flex-1 flex-col items-center gap-3 py-3">
-            <button
-              type="button"
-              title="展开会话列表"
-              onClick={() => setSidebarOpen(true)}
-              className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
-            >
-              <span className="sr-only">展开会话列表</span>
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                aria-hidden
-              >
-                <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-          </div>
-        )}
-      </aside>
+      <ChatSessionSidebar
+        sidebarOpen={sidebarOpen}
+        onSidebarOpenChange={setSidebarOpen}
+        sessions={sessions}
+        sessionId={sessionId}
+        onSelectSession={setSessionId}
+        onNewSession={newSession}
+        onRemoveSession={removeSession}
+      />
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <header className="flex flex-wrap items-center gap-3 border-b border-gray-200 bg-white/80 backdrop-blur-sm px-5 py-2.5">
@@ -265,51 +188,46 @@ export function ChatPage() {
           </label>
         </header>
 
-        <div className="flex-1 overflow-y-auto px-6 py-6">
-          {booting ? (
+        {booting ? (
+          <div className="flex flex-1 items-center justify-center px-6 py-6">
             <p className="text-center text-sm text-gray-400">加载会话…</p>
-          ) : (
-            <div className="mx-auto max-w-3xl">
-              {messages.length === 0 && (
-                <div className="flex flex-col items-center justify-center pt-24 text-gray-400">
-                  <p className="text-4xl mb-3">📊</p>
-                  <p className="text-sm text-gray-500">输入业务问题开始分析</p>
-                  <p className="mt-1 text-xs text-gray-400">例如：1-4月销售额排行</p>
-                </div>
-              )}
-              {messages.map((msg) => (
-                <MessageBubble key={msg.id} message={msg} />
-              ))}
-              {assistantPending ? <AssistantPendingNotice /> : null}
-              <div ref={bottomRef} />
+          </div>
+        ) : showWelcome ? (
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto px-6 py-8">
+              <ChatWelcomeHero title="有什么可以帮到你？" subtitle="例如：1-4月销售额排行">
+                <ChatComposerDock
+                  suggestedPrompts={suggestedPrompts}
+                  onSend={sendMessage}
+                  inputBusy={inputBusy}
+                  booting={booting}
+                  sessionId={sessionId}
+                />
+              </ChatWelcomeHero>
             </div>
-          )}
-        </div>
-
-        <div className="mx-auto w-full max-w-3xl px-4 pb-4">
-          {suggestedPrompts.length > 0 ? (
-            <div className="mb-3 flex flex-wrap gap-2">
-              <span className="w-full text-xs text-gray-400">记忆提示 · 可快捷继续：</span>
-              {suggestedPrompts.map((p, idx) => (
-                <button
-                  key={`${idx}-${p.slice(0, 40)}`}
-                  type="button"
-                  onClick={() => void sendMessage(p)}
-                  disabled={inputBusy || booting || sessionId == null}
-                  className="max-w-full truncate rounded-full border border-amber-200 bg-amber-50 px-3.5 py-1.5 text-left text-xs text-amber-900 transition-colors hover:bg-amber-100 disabled:opacity-50"
-                  title={p}
-                >
-                  {p}
-                </button>
-              ))}
+          </div>
+        ) : (
+          <>
+            <div className="flex-1 overflow-y-auto px-6 py-6">
+              <div className="mx-auto max-w-3xl">
+                {messages.map((msg) => (
+                  <MessageBubble key={msg.id} message={msg} />
+                ))}
+                {assistantPending ? <AssistantPendingNotice /> : null}
+                <div ref={bottomRef} />
+              </div>
             </div>
-          ) : null}
-          <ChatInput
-            onSend={sendMessage}
-            loading={inputBusy}
-            disabled={booting || sessionId == null}
-          />
-        </div>
+            <div className="mx-auto w-full max-w-3xl px-4 pb-4">
+              <ChatComposerDock
+                suggestedPrompts={suggestedPrompts}
+                onSend={sendMessage}
+                inputBusy={inputBusy}
+                booting={booting}
+                sessionId={sessionId}
+              />
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

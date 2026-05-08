@@ -195,3 +195,4 @@
 | 65 | 新增 `chatbi-database-overview` Skill：读取当前生效业务库的 `information_schema` 与 ChatBI 语义层，返回可查询业务表/视图、字段、行数、指标、维度和推荐提问；Agent prompt 增加“数据库概览/表清单/schema”触发规则，并加入分析专线白名单 | 已通过脚本单测与 dev backend 容器真实调用；`test_agent_runner_contract.py` 在当前本机 `.venv` 缺 `pymysql`，仍无法作为本轮验证项收集 | 前端提问“当前数据库有哪些表可以查”验证是否稳定选择 `chatbi-database-overview`；必要时再补 deterministic router 规则 |
 | 66 | 新增用户向技术与使用文档 `docs/user-guide.md`：产品能力、启动方式概要、登录与角色、各路由页面功能、对话区与会话/上传/PDF/多专线、仪表盘与各管理页说明、典型问法与限制 | 无 | 后续若路由或菜单变更，同步更新该文档 |
 | 67 | 新增开发者向 `docs/tech-guide.md`：单 Agent（ReAct/Legacy）与 Multi-Agent 编排、System/User 消息拼装、记忆读写、四库表职责、上传路径与 Skill 调用、各 Skill 职责表 | 无 | Agent 或 registry 行为变更时同步更新 |
+| 68 | 对话页欢迎态：无消息时会话主区垂直居中展示「有什么可以帮到你？」+ `ChatComposerDock`；首条消息发送后恢复底部输入区；侧栏 `ChatSessionSidebar`；`chatWelcomeView` + Vitest；后续已按产品要求移除 Logo 与 `@logo` 别名 | 无 | 浏览器验证新对话 → 发送一条 →「新对话」回到欢迎态 |

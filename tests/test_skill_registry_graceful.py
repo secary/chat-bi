@@ -11,5 +11,5 @@ def test_disabled_slugs_returns_empty_on_query_error(monkeypatch: pytest.MonkeyP
     def boom(*_a, **_k):
         raise RuntimeError("no such table")
 
-    monkeypatch.setattr("backend.skill_registry_repo.fetch_all", boom)
+    monkeypatch.setattr("backend.skill_registry_repo.admin_fetch_all", boom)
     assert disabled_slugs() == set()

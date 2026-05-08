@@ -1,7 +1,5 @@
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useState,
@@ -11,15 +9,7 @@ import type { AppUser } from '../types/auth';
 import { getMeApi, getStoredToken, loginApi, setStoredToken } from '../api/client';
 import { authEnabled } from '../lib/authFlags';
 import { devAuthFallbackAdmin } from '../lib/devAuthDefaults';
-
-interface AuthState {
-  user: AppUser | null;
-  ready: boolean;
-  login: (username: string, password: string) => Promise<void>;
-  logout: () => void;
-}
-
-const AuthContext = createContext<AuthState | null>(null);
+import { AuthContext } from './authContextValue';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AppUser | null>(null);
@@ -35,7 +25,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const token = getStoredToken();
     if (!token) {
-      setReady(true);
+      queueMicrotask(() => setReady(true));
       return;
     }
     void getMeApi()
@@ -70,10 +60,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-export function useAuth(): AuthState {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('AuthProvider missing');
-  return ctx;
 }

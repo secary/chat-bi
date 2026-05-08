@@ -7,7 +7,6 @@ from typing import Any, Dict, Optional
 
 from backend.config import settings
 
-
 MAX_PAYLOAD_LENGTH = 6000
 
 

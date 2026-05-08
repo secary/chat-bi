@@ -105,9 +105,7 @@ class ReportPdfTest(unittest.TestCase):
 
         with patch.dict(os.environ, {"CHATBI_PDF_SUMMARY_DISABLED": "1"}):
             with patch("builtins.__import__", side_effect=fake_import):
-                pdf = render_session_pdf_bytes(
-                    [{"role": "user", "content": "你好"}], "降级测试"
-                )
+                pdf = render_session_pdf_bytes([{"role": "user", "content": "你好"}], "降级测试")
         self.assertTrue(pdf.startswith(b"%PDF"))
 
 

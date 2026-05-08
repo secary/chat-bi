@@ -77,11 +77,7 @@ async def stream_chat_react(
         "started",
         payload={"message_count": len(messages), "mode": "react"},
     )
-    skills = (
-        skill_docs
-        if skill_docs is not None
-        else scan_skills_enabled(settings.skills_dir)
-    )
+    skills = skill_docs if skill_docs is not None else scan_skills_enabled(settings.skills_dir)
     user_text = next(
         (str(m.get("content", "")) for m in reversed(messages) if m.get("role") == "user"),
         "",
@@ -165,9 +161,7 @@ async def stream_chat_react(
 
         yield {"type": "thinking", "content": f"正在执行 Skill「{skill_name}」..."}
 
-        args = skill_args_for_execution(
-            skill_name, plan.get("skill_args") or [], messages
-        )
+        args = skill_args_for_execution(skill_name, plan.get("skill_args") or [], messages)
         assistant_note = json.dumps(
             {"action": "call_skill", "skill": skill_name, "skill_args": args},
             ensure_ascii=False,
@@ -224,9 +218,7 @@ async def stream_chat_react(
             "text": "已达到最大推理步数，以上为最后一次工具返回的数据摘要。",
         }
         merged = _merge_finish_result(fallback_plan, last_result, last_skill_name)
-        async for event in stream_result_events(
-            last_skill_name or "skill", fallback_plan, merged
-        ):
+        async for event in stream_result_events(last_skill_name or "skill", fallback_plan, merged):
             yield event
     else:
         yield {

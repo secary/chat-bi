@@ -56,9 +56,7 @@ def delete_session(session_id: int, user_id: int) -> None:
     )
 
 
-def list_messages_for_llm(
-    session_id: int, max_messages: int = 20
-) -> List[Dict[str, str]]:
+def list_messages_for_llm(session_id: int, max_messages: int = 20) -> List[Dict[str, str]]:
     """Return recent turns as role/content pairs for LLM (text only, chronological)."""
     rows = app_fetch_all(
         "SELECT m.role, m.content FROM chat_message m "

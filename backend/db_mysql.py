@@ -48,18 +48,14 @@ def admin_connection() -> Iterator[pymysql.connections.Connection]:
         yield conn
 
 
-def app_fetch_one(
-    sql: str, args: Optional[tuple[Any, ...]] = None
-) -> Optional[Dict[str, Any]]:
+def app_fetch_one(sql: str, args: Optional[tuple[Any, ...]] = None) -> Optional[Dict[str, Any]]:
     with app_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(sql, args or ())
             return cur.fetchone()
 
 
-def app_fetch_all(
-    sql: str, args: Optional[tuple[Any, ...]] = None
-) -> List[Dict[str, Any]]:
+def app_fetch_all(sql: str, args: Optional[tuple[Any, ...]] = None) -> List[Dict[str, Any]]:
     with app_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(sql, args or ())
@@ -72,18 +68,14 @@ def app_execute(sql: str, args: Optional[tuple[Any, ...]] = None) -> int:
             return cur.execute(sql, args or ())
 
 
-def admin_fetch_one(
-    sql: str, args: Optional[tuple[Any, ...]] = None
-) -> Optional[Dict[str, Any]]:
+def admin_fetch_one(sql: str, args: Optional[tuple[Any, ...]] = None) -> Optional[Dict[str, Any]]:
     with admin_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(sql, args or ())
             return cur.fetchone()
 
 
-def admin_fetch_all(
-    sql: str, args: Optional[tuple[Any, ...]] = None
-) -> List[Dict[str, Any]]:
+def admin_fetch_all(sql: str, args: Optional[tuple[Any, ...]] = None) -> List[Dict[str, Any]]:
     with admin_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(sql, args or ())

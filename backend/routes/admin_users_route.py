@@ -37,9 +37,7 @@ class UserPatch(BaseModel):
 
 
 @router.get("")
-def get_users(
-    request: Request, admin: Dict[str, Any] = Depends(require_admin)
-) -> List[dict]:
+def get_users(request: Request, admin: Dict[str, Any] = Depends(require_admin)) -> List[dict]:
     log_event(
         request_trace_id(request),
         "admin.users",

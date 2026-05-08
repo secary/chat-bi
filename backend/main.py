@@ -54,9 +54,7 @@ app.include_router(sessions_router)
 app.include_router(admin_llm_router, dependencies=[Depends(require_admin)])
 app.include_router(admin_db_router, dependencies=[Depends(require_admin)])
 app.include_router(admin_skills_router, dependencies=[Depends(require_admin)])
-app.include_router(
-    admin_multi_agents_router, dependencies=[Depends(require_admin)]
-)
+app.include_router(admin_multi_agents_router, dependencies=[Depends(require_admin)])
 app.include_router(admin_users_router)
 
 
@@ -117,9 +115,7 @@ async def upload(
 
     if size == 0:
         target.unlink(missing_ok=True)
-        log_event(
-            trace_id, "http.upload", "request.rejected", "empty file", level="WARN"
-        )
+        log_event(trace_id, "http.upload", "request.rejected", "empty file", level="WARN")
         raise HTTPException(status_code=400, detail="上传文件为空")
 
     log_event(

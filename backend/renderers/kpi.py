@@ -20,12 +20,14 @@ def build_kpi_cards(
         value_field = card_def.get("field", label)
         value = _extract_value(data, value_field, card_def.get("default", "--"))
 
-        cards.append({
-            "label": label,
-            "value": value,
-            "unit": card_def.get("unit", ""),
-            "status": card_def.get("status", "neutral"),
-        })
+        cards.append(
+            {
+                "label": label,
+                "value": value,
+                "unit": card_def.get("unit", ""),
+                "status": card_def.get("status", "neutral"),
+            }
+        )
 
     return cards
 

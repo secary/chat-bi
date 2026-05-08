@@ -100,17 +100,17 @@ export function DashboardPage() {
   );
 
   return (
-    <div className="h-full overflow-y-auto bg-gray-50 p-6">
-      <div className="mx-auto max-w-6xl space-y-6">
+    <div className="h-full overflow-y-auto bg-gray-50 p-6 lg:p-8">
+      <div className="mx-auto max-w-6xl space-y-7">
         <header>
-          <h2 className="text-lg font-semibold text-gray-900">数据仪表盘</h2>
+          <h2 className="text-lg font-semibold tracking-tight text-gray-900">数据仪表盘</h2>
           <p className="mt-1 text-sm text-gray-500">
             当前业务库中的订单与客户概况，以及语义层资产规模
           </p>
         </header>
 
         {data.warnings.length > 0 && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-5 py-3.5 text-sm text-amber-900">
             <ul className="list-inside list-disc space-y-1">
               {data.warnings.map((w, i) => (
                 <li key={i}>{w}</li>
@@ -123,31 +123,31 @@ export function DashboardPage() {
 
         <div className="grid gap-6 lg:grid-cols-2">
           <div>
-            <h3 className="mb-2 text-sm font-medium text-gray-700">销售额占比（按区域）</h3>
+            <h3 className="mb-2 text-sm font-medium tracking-tight text-gray-700">销售额占比（按区域）</h3>
             <ChartRenderer option={pieOpt} />
           </div>
           <div>
-            <h3 className="mb-2 text-sm font-medium text-gray-700">销售额趋势（按月）</h3>
+            <h3 className="mb-2 text-sm font-medium tracking-tight text-gray-700">销售额趋势（按月）</h3>
             <ChartRenderer option={barMonthOpt} />
           </div>
         </div>
 
         <div>
-          <h3 className="mb-2 text-sm font-medium text-gray-700">活跃客户（按区域汇总）</h3>
+          <h3 className="mb-2 text-sm font-medium tracking-tight text-gray-700">活跃客户（按区域汇总）</h3>
           <ChartRenderer option={barCustOpt} />
         </div>
 
-        <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-          <h3 className="text-sm font-medium text-gray-900">语义层与数据目录</h3>
+        <section className="rounded-xl border border-gray-200 bg-surface p-5 shadow-card">
+          <h3 className="text-sm font-medium tracking-tight text-gray-900">语义层与数据目录</h3>
           <p className="mt-1 text-xs text-gray-500">各元数据表当前行数（表不存在时为 0）</p>
           <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {semanticEntries.map(([name, count]) => (
               <div
                 key={name}
-                className="flex items-center justify-between rounded-md border border-gray-100 bg-gray-50 px-3 py-2"
+                className="flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50/60 px-3.5 py-2.5"
               >
-                <dt className="font-mono text-xs text-gray-600">{name}</dt>
-                <dd className="text-sm font-semibold text-gray-900">{count}</dd>
+                <dt className="font-mono text-xs text-gray-500">{name}</dt>
+                <dd className="text-sm font-semibold tracking-tight text-gray-900">{count}</dd>
               </div>
             ))}
           </dl>

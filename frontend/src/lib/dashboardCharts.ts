@@ -15,14 +15,14 @@ export function buildRegionPieOption(rows: SalesByRegionRow[]): Record<string, u
     series: [
       {
         type: 'pie',
-        radius: ['35%', '65%'],
+        radius: ['30%', '65%'],
         center: ['58%', '50%'],
         data,
         emphasis: {
           itemStyle: {
             shadowBlur: 10,
             shadowOffsetX: 0,
-            shadowColor: 'rgba(0, 0, 0, 0.2)',
+            shadowColor: 'rgba(0, 0, 0, 0.1)',
           },
         },
       },
@@ -46,7 +46,7 @@ export function buildMonthlyBarOption(rows: SalesByMonthRow[]): Record<string, u
       {
         type: 'bar',
         data: values,
-        itemStyle: { color: '#3b82f6' },
+        itemStyle: { color: '#2563eb' },
       },
     ],
   };
@@ -64,7 +64,7 @@ export function buildCustomerBarOption(rows: CustomerByRegionRow[]): Record<stri
       {
         type: 'bar',
         data: values,
-        itemStyle: { color: '#10b981' },
+        itemStyle: { color: '#059669' },
       },
     ],
   };

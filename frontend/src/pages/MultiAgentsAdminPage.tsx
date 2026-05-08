@@ -125,17 +125,17 @@ export function MultiAgentsAdminPage() {
   const agentIds = draft ? Object.keys(draft.agents).sort((a, b) => a.localeCompare(b)) : [];
 
   return (
-    <div className="flex h-full flex-col gap-4 overflow-auto p-6">
+    <div className="flex h-full flex-col gap-4 overflow-auto p-6 lg:p-8">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">多 Agents 管理</h2>
+          <h2 className="text-lg font-semibold tracking-tight text-gray-900">多 Agents 管理</h2>
           <p className="mt-1 text-xs text-gray-500">
             配置每条专线的展示名、角色提示与可用技能。全局禁用的技能仍可勾选；运行时仅与已启用技能求交集。
           </p>
         </div>
         <button
           type="button"
-          className="rounded-md bg-gray-900 px-4 py-2 text-sm text-white disabled:bg-gray-400"
+          className="rounded-lg bg-accent px-5 py-2 text-sm text-white transition-colors hover:bg-accent-hover active:scale-[0.98] disabled:opacity-50 disabled:bg-gray-300"
           disabled={busy || !draft}
           onClick={() => void save()}
         >
@@ -144,21 +144,21 @@ export function MultiAgentsAdminPage() {
       </div>
 
       {savedHint ? (
-        <p className="text-sm text-emerald-700">已保存</p>
+        <p className="text-sm font-medium text-emerald-600">已保存</p>
       ) : null}
 
       {!draft ? (
-        <p className="text-sm text-gray-500">加载中…</p>
+        <p className="text-sm text-gray-400">加载中…</p>
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white p-4">
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-gray-200 bg-surface p-4 shadow-card">
             <label className="flex items-center gap-2 text-sm text-gray-700">
               每轮最多专线数
               <input
                 type="number"
                 min={1}
                 max={8}
-                className="w-20 rounded border border-gray-300 px-2 py-1 text-sm"
+                className="w-20 rounded-lg border border-gray-200 px-3 py-1.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
                 value={draft.max_agents_per_round}
                 onChange={(e) => {
                   const n = Number(e.target.value);
@@ -171,16 +171,16 @@ export function MultiAgentsAdminPage() {
             </label>
           </div>
 
-          <div className="flex flex-wrap gap-2 rounded-lg border border-gray-200 bg-white p-4">
+          <div className="flex flex-wrap gap-2 rounded-xl border border-gray-200 bg-surface p-4 shadow-card">
             <input
-              className="max-w-xs flex-1 rounded border border-gray-300 px-2 py-1 text-sm"
+              className="max-w-xs flex-1 rounded-lg border border-gray-200 px-3 py-1.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
               placeholder="新专线 id（字母数字开头）"
               value={newId}
               onChange={(e) => setNewId(e.target.value)}
             />
             <button
               type="button"
-              className="rounded bg-gray-100 px-3 py-1 text-sm text-gray-800 hover:bg-gray-200 disabled:opacity-50"
+              className="rounded-lg border border-gray-200 bg-white px-4 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
               disabled={busy || !newId.trim()}
               onClick={() => addAgent()}
             >
@@ -194,32 +194,32 @@ export function MultiAgentsAdminPage() {
               return (
                 <section
                   key={aid}
-                  className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
+                  className="rounded-xl border border-gray-200 bg-surface p-5 shadow-card"
                 >
                   <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                     <h3 className="font-mono text-sm font-semibold text-gray-900">{aid}</h3>
                     <button
                       type="button"
-                      className="text-xs text-red-600 hover:underline"
+                      className="text-xs text-red-600 transition-colors hover:text-red-700"
                       onClick={() => removeAgent(aid)}
                     >
                       删除专线
                     </button>
                   </div>
                   <div className="grid gap-3 md:grid-cols-2">
-                    <label className="block text-xs text-gray-600">
+                    <label className="block text-xs text-gray-500">
                       展示名
                       <input
-                        className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm"
+                        className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
                         value={meta.label}
                         onChange={(e) => updateAgent(aid, { label: e.target.value })}
                       />
                     </label>
                     <div className="md:col-span-2">
-                      <label className="block text-xs text-gray-600">
+                      <label className="block text-xs text-gray-500">
                         角色提示（role_prompt）
                         <textarea
-                          className="mt-1 w-full rounded border border-gray-300 px-2 py-2 text-sm"
+                          className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
                           rows={3}
                           value={meta.role_prompt}
                           onChange={(e) => updateAgent(aid, { role_prompt: e.target.value })}
@@ -227,11 +227,11 @@ export function MultiAgentsAdminPage() {
                       </label>
                     </div>
                   </div>
-                  <p className="mb-2 mt-3 text-xs font-medium text-gray-600">可用技能</p>
+                  <p className="mb-2 mt-3 text-xs font-medium tracking-wide text-gray-500">可用技能</p>
                   <ul className="grid max-h-48 grid-cols-1 gap-1 overflow-y-auto text-sm sm:grid-cols-2 lg:grid-cols-3">
                     {skillSlugsSorted.map((s) => (
                       <li key={`${aid}-${s.slug}`}>
-                        <label className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 hover:bg-gray-50">
+                        <label className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 transition-colors hover:bg-gray-50">
                           <input
                             type="checkbox"
                             checked={meta.skills.includes(s.slug)}
@@ -253,7 +253,7 @@ export function MultiAgentsAdminPage() {
           </div>
 
           {agentIds.length === 0 ? (
-            <p className="text-sm text-amber-800">请至少添加一条专线后再保存。</p>
+            <p className="text-sm text-amber-700">请至少添加一条专线后再保存。</p>
           ) : null}
         </>
       )}

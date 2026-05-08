@@ -47,30 +47,30 @@ export function LlmConfigPage() {
   };
 
   return (
-    <div className="h-full overflow-auto p-6">
-      <h2 className="mb-4 text-lg font-semibold text-gray-900">LLM 配置</h2>
-      <div className="mb-4 max-w-xl rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+    <div className="h-full overflow-auto p-6 lg:p-8">
+      <h2 className="mb-4 text-lg font-semibold tracking-tight text-gray-900">LLM 配置</h2>
+      <div className="mb-4 max-w-xl rounded-xl border border-accent/20 bg-accent-light p-3.5 text-sm text-accent">
         当前生效模型：
         <span className="ml-1 font-medium">{view?.effective_model || '未配置'}</span>
-        <span className="ml-2 text-xs text-blue-700">
+        <span className="ml-2 text-xs text-accent/70">
           来源：{view?.effective_source === 'saved_settings' ? '管理页配置' : '环境变量'}
         </span>
         {view?.effective_api_base && (
-          <div className="mt-1 text-xs text-blue-800">API Base：{view.effective_api_base}</div>
+          <div className="mt-1 text-xs text-accent/80">API Base：{view.effective_api_base}</div>
         )}
-        <div className="mt-1 text-xs text-blue-800">
+        <div className="mt-1 text-xs text-accent/80">
           API Key：{view?.effective_api_key_set ? '已配置' : '未配置'}
         </div>
       </div>
-      <p className="mb-4 max-w-xl text-sm text-gray-600">
+      <p className="mb-4 max-w-xl text-sm text-gray-500">
         此处保存的配置会覆盖进程环境变量中的 `LLM_MODEL` / `API_BASE` / `OPENAI_API_KEY`（非空字段）。
         {view?.updated_at ? ` 最近更新：${String(view.updated_at)}` : ''}
       </p>
-      <div className="max-w-xl space-y-3 rounded-lg border border-gray-200 bg-white p-4 text-sm">
+      <div className="max-w-xl space-y-3 rounded-xl border border-gray-200 bg-surface p-5 shadow-card text-sm">
         <label className="block">
           模型名（如 openai/gpt-4o-mini）
           <input
-            className="mt-1 w-full rounded border border-gray-300 px-2 py-1"
+            className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 transition-all focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
             value={model}
             onChange={(e) => setModel(e.target.value)}
           />
@@ -78,7 +78,7 @@ export function LlmConfigPage() {
         <label className="block">
           API Base（可选，兼容 OpenAI 网关）
           <input
-            className="mt-1 w-full rounded border border-gray-300 px-2 py-1"
+            className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 transition-all focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
             value={apiBase}
             onChange={(e) => setApiBase(e.target.value)}
           />
@@ -87,7 +87,7 @@ export function LlmConfigPage() {
           API Key
           <input
             type="password"
-            className="mt-1 w-full rounded border border-gray-300 px-2 py-1"
+            className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 transition-all focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
             value={apiKey}
             placeholder={view?.api_key_set ? '已配置，留空则不修改' : ''}
             onChange={(e) => setApiKey(e.target.value)}
@@ -95,7 +95,7 @@ export function LlmConfigPage() {
         </label>
         <button
           type="button"
-          className="rounded bg-blue-600 px-4 py-2 text-white"
+          className="rounded-lg bg-accent px-4 py-2 text-sm text-white transition-colors hover:bg-accent-hover active:scale-[0.98]"
           onClick={() => void save()}
         >
           保存

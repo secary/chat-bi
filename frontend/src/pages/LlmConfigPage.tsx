@@ -62,6 +62,7 @@ export function LlmConfigPage() {
 
   const validation = validateLlmConfig(model, apiBase);
   const activePreset = detectPreset(model, apiBase);
+  const activePresetMeta = LLM_PROVIDER_PRESETS.find((preset) => preset.id === activePreset) || null;
 
   return (
     <div className="h-full overflow-auto p-6 lg:p-8">
@@ -128,6 +129,17 @@ export function LlmConfigPage() {
               );
             })}
           </div>
+          {activePresetMeta ? (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+              <div className="font-medium">{activePresetMeta.label} 推荐配置</div>
+              <div className="mt-1">{activePresetMeta.modelRule}</div>
+              <div className="mt-1">{activePresetMeta.note}</div>
+            </div>
+          ) : (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+              当前输入未命中预设，建议先点击上方厂商按钮再补充 API Key。
+            </div>
+          )}
         </div>
         <label className="block">
           模型名（如 openai/gpt-4o-mini）

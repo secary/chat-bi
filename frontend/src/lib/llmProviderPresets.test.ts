@@ -4,7 +4,7 @@ import { LLM_PROVIDER_PRESETS, detectPreset } from './llmProviderPresets';
 describe('llmProviderPresets', () => {
   it('contains required provider presets', () => {
     const ids = LLM_PROVIDER_PRESETS.map((p) => p.id);
-    expect(ids).toEqual(['openai', 'anthropic', 'ark', 'minimax']);
+    expect(ids).toEqual(['openai', 'anthropic', 'ark', 'minimax', 'deepseek']);
   });
 
   it('detects matching preset by model and api base', () => {
@@ -13,5 +13,9 @@ describe('llmProviderPresets', () => {
 
   it('returns empty when no preset matches', () => {
     expect(detectPreset('openai/gpt-4.1', 'https://example.com/v1')).toBe('');
+  });
+
+  it('detects deepseek preset', () => {
+    expect(detectPreset('openai/deepseek-v4-flash', 'https://api.deepseek.com')).toBe('deepseek');
   });
 });

@@ -12,6 +12,7 @@ function isOpenAiCompatibleBase(apiBase: string): boolean {
   return (
     base.includes('/v1') &&
     (base.includes('openai.com') ||
+      base.includes('deepseek.com') ||
       base.includes('minimaxi.com') ||
       base.includes('dashscope.aliyuncs.com') ||
       base.includes('siliconflow.cn') ||

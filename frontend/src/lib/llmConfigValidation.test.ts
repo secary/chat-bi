@@ -11,4 +11,9 @@ describe('validateLlmConfig', () => {
     const out = validateLlmConfig('openai/MiniMax-M2.5', 'https://api.minimaxi.com/v1');
     expect(out.errors).toHaveLength(0);
   });
+
+  it('treats deepseek base as openai-compatible gateway', () => {
+    const out = validateLlmConfig('deepseek-v4-flash', 'https://api.deepseek.com/v1');
+    expect(out.errors).toHaveLength(1);
+  });
 });

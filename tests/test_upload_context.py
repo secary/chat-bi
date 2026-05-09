@@ -42,3 +42,18 @@ def test_skips_pure_db_question_without_file_markers():
     ]
     out = augment_messages_for_upload_followup(msgs)
     assert out[-1]["content"] == "2026年1-4月各区域销售额排行"
+
+
+def test_prefers_latest_user_path_not_assistant_error_path():
+    old_path = "/tmp/chatbi-uploads/old_chatbi_file_parse_test.csv"
+    new_path = "/tmp/chatbi-uploads/new_chatbi_file_parse_test.csv"
+    msgs = [
+        {"role": "user", "content": f"请读取 {old_path}"},
+        {"role": "assistant", "content": f"文件读取失败：{old_path}"},
+        {"role": "user", "content": f"我重新上传了 {new_path}"},
+        {"role": "assistant", "content": "收到"},
+        {"role": "user", "content": "请继续分析并画图"},
+    ]
+    out = augment_messages_for_upload_followup(msgs)
+    assert new_path in out[-1]["content"]
+    assert old_path not in out[-1]["content"]

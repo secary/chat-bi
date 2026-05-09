@@ -35,6 +35,8 @@ def _primary_upload_path(messages: List[Dict[str, str]]) -> str | None:
     """Return the last upload path mention in chronological order (most recent)."""
     last: str | None = None
     for msg in messages:
+        if msg.get("role") != "user":
+            continue
         text = str(msg.get("content") or "")
         for m in _UPLOAD_PATH_RE.finditer(text):
             last = m.group(0)

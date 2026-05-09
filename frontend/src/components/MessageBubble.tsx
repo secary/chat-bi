@@ -2,51 +2,98 @@ import type { ChatMessage } from '../types/message';
 import { ThinkingBubble } from './ThinkingBubble';
 import { ChartRenderer } from './ChartRenderer';
 import { KPICards } from './KPICards';
+import { tokenizeInlineMarkdown } from '../lib/inlineMarkdown';
+import { parseMarkdownBlocks } from '../lib/markdownBlocks';
 
 interface MessageBubbleProps {
   message: ChatMessage;
 }
 
+function renderInline(content: string) {
+  return tokenizeInlineMarkdown(content).map((token, idx) =>
+    token.type === 'bold' ? (
+      <strong key={idx} className="font-semibold text-gray-900">
+        {token.value}
+      </strong>
+    ) : (
+      <span key={idx}>{token.value}</span>
+    ),
+  );
+}
+
 function FormattedContent({ content }: { content: string }) {
+  const blocks = parseMarkdownBlocks(content);
   return (
     <div className="space-y-1">
-      {content.split('\n').map((line, index) => {
-        const trimmed = line.trim();
+      {blocks.map((block, index) => {
+        if (block.type === 'table') {
+          return (
+            <div key={index} className="my-2 overflow-x-auto rounded-lg border border-gray-200">
+              <table className="min-w-full border-collapse text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    {block.header.map((cell, hIdx) => (
+                      <th
+                        key={hIdx}
+                        className="border-b border-gray-200 px-3 py-2 text-left font-semibold text-gray-800"
+                      >
+                        {renderInline(cell)}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {block.rows.map((row, rIdx) => (
+                    <tr key={rIdx} className="border-b border-gray-100 last:border-b-0">
+                      {row.map((cell, cIdx) => (
+                        <td key={cIdx} className="px-3 py-2 align-top text-gray-700">
+                          {renderInline(cell)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        }
+
+        const trimmed = block.content.trim();
         if (!trimmed) {
           return <div key={index} className="h-2" />;
         }
         if (trimmed.startsWith('## ')) {
           return (
             <h2 key={index} className="pt-1 text-base font-semibold tracking-tight text-gray-950">
-              {trimmed.slice(3)}
+              {renderInline(trimmed.slice(3))}
             </h2>
           );
         }
         if (trimmed.startsWith('### ')) {
           return (
             <h3 key={index} className="pt-3 text-sm font-semibold text-gray-900">
-              {trimmed.slice(4)}
+              {renderInline(trimmed.slice(4))}
             </h3>
           );
         }
         if (/^\d+\.\s/.test(trimmed)) {
           return (
             <p key={index} className="pt-2 text-sm font-semibold text-gray-900">
-              {trimmed}
+              {renderInline(trimmed)}
             </p>
           );
         }
-        if (trimmed.startsWith('- ')) {
+        if (/^[-•]\s+/.test(trimmed)) {
           return (
             <div key={index} className="flex gap-2 text-sm text-gray-700">
               <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-gray-400/60" />
-              <span>{trimmed.slice(2)}</span>
+              <span>{renderInline(trimmed.slice(2))}</span>
             </div>
           );
         }
         return (
           <p key={index} className="text-sm text-gray-700">
-            {trimmed}
+            {renderInline(trimmed)}
           </p>
         );
       })}

@@ -2,9 +2,32 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, List, Optional
 
 from backend.db_mysql import app_connection, app_execute, app_fetch_all, app_fetch_one
+
+_UPLOAD_PATH_RE = re.compile(r"/tmp/chatbi-uploads/[A-Za-z0-9._-]+", re.IGNORECASE)
+_NOISE_MARKERS = (
+    "请读取我上传的文件",
+    "请读取我上传的图像",
+    "按数据库表结构校验",
+    "chatbi-file-ingestion",
+)
+
+
+def _normalize_prompt(text: str) -> str:
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _prompt_is_noise(text: str) -> bool:
+    if not text:
+        return True
+    if len(text) > 48:
+        return True
+    if _UPLOAD_PATH_RE.search(text):
+        return True
+    return any(marker in text for marker in _NOISE_MARKERS)
 
 
 def suggested_prompts_for_user(user_id: int, limit: int = 5) -> List[str]:
@@ -20,9 +43,13 @@ def suggested_prompts_for_user(user_id: int, limit: int = 5) -> List[str]:
         return []
     out: List[str] = []
     for row in rows:
-        t = str(row.get("title") or "").strip()
-        if t and t not in out:
+        t = _normalize_prompt(str(row.get("title") or ""))
+        if _prompt_is_noise(t):
+            continue
+        if t not in out:
             out.append(t)
+        if len(out) >= limit:
+            break
     return out
 
 

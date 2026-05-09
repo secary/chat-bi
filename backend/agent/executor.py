@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from typing import Any, Dict, List, Optional
@@ -9,6 +10,8 @@ from typing import Any, Dict, List, Optional
 from backend.agent.prompt_builder import SkillDoc
 from backend.agent.protocol import normalize_skill_result
 from backend.config import settings
+
+_UPLOAD_PATH_RE = re.compile(r"/tmp/chatbi-uploads/[A-Za-z0-9._-]+", re.IGNORECASE)
 
 
 def find_skill(skills: List[SkillDoc], name: str) -> Optional[SkillDoc]:
@@ -32,6 +35,8 @@ def skill_args_for_execution(
         latest_user = latest_user_content(messages)
         if latest_user:
             return [latest_user]
+    if skill_name == "chatbi-file-ingestion":
+        return file_ingestion_args(args, messages)
     return args
 
 
@@ -40,6 +45,45 @@ def latest_user_content(messages: List[Dict[str, str]]) -> str:
         if message.get("role") == "user" and message.get("content"):
             return message["content"]
     return ""
+
+
+def file_ingestion_args(args: List[str], messages: List[Dict[str, str]]) -> List[str]:
+    upload_path = first_upload_path(args) or latest_user_upload_path(messages)
+    if not upload_path:
+        return args
+    return [upload_path, *option_args(args)]
+
+
+def first_upload_path(args: List[str]) -> str:
+    for arg in args:
+        m = _UPLOAD_PATH_RE.search(str(arg))
+        if m:
+            return m.group(0)
+    return ""
+
+
+def latest_user_upload_path(messages: List[Dict[str, str]]) -> str:
+    for message in reversed(messages):
+        if message.get("role") != "user":
+            continue
+        content = str(message.get("content") or "")
+        for m in _UPLOAD_PATH_RE.finditer(content):
+            return m.group(0)
+    return ""
+
+
+def option_args(args: List[str]) -> List[str]:
+    kept: List[str] = []
+    i = 0
+    while i < len(args):
+        token = str(args[i])
+        if token.startswith("--"):
+            kept.append(token)
+            if i + 1 < len(args) and not str(args[i + 1]).startswith("--"):
+                kept.append(str(args[i + 1]))
+                i += 1
+        i += 1
+    return kept
 
 
 def run_script(

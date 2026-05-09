@@ -46,13 +46,4 @@ def _extract_value(data: List[Dict[str, str]], field: str, default: str) -> str:
         if field in key or key in field:
             return data[0][key]
 
-    # Try numeric sum for single-row case
-    if len(data) == 1:
-        for key in data[0]:
-            try:
-                float(data[0][key])
-                return data[0][key]
-            except (ValueError, TypeError):
-                continue
-
     return default

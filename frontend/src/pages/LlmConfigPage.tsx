@@ -2,12 +2,16 @@ import { useEffect, useState } from 'react';
 import { getLlmSettings, putLlmSettings } from '../api/client';
 import type { LlmSettingsView } from '../types/admin';
 import { logger } from '../lib/logger';
+import { validateLlmConfig } from '../lib/llmConfigValidation';
+import { detectPreset, LLM_PROVIDER_PRESETS } from '../lib/llmProviderPresets';
 
 export function LlmConfigPage() {
   const [view, setView] = useState<LlmSettingsView | null>(null);
   const [model, setModel] = useState('');
   const [apiBase, setApiBase] = useState('');
   const [apiKey, setApiKey] = useState('');
+  const [error, setError] = useState('');
+  const [saved, setSaved] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -29,7 +33,14 @@ export function LlmConfigPage() {
   }, []);
 
   const save = async () => {
+    const vld = validateLlmConfig(model, apiBase);
+    if (vld.errors.length > 0) {
+      setSaved('');
+      setError(vld.errors[0]);
+      return;
+    }
     try {
+      setError('');
       const payload: { model?: string | null; api_base?: string | null; api_key?: string | null } =
         {
           model: model || null,
@@ -41,10 +52,17 @@ export function LlmConfigPage() {
       const v = await putLlmSettings(payload);
       setView(v);
       setApiKey('');
+      setSaved('已保存。');
     } catch (e) {
+      setSaved('');
+      setError(e instanceof Error ? e.message : String(e));
       logger.error('save llm', e);
     }
   };
+
+  const validation = validateLlmConfig(model, apiBase);
+  const activePreset = detectPreset(model, apiBase);
+  const activePresetMeta = LLM_PROVIDER_PRESETS.find((preset) => preset.id === activePreset) || null;
 
   return (
     <div className="h-full overflow-auto p-6 lg:p-8">
@@ -66,7 +84,63 @@ export function LlmConfigPage() {
         此处保存的配置会覆盖进程环境变量中的 `LLM_MODEL` / `API_BASE` / `OPENAI_API_KEY`（非空字段）。
         {view?.updated_at ? ` 最近更新：${String(view.updated_at)}` : ''}
       </p>
+      <div className="mb-4 max-w-xl space-y-2 text-sm">
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-800">
+          使用 LiteLLM + OpenAI 兼容网关（`.../v1`）时，模型名请写成 `openai/&lt;具体模型名&gt;`。
+        </div>
+        {validation.warnings.map((w) => (
+          <div key={w} className="rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-yellow-800">
+            {w}
+          </div>
+        ))}
+        {(error || validation.errors.length > 0) && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-700">
+            {error || validation.errors[0]}
+          </div>
+        )}
+        {saved && <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-emerald-700">{saved}</div>}
+      </div>
       <div className="max-w-xl space-y-3 rounded-xl border border-gray-200 bg-surface p-5 shadow-card text-sm">
+        <div className="space-y-2">
+          <div className="text-xs text-gray-500">厂商快捷配置（点击自动填充模型名与 API Base）</div>
+          <div className="flex flex-wrap gap-2">
+            {LLM_PROVIDER_PRESETS.map((preset) => {
+              const active = activePreset === preset.id;
+              return (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={() => {
+                    setModel(preset.model);
+                    setApiBase(preset.apiBase);
+                    setSaved('');
+                    setError('');
+                  }}
+                  className={
+                    'rounded-full border px-3 py-1.5 text-xs transition-colors ' +
+                    (active
+                      ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                      : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50')
+                  }
+                  title={`${preset.model} @ ${preset.apiBase}`}
+                >
+                  {preset.label}
+                </button>
+              );
+            })}
+          </div>
+          {activePresetMeta ? (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+              <div className="font-medium">{activePresetMeta.label} 推荐配置</div>
+              <div className="mt-1">{activePresetMeta.modelRule}</div>
+              <div className="mt-1">{activePresetMeta.note}</div>
+            </div>
+          ) : (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+              当前输入未命中预设，建议先点击上方厂商按钮再补充 API Key。
+            </div>
+          )}
+        </div>
         <label className="block">
           模型名（如 openai/gpt-4o-mini）
           <input
@@ -95,8 +169,9 @@ export function LlmConfigPage() {
         </label>
         <button
           type="button"
-          className="rounded-lg bg-accent px-4 py-2 text-sm text-white transition-colors hover:bg-accent-hover active:scale-[0.98]"
+          className="rounded-lg bg-accent px-4 py-2 text-sm text-white transition-colors hover:bg-accent-hover active:scale-[0.98] disabled:opacity-50"
           onClick={() => void save()}
+          disabled={validation.errors.length > 0}
         >
           保存
         </button>

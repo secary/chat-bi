@@ -3,6 +3,7 @@ import { ThinkingBubble } from './ThinkingBubble';
 import { ChartRenderer } from './ChartRenderer';
 import { KPICards } from './KPICards';
 import { tokenizeInlineMarkdown } from '../lib/inlineMarkdown';
+import { parseMarkdownBlocks } from '../lib/markdownBlocks';
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -21,10 +22,43 @@ function renderInline(content: string) {
 }
 
 function FormattedContent({ content }: { content: string }) {
+  const blocks = parseMarkdownBlocks(content);
   return (
     <div className="space-y-1">
-      {content.split('\n').map((line, index) => {
-        const trimmed = line.trim();
+      {blocks.map((block, index) => {
+        if (block.type === 'table') {
+          return (
+            <div key={index} className="my-2 overflow-x-auto rounded-lg border border-gray-200">
+              <table className="min-w-full border-collapse text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    {block.header.map((cell, hIdx) => (
+                      <th
+                        key={hIdx}
+                        className="border-b border-gray-200 px-3 py-2 text-left font-semibold text-gray-800"
+                      >
+                        {renderInline(cell)}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {block.rows.map((row, rIdx) => (
+                    <tr key={rIdx} className="border-b border-gray-100 last:border-b-0">
+                      {row.map((cell, cIdx) => (
+                        <td key={cIdx} className="px-3 py-2 align-top text-gray-700">
+                          {renderInline(cell)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        }
+
+        const trimmed = block.content.trim();
         if (!trimmed) {
           return <div key={index} className="h-2" />;
         }

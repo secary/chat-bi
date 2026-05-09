@@ -2,9 +2,22 @@ import type { ChatMessage } from '../types/message';
 import { ThinkingBubble } from './ThinkingBubble';
 import { ChartRenderer } from './ChartRenderer';
 import { KPICards } from './KPICards';
+import { tokenizeInlineMarkdown } from '../lib/inlineMarkdown';
 
 interface MessageBubbleProps {
   message: ChatMessage;
+}
+
+function renderInline(content: string) {
+  return tokenizeInlineMarkdown(content).map((token, idx) =>
+    token.type === 'bold' ? (
+      <strong key={idx} className="font-semibold text-gray-900">
+        {token.value}
+      </strong>
+    ) : (
+      <span key={idx}>{token.value}</span>
+    ),
+  );
 }
 
 function FormattedContent({ content }: { content: string }) {
@@ -18,35 +31,35 @@ function FormattedContent({ content }: { content: string }) {
         if (trimmed.startsWith('## ')) {
           return (
             <h2 key={index} className="pt-1 text-base font-semibold tracking-tight text-gray-950">
-              {trimmed.slice(3)}
+              {renderInline(trimmed.slice(3))}
             </h2>
           );
         }
         if (trimmed.startsWith('### ')) {
           return (
             <h3 key={index} className="pt-3 text-sm font-semibold text-gray-900">
-              {trimmed.slice(4)}
+              {renderInline(trimmed.slice(4))}
             </h3>
           );
         }
         if (/^\d+\.\s/.test(trimmed)) {
           return (
             <p key={index} className="pt-2 text-sm font-semibold text-gray-900">
-              {trimmed}
+              {renderInline(trimmed)}
             </p>
           );
         }
-        if (trimmed.startsWith('- ')) {
+        if (/^[-•]\s+/.test(trimmed)) {
           return (
             <div key={index} className="flex gap-2 text-sm text-gray-700">
               <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-gray-400/60" />
-              <span>{trimmed.slice(2)}</span>
+              <span>{renderInline(trimmed.slice(2))}</span>
             </div>
           );
         }
         return (
           <p key={index} className="text-sm text-gray-700">
-            {trimmed}
+            {renderInline(trimmed)}
           </p>
         );
       })}

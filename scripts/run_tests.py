@@ -63,15 +63,18 @@ MODULE_SUITES: dict[str, list[str]] = {
         "tests/test_auth_deps_disabled.py",
         "tests/test_auth_password.py",
         "tests/test_auth_tokens.py",
+        "tests/test_memory_repo_prompts.py",
         "tests/test_memory_service_off.py",
     ],
     "dashboard": [
         "tests/test_dashboard_overview.py",
         "tests/test_chart_renderer.py",
+        "tests/test_kpi_renderer.py",
     ],
     "data-sources": [
         "tests/test_database_overview_skill.py",
         "tests/test_db_mysql_targets.py",
+        "tests/test_executor_file_ingestion_args.py",
         "tests/test_external_bank_demo_sql.py",
         "tests/test_file_ingestion_skill.py",
     ],

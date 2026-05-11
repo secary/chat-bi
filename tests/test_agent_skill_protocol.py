@@ -64,6 +64,10 @@ class SkillProtocolTest(unittest.TestCase):
             "text": "查询完成",
             "data": {
                 "rows": [{"区域": "华东", "销售额": "100"}],
+                "plan_trace": [
+                    "收到问数请求：1-4月各区域销售额排行",
+                    "识别时间范围：`order_date` >= '2026-01-01' AND `order_date` < '2026-05-01'",
+                ],
                 "plan_summary": {
                     "metric": "销售额",
                     "dimensions": ["区域"],
@@ -86,7 +90,8 @@ class SkillProtocolTest(unittest.TestCase):
         self.assertEqual(len(plan_events), 1)
         self.assertEqual(plan_events[0]["content"]["metric"], "销售额")
         self.assertEqual(events[0]["type"], "thinking")
-        self.assertIn("查询计划：指标=销售额", events[0]["content"])
+        self.assertEqual(events[0]["content"], "收到问数请求：1-4月各区域销售额排行")
+        self.assertEqual(events[1]["content"], "识别时间范围：`order_date` >= '2026-01-01' AND `order_date` < '2026-05-01'")
 
 
 if __name__ == "__main__":

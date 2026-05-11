@@ -9,8 +9,16 @@ from backend.renderers.kpi import build_kpi_cards
 async def stream_result_events(
     skill_name: str, plan: Dict[str, Any], result: Dict[str, Any]
 ) -> AsyncGenerator[Dict[str, Any], None]:
-    plan_summary = result.get("data", {}).get("plan_summary")
-    if plan_summary:
+    data = result.get("data", {})
+    plan_trace = data.get("plan_trace") if isinstance(data, dict) else None
+    if isinstance(plan_trace, list):
+        for item in plan_trace:
+            text = str(item).strip()
+            if text:
+                yield {"type": "thinking", "content": text}
+
+    plan_summary = data.get("plan_summary") if isinstance(data, dict) else None
+    if not plan_trace and plan_summary:
         thinking = summarize_plan_summary(plan_summary)
         if thinking:
             yield {"type": "thinking", "content": thinking}

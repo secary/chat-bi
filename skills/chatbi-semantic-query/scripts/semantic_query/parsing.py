@@ -29,17 +29,40 @@ def normalize_text(text: str) -> str:
     return re.sub(r"\s+", "", text).lower()
 
 
+def _is_rate_metric(metric_name: str) -> bool:
+    return any(word in metric_name for word in ["率", "占比", "比例", "份额"])
+
+
 def pick_metric(question: str, metrics: Dict[str, Metric], aliases: Dict[str, str]) -> Metric:
     normalized = normalize_text(question)
     candidates = []
     for alias, standard in aliases.items():
-        if normalize_text(alias) in normalized and standard in metrics:
-            candidates.append((len(alias), metrics[standard]))
+        alias_norm = normalize_text(alias)
+        position = normalized.find(alias_norm)
+        if position >= 0 and standard in metrics:
+            metric = metrics[standard]
+            candidates.append(
+                (
+                    1 if _is_rate_metric(metric.name) else 0,
+                    position + len(alias_norm),
+                    len(alias_norm),
+                    metric,
+                )
+            )
     for name, metric in metrics.items():
-        if normalize_text(name) in normalized:
-            candidates.append((len(name), metric))
+        name_norm = normalize_text(name)
+        position = normalized.find(name_norm)
+        if position >= 0:
+            candidates.append(
+                (
+                    1 if _is_rate_metric(metric.name) else 0,
+                    position + len(name_norm),
+                    len(name_norm),
+                    metric,
+                )
+            )
     if candidates:
-        return sorted(candidates, key=lambda item: item[0], reverse=True)[0][1]
+        return max(candidates, key=lambda item: (item[0], item[1], item[2]))[3]
     return metrics["销售额"]
 
 

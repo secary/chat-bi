@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "skills"))
 sys.path.insert(0, str(ROOT / "skills" / "chatbi-semantic-query" / "scripts"))
 
+from semantic_query.parsing import pick_metric
 from semantic_query.planner import make_plan
 from semantic_query.presenters import build_json_payload
 
@@ -21,6 +22,13 @@ class StubDb:
                     "source_table": "sales_order",
                     "formula": "SUM(sales_amount)",
                     "business_caliber": "订单销售额汇总",
+                },
+                {
+                    "metric_name": "毛利率",
+                    "metric_code": "gross_profit_rate",
+                    "source_table": "sales_order",
+                    "formula": "SUM(gross_profit) / SUM(sales_amount)",
+                    "business_caliber": "毛利占销售额比例",
                 }
             ]
         if "FROM alias_mapping" in sql:
@@ -63,6 +71,26 @@ def test_make_plan_keeps_generic_fallback_dimension_words():
     assert plan.dimensions[0].name == "月份"
 
 
+def test_pick_metric_prefers_rate_metric_when_multiple_metrics_match():
+    metrics = {
+        "销售额": type("MetricObj", (), {"name": "销售额"})(),
+        "毛利率": type("MetricObj", (), {"name": "毛利率"})(),
+    }
+    metrics["sales_amount"] = metrics["销售额"]
+    metrics["gross_profit_rate"] = metrics["毛利率"]
+
+    picked = pick_metric("2-4月销售额毛利率排行", metrics, {})
+
+    assert picked.name == "毛利率"
+
+
+def test_make_plan_uses_rate_metric_for_sales_amount_margin_ranking():
+    plan = make_plan("2-4月销售额毛利率排行", StubDb())
+
+    assert plan.metric.name == "毛利率"
+    assert "SUM(gross_profit) / SUM(sales_amount)" in plan.sql
+
+
 def test_build_json_payload_includes_plan_summary_when_plan_provided():
     plan = make_plan("1-4月各区域收入排行", StubDb())
     payload = build_json_payload(
@@ -82,6 +110,8 @@ def test_build_json_payload_includes_plan_summary_when_plan_provided():
         "order_by_metric_desc": True,
         "limit": None,
     }
+    assert payload["data"]["plan_trace"][0] == "收到问数请求：1-4月各区域收入排行"
+    assert payload["data"]["plan_trace"][-1].startswith("生成 SQL：SELECT `region` AS `区域`")
 
 
 def test_build_json_payload_keeps_chart_plan_for_trend_rows():

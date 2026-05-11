@@ -118,6 +118,40 @@ def build_plan_summary(plan: SemanticPlan) -> Dict[str, object]:
     }
 
 
+def build_plan_trace(plan: SemanticPlan) -> list[str]:
+    steps = [f"收到问数请求：{plan.question}"]
+    if plan.time_filter:
+        steps.append(f"识别时间范围：{plan.time_filter[1]}")
+    else:
+        steps.append("未识别显式时间范围，按默认口径查询。")
+
+    steps.append(
+        f"识别指标：{plan.metric.name}（来源表 {plan.metric.table}，编码 {plan.metric.code}）"
+    )
+
+    if plan.dimensions:
+        steps.append(f"识别维度：{'、'.join(dim.name for dim in plan.dimensions)}")
+    else:
+        steps.append("未识别分组维度，按单值汇总查询。")
+
+    if plan.filters:
+        rendered_filters = "，".join(f"{dim_name}={value}" for dim_name, value, _ in plan.filters)
+        steps.append(f"识别过滤条件：{rendered_filters}")
+    else:
+        steps.append("未识别额外过滤条件。")
+
+    if plan.order_by_metric_desc:
+        steps.append(f"识别排序需求：按{plan.metric.name}从高到低排行。")
+    else:
+        steps.append("未识别排序需求。")
+
+    if plan.limit is not None:
+        steps.append(f"识别结果条数限制：返回前 {plan.limit} 条。")
+
+    steps.append(f"生成 SQL：{plan.sql}")
+    return steps
+
+
 def build_json_payload(
     question: str,
     sql: str,
@@ -127,6 +161,7 @@ def build_json_payload(
     data: Dict[str, object] = {"question": question, "sql": sql, "rows": list(rows)}
     if plan is not None:
         data["plan_summary"] = build_plan_summary(plan)
+        data["plan_trace"] = build_plan_trace(plan)
     payload = skill_response(
         kind="table",
         text=response_text(rows),

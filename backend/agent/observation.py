@@ -41,10 +41,13 @@ def _where_has_repeated_equality_on_same_column(where_sql: str) -> bool:
     return False
 
 
+"""
+turn skill result into a compact json string format for llm input. 
+"""
 def summarize_observation(skill_name: str, result: Dict[str, Any]) -> str:
     """Compact JSON string for LLM context; avoids dumping full wide tables."""
-    kind = result.get("kind", "")
-    text = (result.get("text") or "")[:800]
+    kind = result.get("kind", "") 
+    text = (result.get("text") or "")[:800] # 
     data = result.get("data")
     rows: list = []
     if isinstance(data, dict) and isinstance(data.get("rows"), list):

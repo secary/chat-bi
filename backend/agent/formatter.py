@@ -81,9 +81,7 @@ def summarize_rows(rows: List[Dict[str, str]]) -> str:
 def summarize_plan_summary(plan_summary: Dict[str, Any]) -> str:
     metric = str(plan_summary.get("metric") or "").strip()
     dimensions = [
-        str(item).strip()
-        for item in plan_summary.get("dimensions", []) or []
-        if str(item).strip()
+        str(item).strip() for item in plan_summary.get("dimensions", []) or [] if str(item).strip()
     ]
     filters = plan_summary.get("filters", []) or []
     time_filter = str(plan_summary.get("time_filter") or "").strip()

@@ -29,7 +29,7 @@ class StubDb:
                     "source_table": "sales_order",
                     "formula": "SUM(gross_profit) / SUM(sales_amount)",
                     "business_caliber": "毛利占销售额比例",
-                }
+                },
             ]
         if "FROM alias_mapping" in sql:
             return [{"alias_name": "收入", "standard_name": "销售额"}]

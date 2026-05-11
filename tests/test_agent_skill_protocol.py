@@ -81,8 +81,7 @@ class SkillProtocolTest(unittest.TestCase):
 
         async def collect():
             return [
-                event
-                async for event in stream_result_events("chatbi-semantic-query", {}, result)
+                event async for event in stream_result_events("chatbi-semantic-query", {}, result)
             ]
 
         events = asyncio.run(collect())
@@ -91,7 +90,10 @@ class SkillProtocolTest(unittest.TestCase):
         self.assertEqual(plan_events[0]["content"]["metric"], "销售额")
         self.assertEqual(events[0]["type"], "thinking")
         self.assertEqual(events[0]["content"], "收到问数请求：1-4月各区域销售额排行")
-        self.assertEqual(events[1]["content"], "识别时间范围：`order_date` >= '2026-01-01' AND `order_date` < '2026-05-01'")
+        self.assertEqual(
+            events[1]["content"],
+            "识别时间范围：`order_date` >= '2026-01-01' AND `order_date` < '2026-05-01'",
+        )
 
 
 if __name__ == "__main__":

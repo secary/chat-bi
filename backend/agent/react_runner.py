@@ -32,6 +32,11 @@ def _merge_finish_result(
     last_result: Optional[Dict[str, Any]],
     last_skill_name: Optional[str] = None,
 ) -> Dict[str, Any]:
+    """
+    Merges the final LLM finish text with the last skill result.
+    Suppresses finish text when the skill already produced visual content (charts/kpis),
+    or when the last skill is a decision-advisor that already provided text.
+    """
     merged: Dict[str, Any] = dict(last_result or {})
     if _should_suppress_finish_text(last_skill_name, merged):
         merged["text"] = ""
@@ -49,6 +54,11 @@ def _merge_finish_result(
 def _should_suppress_finish_text(
     last_skill_name: Optional[str], result: Optional[Dict[str, Any]]
 ) -> bool:
+    """
+    Returns True when the last skill is a visual-first skill (chart-recommendation,
+    dashboard-orchestration) and already produced charts or KPIs, so the LLM finish
+    text should not overwrite the visual content.
+    """
     if last_skill_name not in _VISUAL_FIRST_SKILLS:
         return False
     if not isinstance(result, dict):
@@ -63,10 +73,12 @@ def _sink_write(
     last_result: Optional[Dict[str, Any]],
     last_skill_name: Optional[str],
 ) -> None:
+    """Writes the last executed result and skill name into the result sink dict."""
     if sink is None:
         return
     sink["last_result"] = last_result
     sink["last_skill_name"] = last_skill_name
+
 
 
 async def stream_chat_react(
@@ -78,6 +90,13 @@ async def stream_chat_react(
     role_prompt: Optional[str] = None,
     result_sink: Optional[Dict[str, Any]] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
+    """
+    ReAct multi-step agent loop.
+    Each iteration: LLM decides next action {"thought", "action", "skill", "skill_args"} → executes a skill → summarizes observation → repeats.
+    Stops when the LLM outputs 'finish/done/answer', or when agent_max_steps is exhausted.
+    action == "call_skill", execute Skill，append observation result to working list. 
+    Auto-runs chatbi-decision-advisor as a followup when query+decision intent is detected.
+    """
     log_event(
         trace_id,
         "agent.runner",
@@ -96,12 +115,24 @@ async def stream_chat_react(
         yield {"type": "text", "content": small_talk_reply(user_text)}
         yield {"type": "done", "content": None}
         return
+
+    """
+    Build the system prompt for the ReAct agent.
+    It includes the skills, the role prompt, and the memory block.
+    The role prompt is the user's role in the conversation.
+    The memory block is the memory of the agent.
+    The skills are the skills that the agent can use.
+    The system prompt is the prompt that the agent uses to make a decision.
+    """
     system_prompt = build_react_system_prompt(skills)
     if role_prompt and role_prompt.strip():
         system_prompt = role_prompt.strip() + "\n\n" + system_prompt
     if memory_block and memory_block.strip():
         system_prompt = memory_block.strip() + "\n\n" + system_prompt
 
+    """
+    working: 一个消息列表，用于存储对话历史和obs(observation的内容)
+    """
     working = [dict(m) for m in messages]
     last_skill_name: Optional[str] = None
     last_result: Optional[Dict[str, Any]] = None
@@ -109,6 +140,11 @@ async def stream_chat_react(
 
     yield {"type": "thinking", "content": "正在分析您的问题（ReAct 多步推理）..."}
 
+    """
+    ReAct loop:
+    LLM decides next action {"thought", "action", "skill", "skill_args"} → executes a skill → summarizes observation → repeats.
+    The agent_max_steps is 8 by default. If the agent_max_steps is reached, the agent will return the last result.
+    """
     for step in range(settings.agent_max_steps):
         log_event(
             trace_id,
@@ -117,6 +153,11 @@ async def stream_chat_react(
             payload={"step": step + 1, "max_steps": settings.agent_max_steps},
         )
         try:
+            """
+            Call LLM for the next ReAct step.
+            将system prompt + 对话的上下文 + skill所执行的结果obs，一起传给LLM，得到下一步的决策。
+            LLM 返回 {"thought", "action", "skill", "skill_args"}
+            """
             plan = await call_llm_for_react_step(system_prompt, working)
         except Exception as exc:
             if last_result:
@@ -177,6 +218,9 @@ async def stream_chat_react(
             yield {"type": "done", "content": None}
             return
 
+        """
+        Execute the skill by given the skill name.
+        """
         skill_name = plan.get("skill")
         if not skill_name or not isinstance(skill_name, str):
             _sink_write(result_sink, last_result, last_skill_name)
@@ -193,6 +237,15 @@ async def stream_chat_react(
 
         yield {"type": "thinking", "content": f"正在执行 Skill「{skill_name}」..."}
 
+        """
+        transfer llm raw args into real args for the skill.
+        for example: 
+            LLM plan: {"skill": "chatbi-file-ingestion", "skill_args": ["帮我分析"]}
+            skill_args_for_execution("chatbi-file-ingestion", ["帮我分析"], messages)
+            find the real address of a file by the user's upload path, mathch /tmp/chatbi-uploads/xxx.csv
+            return ["/tmp/chatbi-uploads/xxx.csv", "--sheet", "Sheet1"]
+            assistant_note: {"action": "call_skill", "skill": "chatbi-file-ingestion", "skill_args": ["/tmp/chatbi-uploads/xxx.csv", "--sheet", "Sheet1"]}
+        """
         args = skill_args_for_execution(skill_name, plan.get("skill_args") or [], messages)
         assistant_note = json.dumps(
             {"action": "call_skill", "skill": skill_name, "skill_args": args},
@@ -276,7 +329,21 @@ async def stream_chat_react(
             "kpi_cards": None,
             "text": "已达到最大推理步数，以上为最后一次工具返回的数据摘要。",
         }
+
+        """
+        Merge llm last output and last skill output. 
+
+        For example:
+            call_skill → chatbi-semantic-query → skill result = {"text": "本月销售额 100 万", "chart_plan": {...}}
+            LLM result= action="finish", plan={"text": "以下是您要求的数据..."}
+
+            final result: skill result(chart/kpis/text) + llm result(text)
+        """
         merged = _merge_finish_result(fallback_plan, last_result, last_skill_name)
+        """
+        stream_result_events:
+        transfer the skill result to the frontend page by sse. 
+        """
         async for event in stream_result_events(last_skill_name or "skill", fallback_plan, merged):
             yield event
     else:

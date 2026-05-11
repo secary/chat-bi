@@ -20,6 +20,7 @@ from backend.trace import log_event
 
 
 def _latest_user_question(messages: List[Dict[str, str]]) -> str:
+    """Extracts the last user message content as the question for the summarize LLM."""
     for m in reversed(messages):
         if m.get("role") == "user":
             return str(m.get("content") or "")
@@ -27,6 +28,10 @@ def _latest_user_question(messages: List[Dict[str, str]]) -> str:
 
 
 def _pick_route_agents(route: Optional[Dict[str, Any]]) -> List[str]:
+    """
+    Extracts valid agent IDs from the router LLM response, capped by max_agents_per_round.
+    Skips agents that are not in the registry or have no available skills.
+    """
     if not route or not isinstance(route, dict):
         return []
     raw = route.get("agents")
@@ -53,6 +58,13 @@ async def stream_chat_multi_agent(
     skill_db_overrides: Optional[Dict[str, str]] = None,
     memory_block: Optional[str] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
+    """
+    Multi-agent orchestration pipeline:
+      1. Router LLM selects which specialist agents to activate
+      2. Each chosen agent runs stream_specialist with a filtered skill set + role prompt
+      3. A summarize LLM merges all observations into a final answer
+    Falls back to single-agent mode if no agents are selected.
+    """
     log_event(
         trace_id,
         "agent.multi",

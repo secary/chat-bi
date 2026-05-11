@@ -71,6 +71,9 @@ async def stream_chat_multi_agent(
         "started",
         payload={"message_count": len(messages)},
     )
+    """
+    LLM pick the right agents for the user's question according to user intent. 
+    """
     route = await call_route_llm(messages, trace_id=trace_id)
     chosen = _pick_route_agents(route)
     if route:
@@ -86,7 +89,9 @@ async def stream_chat_multi_agent(
     if not chosen:
         log_event(trace_id, "agent.multi", "fallback_single", level="INFO")
         from backend.agent.runner import stream_chat as _single
-
+        """
+        If no agents are selected, fallback to single-agent mode.
+        """
         async for event in _single(
             messages,
             trace_id=trace_id,
@@ -101,10 +106,13 @@ async def stream_chat_multi_agent(
     last_result: Optional[Dict[str, Any]] = None
     last_skill_name: Optional[str] = None
 
+    """
+    Every agent has an id. 
+    """
     for agent_id in chosen:
-        label = agent_label(agent_id)
-        role = agent_role_prompt(agent_id)
-        docs = skills_for_agent(agent_id)
+        label = agent_label(agent_id) 
+        role = agent_role_prompt(agent_id) # agent specific role prompt.
+        docs = skills_for_agent(agent_id) # agent specific skills.
         if not docs:
             yield {
                 "type": "thinking",
@@ -113,6 +121,10 @@ async def stream_chat_multi_agent(
             continue
         sink: Dict[str, Any] = {}
         acc_text = ""
+
+        """
+        Each specific agent will run at ReAct mode. It will call the skill and append the observation to the working list.
+        """
         async for event in stream_specialist(
             messages,
             docs,
@@ -159,6 +171,9 @@ async def stream_chat_multi_agent(
 
     q = _latest_user_question(messages)
     yield {"type": "thinking", "content": "[汇总] 正在整合各专线结论..."}
+    """
+    summarize the observations from all agents.
+    """
     plan = await call_summarize_llm(q, blocks, trace_id=trace_id)
     if not plan or not isinstance(plan, dict):
         yield {
@@ -175,6 +190,10 @@ async def stream_chat_multi_agent(
         merged["text"] = plan["text"]
 
     yield {"type": "thinking", "content": "[汇总] 正在输出最终结论..."}
+
+    """
+    output final result to the frontend page by sse.
+    """
     async for event in stream_result_events(skill_label, plan, merged):
         yield event
 

@@ -28,7 +28,6 @@ def _legacy_sink_write(
     last_result: Optional[Dict[str, Any]],
     last_skill_name: Optional[str],
 ) -> None:
-    """Writes the last executed result and skill name into the result sink dict."""
     if sink is None:
         return
     sink["last_result"] = last_result
@@ -36,12 +35,10 @@ def _legacy_sink_write(
 
 
 def _is_query_plus_decision(messages: List[Dict[str, str]]) -> bool:
-    """Returns True if the user's message contains both a query and a decision intent."""
     return is_query_plus_decision_text(latest_user_content(messages))
 
 
 def _infer_primary_dimension(result: Dict[str, Any]) -> str:
-    """Infers the primary dimension column name from a query result (first column of the first row)."""
     data = result.get("data", {})
     rows = data.get("rows") if isinstance(data, dict) else None
     if not isinstance(rows, list) or not rows or not isinstance(rows[0], dict):
@@ -54,13 +51,6 @@ def _build_steps(
     plan: Dict[str, Any],
     messages: List[Dict[str, str]],
 ) -> List[Dict[str, Any]]:
-    """
-    Builds an ordered list of execution steps from an LLM plan.
-    If the message has both query and decision intent, returns two steps:
-      1. chatbi-semantic-query  (the data query)
-      2. chatbi-decision-advisor (advice based on the query result)
-    Otherwise returns a single step for the planned skill.
-    """
     user_text = latest_user_content(messages)
     if _is_query_plus_decision(messages):
         query_plan = plan if plan.get("skill") == "chatbi-semantic-query" else {}
@@ -87,7 +77,12 @@ def _build_steps(
         }
     ]
 
-
+"""
+The agent main entrance.
+if multi-agents mode is on, then goes to stream_chat_multi_agent
+otherwise, it goes to stream_chat_react. React(think-do-observe) mode. 
+stream_chat_legacy is not in use by default. It is not ReAct mode. 
+"""
 async def stream_chat(
     messages: List[Dict[str, str]],
     trace_id: str = "",
@@ -95,7 +90,7 @@ async def stream_chat(
     memory_block: Optional[str] = None,
     multi_agents: bool = False,
 ) -> AsyncGenerator[Dict[str, Any], None]:
-    """Agent entry point: routes to multi-agent, ReAct, or legacy execution mode."""
+    """Agent loop: ReAct multi-step or legacy single-plan Skill execution."""
     if multi_agents:
         from backend.agent.multi_agent_runner import stream_chat_multi_agent
 
@@ -136,10 +131,7 @@ async def _stream_chat_legacy(
     role_prompt: Optional[str] = None,
     result_sink: Optional[Dict[str, Any]] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
-    """
-    Legacy single-shot mode: one LLM call produces a JSON plan, then executes
-    one or two skills (query + optional decision advice) based on user intent.
-    """
+    """Single LLM JSON plan with optional two-step query and advice execution."""
     log_event(
         trace_id,
         "agent.runner",
@@ -270,11 +262,7 @@ async def stream_specialist(
     memory_block: Optional[str] = None,
     result_sink: Optional[Dict[str, Any]] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
-    """
-    Runs one specialist pass for a single agent in multi-agent mode.
-    Uses a pre-filtered skill list instead of all available skills.
-    Routes to ReAct or legacy mode based on settings.
-    """
+    """One specialist pass: ReAct or Legacy with a filtered skill list."""
     if settings.agent_react:
         async for event in stream_chat_react(
             messages,

@@ -1,6 +1,17 @@
 export interface SseEvent {
-  type: 'thinking' | 'text' | 'chart' | 'kpi_cards' | 'error' | 'done';
+  type: 'thinking' | 'text' | 'chart' | 'kpi_cards' | 'plan_summary' | 'error' | 'done';
   content: unknown;
+}
+
+export interface PlanSummary {
+  metric: string;
+  metric_code: string;
+  source_table: string;
+  dimensions: string[];
+  filters: Array<{ dimension: string; value: string }>;
+  time_filter: string | null;
+  order_by_metric_desc: boolean;
+  limit: number | null;
 }
 
 export interface ChatMessage {
@@ -9,6 +20,7 @@ export interface ChatMessage {
   content: string;
   chart?: Record<string, unknown>;
   kpiCards?: KpiCard[];
+  planSummary?: PlanSummary;
   thinking?: string[];
   error?: string;
 }

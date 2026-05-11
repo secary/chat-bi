@@ -6,11 +6,12 @@ from typing import Any, Dict, List, Optional
 
 from backend.llm_runtime import chatbi_acompletion
 
-
+"""
+Each ReAct round, tell LLM should return "action", such as skill/finish/answer/done...
+"""
 async def call_llm_for_react_step(
     system_prompt: str, messages: List[Dict[str, str]]
 ) -> Optional[Dict[str, Any]]:
-    """One ReAct iteration: model returns JSON with `action` call_skill|finish."""
     llm_messages = [
         {"role": "system", "content": system_prompt},
         *messages,

@@ -72,6 +72,7 @@ async def chatbi_acompletion(**kwargs: Any) -> Any:
     attempts = _attempt_param_dicts()
     for i, base in enumerate(attempts):
         merged = {**base, **kwargs}
+        merged.pop("response_format", None)
         try:
             return await acompletion(**merged)
         except Exception as exc:
@@ -88,6 +89,7 @@ def chatbi_completion(**kwargs: Any) -> Any:
     attempts = _attempt_param_dicts()
     for i, base in enumerate(attempts):
         merged = {**base, **kwargs}
+        merged.pop("response_format", None)
         try:
             return completion(**merged)
         except Exception as exc:

@@ -58,6 +58,36 @@ class SkillProtocolTest(unittest.TestCase):
         self.assertEqual(len(chart_events), 1)
         self.assertEqual(chart_events[0]["content"]["series"][0]["type"], "bar")
 
+    def test_streams_plan_summary_when_result_provides_it(self):
+        result = {
+            "kind": "table",
+            "text": "查询完成",
+            "data": {
+                "rows": [{"区域": "华东", "销售额": "100"}],
+                "plan_summary": {
+                    "metric": "销售额",
+                    "dimensions": ["区域"],
+                    "filters": [],
+                    "time_filter": "`order_date` >= '2026-01-01' AND `order_date` < '2026-05-01'",
+                    "order_by_metric_desc": True,
+                    "limit": None,
+                },
+            },
+        }
+
+        async def collect():
+            return [
+                event
+                async for event in stream_result_events("chatbi-semantic-query", {}, result)
+            ]
+
+        events = asyncio.run(collect())
+        plan_events = [event for event in events if event.get("type") == "plan_summary"]
+        self.assertEqual(len(plan_events), 1)
+        self.assertEqual(plan_events[0]["content"]["metric"], "销售额")
+        self.assertEqual(events[0]["type"], "thinking")
+        self.assertIn("查询计划：指标=销售额", events[0]["content"])
+
 
 if __name__ == "__main__":
     unittest.main()

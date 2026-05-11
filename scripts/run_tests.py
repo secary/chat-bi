@@ -38,6 +38,7 @@ MODULE_SUITES: dict[str, list[str]] = {
         "tests/test_decision_advisor_focus.py",
         "tests/test_file_ingestion_skill.py",
         "tests/test_metric_explainer_skill.py",
+        "tests/test_semantic_query_core.py",
         "tests/test_semantic_processing_skill.py",
         "tests/test_skill_result_log_payload.py",
     ],

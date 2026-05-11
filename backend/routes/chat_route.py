@@ -48,6 +48,8 @@ def _accumulate_assistant(acc: Dict[str, Any], event: Dict[str, Any]) -> None:
         acc["chart"] = event.get("content")
     elif et == "kpi_cards":
         acc["kpiCards"] = event.get("content")
+    elif et == "plan_summary":
+        acc["planSummary"] = event.get("content")
     elif et == "error":
         acc["error"] = str(event.get("content") or "")
 
@@ -60,6 +62,8 @@ def _assistant_payload(acc: Dict[str, Any]) -> Dict[str, Any]:
         out["chart"] = acc["chart"]
     if acc.get("kpiCards") is not None:
         out["kpiCards"] = acc["kpiCards"]
+    if acc.get("planSummary") is not None:
+        out["planSummary"] = acc["planSummary"]
     if acc.get("error"):
         out["error"] = acc["error"]
     return out

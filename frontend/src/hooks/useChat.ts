@@ -18,6 +18,7 @@ function mapRow(row: Record<string, unknown>): ChatMessage {
     thinking: row.thinking as string[] | undefined,
     chart: row.chart as Record<string, unknown> | undefined,
     kpiCards: row.kpiCards as ChatMessage['kpiCards'],
+    planSummary: row.planSummary as ChatMessage['planSummary'],
     error: row.error as string | undefined,
   };
 }
@@ -180,6 +181,9 @@ export function useChat(
                 break;
               case 'kpi_cards':
                 nextLast.kpiCards = event.content as typeof last.kpiCards;
+                break;
+              case 'plan_summary':
+                nextLast.planSummary = event.content as ChatMessage['planSummary'];
                 break;
               case 'error':
                 nextLast.error = String(event.content);

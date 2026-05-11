@@ -55,7 +55,10 @@ MODULE_SUITES: dict[str, list[str]] = {
     ],
     "admin": [
         "tests/test_admin_multi_agents.py",
+        "tests/test_app_llm_saved.py",
+        "tests/test_chatbi_llm_fallback.py",
         "tests/test_db_mysql_targets.py",
+        "tests/test_llm_profile_repo.py",
         "tests/test_multi_agent_registry.py",
         "tests/test_skill_registry_graceful.py",
     ],
@@ -98,7 +101,9 @@ SUITE_ALIASES: dict[str, list[str]] = {
 
 def discover_python_tests() -> list[str]:
     return sorted(
-        str(path.relative_to(ROOT)) for path in (ROOT / "tests").glob("test_*.py") if path.is_file()
+        path.relative_to(ROOT).as_posix()
+        for path in (ROOT / "tests").glob("test_*.py")
+        if path.is_file()
     )
 
 

@@ -6,7 +6,7 @@ import os
 import re
 from typing import Any, Dict, List
 
-from backend.config import settings
+from backend.llm_runtime import chatbi_completion
 
 
 def _pdf_summary_disabled() -> bool:
@@ -56,11 +56,8 @@ def summarize_session_for_pdf(messages: List[Dict[str, Any]]) -> str:
         return "（无可摘要内容）"
 
     try:
-        from litellm import completion
-
-        params = {
-            **settings.llm_params,
-            "messages": [
+        resp = chatbi_completion(
+            messages=[
                 {
                     "role": "system",
                     "content": (
@@ -74,9 +71,8 @@ def summarize_session_for_pdf(messages: List[Dict[str, Any]]) -> str:
                     "content": f"请基于以下对话写摘要报告：\n\n{transcript}",
                 },
             ],
-            "temperature": 0.3,
-        }
-        resp = completion(**params)
+            temperature=0.3,
+        )
         text = _completion_content(resp)
         if text:
             return _markdownish_to_plain_paragraphs(text)

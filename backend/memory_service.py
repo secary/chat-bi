@@ -6,9 +6,7 @@ import os
 import re
 from typing import List
 
-from litellm import acompletion
-
-from backend.app_llm import effective_llm_params
+from backend.llm_runtime import chatbi_acompletion
 from backend.memory_repo import (
     get_long_term_row,
     insert_session_summary,
@@ -54,8 +52,7 @@ def format_memory_for_prompt(user_id: int) -> str:
 
 
 async def _llm_text(system: str, user: str) -> str:
-    resp = await acompletion(
-        **effective_llm_params(),
+    resp = await chatbi_acompletion(
         messages=[
             {"role": "system", "content": system},
             {"role": "user", "content": user},

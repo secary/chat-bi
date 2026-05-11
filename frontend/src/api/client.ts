@@ -3,6 +3,7 @@ import type {
   AdminSkillRow,
   CurrentDbConnectionView,
   DbConnectionRow,
+  LlmProfilePublic,
   LlmSettingsView,
   MultiAgentsRegistryPayload,
   SessionListApi,
@@ -377,4 +378,64 @@ export async function putLlmSettings(payload: {
     method: 'PUT',
     body: JSON.stringify(payload),
   });
+}
+
+export async function postLlmProfile(payload: {
+  display_name?: string | null;
+  model: string;
+  api_base?: string | null;
+  api_key?: string | null;
+}): Promise<{ profile: LlmProfilePublic }> {
+  return requestJson<{ profile: LlmProfilePublic }>('/admin/llm-profiles', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function putLlmProfile(
+  id: number,
+  payload: {
+    display_name?: string | null;
+    model?: string | null;
+    api_base?: string | null;
+    api_key?: string | null;
+  },
+): Promise<{ profile: LlmProfilePublic }> {
+  return requestJson<{ profile: LlmProfilePublic }>(`/admin/llm-profiles/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteLlmProfile(id: number): Promise<{ ok: boolean }> {
+  return requestJson<{ ok: boolean }>(`/admin/llm-profiles/${id}`, { method: 'DELETE' });
+}
+
+export async function putLlmProfilesReorder(orderedIds: number[]): Promise<{ ok: boolean }> {
+  return requestJson<{ ok: boolean }>('/admin/llm-profiles/reorder', {
+    method: 'PUT',
+    body: JSON.stringify({ ordered_ids: orderedIds }),
+  });
+}
+
+export async function putLlmProfilesActive(profileId: number | null): Promise<{ ok: boolean }> {
+  return requestJson<{ ok: boolean }>('/admin/llm-profiles/active', {
+    method: 'PUT',
+    body: JSON.stringify({ profile_id: profileId }),
+  });
+}
+
+export async function postLlmProfileTest(id: number): Promise<{ ok: boolean; message: string }> {
+  return requestJson<{ ok: boolean; message: string }>(`/admin/llm-profiles/${id}/test`, {
+    method: 'POST',
+  });
+}
+
+export async function postLlmProfilesTestAll(): Promise<{
+  results: Array<{ id: number; ok: boolean; message: string }>;
+}> {
+  return requestJson<{ results: Array<{ id: number; ok: boolean; message: string }> }>(
+    '/admin/llm-profiles/test-all',
+    { method: 'POST' },
+  );
 }

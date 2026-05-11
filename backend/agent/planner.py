@@ -4,9 +4,7 @@ import json
 import re
 from typing import Any, Dict, List, Optional
 
-from litellm import acompletion
-
-from backend.app_llm import effective_llm_params
+from backend.llm_runtime import chatbi_acompletion
 
 
 async def call_llm_for_react_step(
@@ -23,8 +21,7 @@ async def call_llm_for_react_step(
     ]
 
     try:
-        resp = await acompletion(
-            **effective_llm_params(),
+        resp = await chatbi_acompletion(
             messages=llm_messages,
             response_format={"type": "json_object"},
             temperature=0.1,
@@ -48,8 +45,7 @@ async def call_llm_for_plan(
     ]
 
     try:
-        resp = await acompletion(
-            **effective_llm_params(),
+        resp = await chatbi_acompletion(
             messages=llm_messages,
             response_format={"type": "json_object"},
             temperature=0.1,

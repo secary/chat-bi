@@ -10,9 +10,7 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from litellm import acompletion
-
-from backend.app_llm import effective_llm_params
+from backend.llm_runtime import chatbi_acompletion
 from backend.trace import log_event
 
 _IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
@@ -102,8 +100,7 @@ async def extract_chart_table_from_image(
         },
     ]
     try:
-        resp = await acompletion(
-            **effective_llm_params(),
+        resp = await chatbi_acompletion(
             messages=messages,
             response_format={"type": "json_object"},
             temperature=0.1,

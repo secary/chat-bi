@@ -51,11 +51,27 @@ export interface MultiAgentsRegistryPayload {
   agents: Record<string, MultiAgentLineEntry>;
 }
 
+export interface LlmProfilePublic {
+  id: number;
+  display_name: string | null;
+  model: string;
+  api_base: string | null;
+  api_key_set: boolean;
+  sort_order: number;
+  health_status: string;
+  health_detail: string | null;
+  health_checked_at: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
 export interface LlmSettingsView {
   model: string | null;
   api_base: string | null;
   api_key_set: boolean;
+  active_profile_id?: number | null;
   updated_at: string | null;
+  profiles?: LlmProfilePublic[];
   effective_model?: string | null;
   effective_api_base?: string | null;
   effective_api_key_set?: boolean;

@@ -6,6 +6,11 @@ from backend.renderers.chart import plan_to_option
 from backend.renderers.kpi import build_kpi_cards
 
 
+"""
+turn agent result into server event stream to show on the frontend page. 
+text, chart, charts, kpi_cards.
+
+"""
 async def stream_result_events(
     skill_name: str, plan: Dict[str, Any], result: Dict[str, Any]
 ) -> AsyncGenerator[Dict[str, Any], None]:
@@ -14,6 +19,7 @@ async def stream_result_events(
     if text:
         yield {"type": "text", "content": text}
 
+    # if result has data.rows, use it to fill the chart and kpi graph. 
     rows = table_rows(result)
     chart_plan = result.get("chart_plan") or plan.get("chart_plan")
     if chart_plan and rows:
@@ -44,7 +50,9 @@ def table_rows(result: Dict[str, Any]) -> List[Dict[str, str]]:
         return data["rows"]
     return []
 
-
+"""
+if result no chart or kpi graph, then return text. 
+"""
 def fallback_text(skill_name: str, result: Dict[str, Any]) -> str:
     kind = result.get("kind", "text")
     if kind == "table":

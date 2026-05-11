@@ -118,7 +118,10 @@ uv pip --python .venv/bin/python install -r requirements.txt
 ### Admin / Auth / Memory
 
 - `test_admin_multi_agents.py::*`：多 Agent 管理默认值、保存回读、非法 Skill/agent/空配置拒绝、registry 原子写。
+- `test_app_llm_saved.py::*`：`saved_settings_apply` 与活跃档案判定。
+- `test_chatbi_llm_fallback.py::*`：`chatbi_acompletion` 在连接失败后尝试下一档参数。
 - `test_db_mysql_targets.py::*`：app/admin 目标库配置路由正确。
+- `test_llm_profile_repo.py::*`：`llm_profile_repo.public_row` 脱敏展示字段。
 - `test_skill_registry_graceful.py::*`：`skill_registry` 查询失败时降级为空禁用集。
 - `test_auth_deps_disabled.py::*`：免登录 dev user、非 admin dev id 回退种子 admin、开启鉴权时必须凭据。
 - `test_auth_password.py::*`：密码 hash roundtrip。

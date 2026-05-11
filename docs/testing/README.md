@@ -9,7 +9,7 @@ ChatBI 的测试先按功能模块组织执行入口，暂时保留 `tests/` 扁
 .venv/bin/ruff check backend/ scripts/ tests/
 .venv/bin/black --check backend/ scripts/ tests/
 
-# 后端测试（快速套件）
+# 后端测试（每次改动后至少跑一套）
 PYTHONPATH=. .venv/bin/python scripts/run_tests.py quick -- -q
 
 # 前端
@@ -70,11 +70,12 @@ uv pip --python .venv/bin/python install -r requirements.txt
 
 ## 新增测试规则
 
-1. 新功能必须先判断归属模块，并把测试文件加入 `scripts/run_tests.py` 的对应 `MODULE_SUITES`。
-2. 如果新增了 `tests/test_*.py` 却没有归属套件，`tests/test_run_tests_script.py` 会失败。
-3. 日常提交前优先跑 `quick`；改 Agent 跑 `agent`；改管理/仪表盘/PDF 跑对应模块。
-4. 需要全量 Python 测试时跑 `all`；需要前端 Vitest 时加 `--frontend`。
-5. 前端测试仍使用 `cd frontend && npm run test`，由 `scripts/run_tests.py --frontend` 统一串联。
+1. 每次代码或测试改动完成后，至少运行一次 `PYTHONPATH=. .venv/bin/python scripts/run_tests.py <suite> -- -q`，套件按改动范围选择。
+2. 新功能必须先判断归属模块；如果新增 `tests/test_*.py`，必须先把测试文件加入 `scripts/run_tests.py` 的对应 `MODULE_SUITES`，再执行本地测试。
+3. 如果新增了 `tests/test_*.py` 却没有归属套件，`tests/test_run_tests_script.py` 会失败。
+4. 日常提交前优先跑 `quick`；改 Agent 跑 `agent`；改管理/仪表盘/PDF 跑对应模块。
+5. 需要全量 Python 测试时跑 `all`；需要前端 Vitest 时加 `--frontend`。
+6. 前端测试仍使用 `cd frontend && npm run test`，由 `scripts/run_tests.py --frontend` 统一串联。
 
 ## 具体用例索引
 
@@ -122,12 +123,15 @@ uv pip --python .venv/bin/python install -r requirements.txt
 - `test_auth_deps_disabled.py::*`：免登录 dev user、非 admin dev id 回退种子 admin、开启鉴权时必须凭据。
 - `test_auth_password.py::*`：密码 hash roundtrip。
 - `test_auth_tokens.py::*`：JWT roundtrip。
+- `test_memory_repo_prompts.py::*`：建议提问过滤上传噪声和重复标题，保留简短有效问题。
 - `test_memory_service_off.py::*`：记忆关闭时格式化为空。
 
 ### Dashboard / Data Sources
 
 - `test_dashboard_overview.py::*`：Dashboard overview 返回 KPI/图表/语义计数结构，非法表名 count 安全。
 - `test_chart_renderer.py::*`：图表渲染器缺 plan 字段时自动推断，空 rows 保持空 option。
+- `test_kpi_renderer.py::*`：KPI 卡片字段不匹配时回落到 default，字段精确命中时展示对应值。
+- `test_executor_file_ingestion_args.py::*`：文件导入执行参数优先提取上传路径，并可回退到最近一次用户上传文件。
 - `test_external_bank_demo_sql.py::*`：外部银行库 SQL 创建独立库、覆盖银行关联表、保留 ChatBI 兼容面和银行语义别名。
 
 ### Upload / Vision / Report

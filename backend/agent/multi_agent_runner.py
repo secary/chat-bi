@@ -72,7 +72,7 @@ async def stream_chat_multi_agent(
         payload={"message_count": len(messages)},
     )
     """
-    LLM pick the right agents for the user's question according to user intent. 
+    LLM pick the right agents for the user's question according to user intent.
     """
     route = await call_route_llm(messages, trace_id=trace_id)
     chosen = _pick_route_agents(route)
@@ -89,6 +89,7 @@ async def stream_chat_multi_agent(
     if not chosen:
         log_event(trace_id, "agent.multi", "fallback_single", level="INFO")
         from backend.agent.runner import stream_chat as _single
+
         """
         If no agents are selected, fallback to single-agent mode.
         """
@@ -107,12 +108,12 @@ async def stream_chat_multi_agent(
     last_skill_name: Optional[str] = None
 
     """
-    Every agent has an id. 
+    Every agent has an id.
     """
     for agent_id in chosen:
-        label = agent_label(agent_id) 
-        role = agent_role_prompt(agent_id) # agent specific role prompt.
-        docs = skills_for_agent(agent_id) # agent specific skills.
+        label = agent_label(agent_id)
+        role = agent_role_prompt(agent_id)  # agent specific role prompt.
+        docs = skills_for_agent(agent_id)  # agent specific skills.
         if not docs:
             yield {
                 "type": "thinking",

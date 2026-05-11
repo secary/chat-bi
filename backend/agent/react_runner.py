@@ -80,7 +80,6 @@ def _sink_write(
     sink["last_skill_name"] = last_skill_name
 
 
-
 async def stream_chat_react(
     messages: List[Dict[str, str]],
     trace_id: str = "",
@@ -94,7 +93,7 @@ async def stream_chat_react(
     ReAct multi-step agent loop.
     Each iteration: LLM decides next action {"thought", "action", "skill", "skill_args"} → executes a skill → summarizes observation → repeats.
     Stops when the LLM outputs 'finish/done/answer', or when agent_max_steps is exhausted.
-    action == "call_skill", execute Skill，append observation result to working list. 
+    action == "call_skill", execute Skill，append observation result to working list.
     Auto-runs chatbi-decision-advisor as a followup when query+decision intent is detected.
     """
     log_event(
@@ -239,7 +238,7 @@ async def stream_chat_react(
 
         """
         transfer llm raw args into real args for the skill.
-        for example: 
+        for example:
             LLM plan: {"skill": "chatbi-file-ingestion", "skill_args": ["帮我分析"]}
             skill_args_for_execution("chatbi-file-ingestion", ["帮我分析"], messages)
             find the real address of a file by the user's upload path, mathch /tmp/chatbi-uploads/xxx.csv
@@ -331,7 +330,7 @@ async def stream_chat_react(
         }
 
         """
-        Merge llm last output and last skill output. 
+        Merge llm last output and last skill output.
 
         For example:
             call_skill → chatbi-semantic-query → skill result = {"text": "本月销售额 100 万", "chart_plan": {...}}
@@ -342,7 +341,7 @@ async def stream_chat_react(
         merged = _merge_finish_result(fallback_plan, last_result, last_skill_name)
         """
         stream_result_events:
-        transfer the skill result to the frontend page by sse. 
+        transfer the skill result to the frontend page by sse.
         """
         async for event in stream_result_events(last_skill_name or "skill", fallback_plan, merged):
             yield event

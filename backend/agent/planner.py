@@ -9,6 +9,8 @@ from backend.llm_runtime import chatbi_acompletion
 """
 Each ReAct round, tell LLM should return "action", such as skill/finish/answer/done...
 """
+
+
 async def call_llm_for_react_step(
     system_prompt: str, messages: List[Dict[str, str]]
 ) -> Optional[Dict[str, Any]]:

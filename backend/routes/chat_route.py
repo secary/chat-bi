@@ -212,5 +212,7 @@ async def chat(
                         str(exc),
                         level="WARN",
                     )
-
+    # turn every stream_chat content into sse event. 
+    # it will turn yield contents into  text/event-stream
+    # each data is a json string
     return EventSourceResponse(event_gen(), headers={"X-Trace-Id": trace_id})

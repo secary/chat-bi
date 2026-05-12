@@ -3,6 +3,10 @@ from __future__ import annotations
 import json
 from typing import Any, Dict
 
+"""
+turn skill result into a compact json string format for llm input.
+"""
+
 
 """
 turn skill result into a compact json string format for llm input.

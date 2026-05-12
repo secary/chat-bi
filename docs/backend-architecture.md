@@ -160,7 +160,8 @@ executor.run_script(skill_doc, args, trace_id, skill_db_overrides)
 
 | 文件 | 职责 |
 |------|------|
-| `chart_table_extract.py` | `extract_chart_table_from_image()`: 用 LLM vision 能力从截图提取表格数据；`enrich_last_user_message_with_vision()`: 检测消息中的图片路径并注入结构化 JSON |
+| `chart_table_extract.py` | `extract_chart_table_from_image()`: 用 LiteLLM 多模态从截图提取表格；`enrich_last_user_message_with_vision()`: 检测消息中的图片路径并注入结构化 JSON（门禁见 `vision_llm_runtime.py`） |
+| `vision_llm_runtime.py` | 解析专用视觉档案或已标记 `supports_vision` 的对话默认档案，单次调用 `acompletion`；`CHATBI_VISION_ALLOW_ENV_MAIN` 供无 DB 档案时的 env 主模型放行 |
 
 ### 2.8 其他服务
 

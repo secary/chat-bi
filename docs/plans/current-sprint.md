@@ -100,7 +100,8 @@
   - [x] `GET /sessions/{id}/report.pdf` 导出服务端 PDF（WeasyPrint）；前端「导出 PDF 报告」；镜像安装 Pango/Cairo 与 Noto CJK；`tests/test_multi_agent_*`、`test_vision_extract.py`、`test_report_pdf.py`
   - [x] PDF 报告：`litellm.completion` 精炼摘要（`CHATBI_PDF_SUMMARY_DISABLED` 时降级为要点摘录）；ECharts 落库 option 经 matplotlib 转 PNG 嵌入 HTML；ReportLab 降级路径含 PNG；`matplotlib`/`pillow` 依赖
   - [x] 对话页：多专线「iOS 风格」拨动开关（`Switch.tsx`）；会话侧栏可收起/展开（`chatbi_sidebar_open`）
-- 涉及文件：`backend/agent/multi_agent_*.py`、`backend/vision/`、`backend/report/pdf_report.py`、`backend/report/pdf_summary.py`、`backend/report/pdf_chart_png.py`、`backend/routes/sessions_route.py`、`frontend/src/pages/ChatPage.tsx`、`frontend/src/components/Switch.tsx`、`frontend/src/hooks/useChat.ts`、`backend/Dockerfile`、`requirements.txt`
+  - [x] 管理端 Vision 门禁：`llm_model_profile.supports_vision`、`llm_settings.vision_profile_id`；识图仅走专用档案或已标记多模态的对话默认档案；`CHATBI_VISION_ALLOW_ENV_MAIN` 供纯 env 部署显式放行；`GET /admin/llm-settings` 返回 `vision_extract_enabled` / `vision_disabled_by_env`；`tests/test_vision_llm_runtime.py`
+- 涉及文件：`backend/agent/multi_agent_*.py`、`backend/vision/`、`backend/llm_profile_repo.py`、`backend/llm_settings_repo.py`、`backend/routes/admin_llm_route.py`、`backend/routes/admin_llm_profiles_route.py`、`database/migrations/005_llm_vision_settings.sql`、`frontend/src/pages/LlmConfigPage.tsx`、`frontend/src/components/LlmConfigEditorCard.tsx`、`backend/report/pdf_report.py`、`backend/report/pdf_summary.py`、`backend/report/pdf_chart_png.py`、`backend/routes/sessions_route.py`、`frontend/src/pages/ChatPage.tsx`、`frontend/src/components/Switch.tsx`、`frontend/src/hooks/useChat.ts`、`backend/Dockerfile`、`requirements.txt`
 - 复杂度：高
 
 ### 任务 10：用户鉴权与长短期记忆（OpenClaw 风格 MVP）

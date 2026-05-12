@@ -381,6 +381,7 @@ CREATE TABLE llm_model_profile (
   api_base VARCHAR(512) NULL,
   api_key VARCHAR(512) NULL,
   sort_order INT NOT NULL DEFAULT 0,
+  supports_vision TINYINT(1) NOT NULL DEFAULT 0,
   health_status VARCHAR(16) NOT NULL DEFAULT 'unknown',
   health_detail VARCHAR(512) NULL,
   health_checked_at DATETIME(6) NULL,
@@ -395,11 +396,14 @@ CREATE TABLE llm_settings (
   api_base VARCHAR(512) NULL,
   api_key VARCHAR(512) NULL,
   active_profile_id BIGINT NULL,
+  vision_profile_id BIGINT NULL,
   updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
   CONSTRAINT fk_llm_settings_active_profile FOREIGN KEY (active_profile_id)
+    REFERENCES llm_model_profile (id) ON DELETE SET NULL,
+  CONSTRAINT fk_llm_settings_vision_profile FOREIGN KEY (vision_profile_id)
     REFERENCES llm_model_profile (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-INSERT INTO llm_settings (id, model, api_base, api_key, active_profile_id)
-VALUES (1, NULL, NULL, NULL, NULL)
+INSERT INTO llm_settings (id, model, api_base, api_key, active_profile_id, vision_profile_id)
+VALUES (1, NULL, NULL, NULL, NULL, NULL)
 ON DUPLICATE KEY UPDATE id = id;

@@ -11,13 +11,13 @@ MAX_PAYLOAD_LENGTH = 6000
 
 
 def create_trace_table_sql() -> str:
-    return """
+    base = """
 CREATE DATABASE IF NOT EXISTS `chatbi_logs`
   DEFAULT CHARACTER SET utf8mb4
   DEFAULT COLLATE utf8mb4_unicode_ci;
-""".strip().replace(
-        "`chatbi_logs`", f"`{_safe_ident(settings.log_db_name)}`"
-    )
+""".strip()
+    db_ident = f"`{_safe_ident(settings.log_db_name)}`"
+    return base.replace("`chatbi_logs`", db_ident)
 
 
 def create_trace_log_table_sql() -> str:

@@ -40,6 +40,14 @@ open http://localhost:5173
 
 ## 本地开发启动
 
+首次拉代码后，建议先执行一次：
+
+```bash
+bash scripts/bootstrap_dev.sh
+```
+
+它会为当前仓库配置 Git `pre-commit` hook、检查 `.venv` / `.env.dev` / `frontend/node_modules`，并在条件满足时先跑一遍本地 formatter。
+
 ### 方式 A：Docker 热更新
 
 推荐日常开发使用，前后端源码会挂载进容器：

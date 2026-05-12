@@ -5,7 +5,6 @@ from typing import Any, AsyncGenerator, Dict, List
 from backend.renderers.chart import plan_to_option
 from backend.renderers.kpi import build_kpi_cards
 
-
 """
 turn agent result into server event stream to show on the frontend page.
 text, chart, charts, kpi_cards.

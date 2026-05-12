@@ -68,7 +68,7 @@ async def stream_result_events(
         return
 
     kpi_config = plan.get("kpi_cards")
-    if kpi_config and rows:
+    if kpi_config and _can_build_plan_kpis(rows):
         try:
             yield {"type": "kpi_cards", "content": build_kpi_cards(kpi_config, rows)}
         except Exception as exc:
@@ -80,6 +80,15 @@ def table_rows(result: Dict[str, Any]) -> List[Dict[str, str]]:
     if isinstance(data, dict) and isinstance(data.get("rows"), list):
         return data["rows"]
     return []
+
+
+def _can_build_plan_kpis(rows: List[Dict[str, str]]) -> bool:
+    """
+    Only allow finish-step KPI fallback for single-row summaries.
+    Multi-row ranking/trend queries should not synthesize KPI cards from the
+    first row, otherwise dimension values like "华东" can leak into the cards.
+    """
+    return len(rows) == 1
 
 
 """

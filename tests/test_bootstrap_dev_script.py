@@ -15,6 +15,7 @@ class BootstrapDevScriptTest(unittest.TestCase):
         (repo / "scripts").mkdir(parents=True, exist_ok=True)
         (repo / "frontend").mkdir(parents=True, exist_ok=True)
         (repo / ".githooks").mkdir(parents=True, exist_ok=True)
+        (repo / ".env.dev").write_text("CHATBI_DB_PORT=3308\n", encoding="utf-8")
         (repo / "scripts/format_code.py").write_text(
             "print('format placeholder')\n", encoding="utf-8"
         )

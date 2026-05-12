@@ -55,7 +55,7 @@ class ReportPdfTest(unittest.TestCase):
         self.assertIn('class="chart-img"', html_doc)
         self.assertIn("data:image/png;base64,", html_doc)
 
-    def test_summarize_with_litellm_mock(self) -> None:
+    def test_summarize_with_chatbi_completion_mock(self) -> None:
         from backend.report.pdf_report import messages_to_html_document
 
         mock_resp = MagicMock()
@@ -63,7 +63,7 @@ class ReportPdfTest(unittest.TestCase):
             MagicMock(message=MagicMock(content="【精炼】要点一行：销售额同比上升。"))
         ]
         with patch.dict(os.environ, {"CHATBI_PDF_SUMMARY_DISABLED": "0"}):
-            with patch("litellm.completion", return_value=mock_resp):
+            with patch("backend.report.pdf_summary.chatbi_completion", return_value=mock_resp):
                 html_doc = messages_to_html_document(
                     [
                         {"role": "user", "content": "很长的问题" * 20},

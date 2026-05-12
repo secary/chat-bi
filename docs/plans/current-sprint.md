@@ -3,11 +3,13 @@
 > 状态标记：📋 待开始 | 🚧 进行中 | ✅ 已完成 | ❌ 有问题
 
 ## 迭代目标
+
 完成 ChatBI MVP：初始化演示数据库和语义层，验证 3 个 Skill 脚本，接入 Agent + FastAPI SSE，并实现 React 前端对话、思考步骤、图表和 KPI 卡片渲染。
 
 ## 任务清单
 
 ### 任务 1：数据库初始化
+
 - 状态：✅ 已完成
 - 验收标准：
   - [x] `docker compose up` 可以启动 MySQL 8.0
@@ -17,11 +19,13 @@
 - 复杂度：中
 
 ### 任务 2：Skill 脚本验证
+
 - 状态：📋 待开始（用户要求暂时跳过）
 - 验收标准同上
 - 复杂度：中
 
 ### 任务 3：Agent Skill 调度
+
 - 状态：✅ 已完成
 - 验收标准：
   - [x] AgentRunner 读取 `skills/*/SKILL.md`
@@ -33,6 +37,7 @@
 - 复杂度：高
 
 ### 任务 4：FastAPI SSE 接口
+
 - 状态：✅ 已完成
 - 验收标准：
   - [x] `POST /chat` 接收用户消息和会话历史
@@ -42,6 +47,7 @@
 - 复杂度：高
 
 ### 任务 5：前端对话界面
+
 - 状态：✅ 已完成
 - 验收标准：
   - [x] `useChat` 管理消息列表、SSE 连接、输入和 loading 状态
@@ -51,6 +57,7 @@
 - 复杂度：高
 
 ### 任务 6：图表与 KPI 渲染
+
 - 状态：✅ 已完成
 - 验收标准：
   - [x] 支持柱状图、折线图、饼图
@@ -62,6 +69,7 @@
 - 复杂度：中
 
 ### 任务 7：端到端联调验收
+
 - 状态：🔄 待开始（需先配置 LLM API Key）
 - 验收标准：
   - [ ] 跑通自然语言问数场景
@@ -72,6 +80,7 @@
 - 复杂度：高
 
 ### 任务 8：会话记忆 + 管理导航（MVP）
+
 - 状态：✅ 已完成
 - 验收标准：
   - [x] `chatbi_demo` 增加 `chat_session` / `chat_message` / `skill_registry` / `app_db_connection` / `llm_settings`；`database/migrations/001_app_tables.sql` 供旧库增量执行
@@ -84,6 +93,7 @@
 - 复杂度：高
 
 ### 任务 9：数据仪表盘
+
 - 状态：✅ 已完成
 - 验收标准：
   - [x] `GET /dashboard/overview` 基于生效业务库（与 Skill 相同的连接解析）只读聚合 `sales_order`、`customer_profile` 及语义层表行数
@@ -93,6 +103,7 @@
 - 复杂度：中
 
 ### 任务 11：Multi-Agent、多模态与 PDF 报告
+
 - 状态：✅ 已完成
 - 验收标准：
   - [x] `skills/_agents/registry.yaml` 定义风控 / 营销 / 分析与 Skill 白名单；路由 LLM 输出专线列表（上限见 registry）；顺序执行专线并按 Observation 汇总输出；`POST /chat` 支持 `multi_agents`
@@ -105,6 +116,7 @@
 - 复杂度：高
 
 ### 任务 10：用户鉴权与长短期记忆（OpenClaw 风格 MVP）
+
 - 状态：✅ 已完成
 - 验收标准：
   - [x] `database/init.sql` 与 `database/migrations/002_users_and_memory.sql`：`app_user`、`chat_session.user_id`、`user_memory`；种子管理员 `admin` / `admin123`（部署后请改密）
@@ -117,6 +129,7 @@
 - 复杂度：高
 
 ### 任务 12：多 Agents 注册表管理（管理员）
+
 - 状态：✅ 已完成
 - 验收标准：
   - [x] `GET/PUT /admin/multi-agents` 读写 `skills/_agents/registry.yaml`（原子写入），校验专线 id、至少一条专线、技能 slug 须存在于 `scan_skills`
@@ -230,6 +243,9 @@
 | 99 | 增加本地自动排版链路：新增 `scripts/format_code.py` 统一执行 `ruff --fix` + `black` + `eslint --fix`，新增 `.githooks/pre-commit` 处理 staged 文件并自动 `git add` 回暂存区；`.vscode/settings.json` 开启保存时自动格式化；补 `test_format_code_script.py` 与测试文档说明 | Git hook 需开发者本地执行一次 `git config core.hooksPath .githooks` 才会生效；VS Code 保存自动格式化依赖本机已安装 Black Formatter / ESLint 扩展 | 本地执行 `PYTHONPATH=. .venv/bin/python scripts/run_tests.py foundation -- -q`、`PYTHONPATH=. .venv/bin/python scripts/format_code.py --staged`，并提交一个格式故意不规范的小改动验证会在 pre-commit 被自动改正 |
 | 100 | 增加 `scripts/bootstrap_dev.sh` 开发引导脚本：为当前仓库配置 `.githooks`、检查 `.venv` / `.env.dev` / `frontend/node_modules`，并在虚拟环境存在时自动跑一遍 `scripts/format_code.py`；补 `test_bootstrap_dev_script.py`，并在 README / 测试文档加入 onboarding 用法 | 脚本保持轻量，不自动装依赖、不自动启动 Docker；若同事没准备好 `.venv` 或前端依赖，只输出提示不强行执行重操作 | 本地执行 `bash scripts/bootstrap_dev.sh` 与 `PYTHONPATH=. .venv/bin/python scripts/run_tests.py foundation -- -q`，确认 hook 配置、提示文案和基础测试都正常 |
 | 101 | 更新 `AGENTS.md` 以对齐当前自动化流程：新增首次协作先跑 `scripts/bootstrap_dev.sh`、改动后先跑 `scripts/format_code.py`、提交时 `pre-commit` 自动兜底；同时修正前端技术栈为 React 19 / ECharts 6，并移除已不使用的 Prettier 描述 | 本次只更新 agent 规则事实源，不改运行逻辑；若后续引入新 formatter 或 hook 框架，需同步更新 `AGENTS.md` 避免 agent 读到旧流程 | 后续新 agent 进入仓库时先读 `AGENTS.md`，应能直接推断初始化、格式化和提交前自动清洗链路 |
-| 102 | 修复 Docker 生产登录 CORS：`frontend/nginx.conf` 增加 `/api/` 与 `/api/chat` 反代到 `backend:8000`（SSE 关闭 buffering、拉长 read_timeout）；`docker-compose.yml` 与 `frontend/Dockerfile` 默认 `VITE_API_BASE_URL=/api`；`.env.example` 与 README 说明勿在 `.env` 保留旧的 `http://localhost:8000` 以免覆盖构建参数 | 同源 `/api` 后浏览器不再跨端口请求 `8000`；直连后端调试仍可用宿主机 `:8000` | `docker compose up -d --build`，确认 `.env` 中 `FRONTEND_API_BASE_URL` 为 `/api` 或省略；浏览器登录 admin |
-| 103 | 根因：根目录 `.env` 中 `FRONTEND_API_BASE_URL=http://localhost:8000` 参与 compose 插值会覆盖默认 `/api`，重建后 bundle 仍指向 8000；`docker-compose.yml` 改为构建参数**硬编码** `VITE_API_BASE_URL: /api`，与 `.env` 脱钩；同步 README / `.env.example` | 分域部署需自行 `docker build --build-arg VITE_API_BASE_URL=...` 或 compose override | `docker compose build --no-cache frontend && docker compose up -d` 后 Network 面板应出现 `/api/auth/login` |
-| 104 | 登录 500 排查：生产 MySQL 卷若早于当前 `init.sql` 初始化，会缺少 `chatbi_app`/`chatbi_admin`，`demo_user` 无法连 `chatbi_app` → `pymysql` 1044；README 增加「删除 `database/mysql-data` 后重建」说明 | 非应用代码缺陷，属数据卷与 init 一次性执行语义 | `docker compose down` → 删 `database/mysql-data` → `docker compose up -d`；`docker exec ... SHOW DATABASES` 应含 `chatbi_app` |
+| 102 | 修复问数最终输出混入异常 KPI 字段：`backend/agent/formatter.py` 将 finish 阶段的 `kpi_cards` 兜底渲染收紧为“仅单行结果可生成”，避免多行排行/趋势查询把首行维度值（如 `华东`）误渲染成卡片；补 `tests/test_agent_skill_protocol.py` 回归用例锁定该场景 | 当前仍保留单行汇总场景的 finish-step KPI 兜底，便于 chart-recommendation / 单值摘要继续工作；若后续要支持“多行结果 + 顶部 KPI 摘要”，应改为显式聚合字段而不是复用首行数据 | 本地执行 `PYTHONPATH=. .venv/bin/python scripts/format_code.py` 与 `PYTHONPATH=. .venv/bin/python scripts/run_tests.py foundation -- -q`，确认不再出现多余 KPI 卡片 |
+| 103 | 修复单值问数误渲染单柱图：`chatbi-semantic-query` 的 `presenters.py` 将“单行 + 单指标 + 可选1个维度标签”视为单值摘要，直接返回顶层 `kpis`，并禁止生成 `chart_plan`，避免 `线上渠道软件服务销售额是多少` 这类问题在前端显示只有一根柱子的分类图；补 `tests/test_semantic_query_core.py` 回归用例 | 当前保留多行分类/趋势图表逻辑不变；若后续要把单值 KPI 再细分为金额/比例/数量不同视觉样式，可在前端按 unit 或 metric type 扩展 | 本地执行 `PYTHONPATH=. .venv/bin/python scripts/format_code.py` 与 `PYTHONPATH=. .venv/bin/python scripts/run_tests.py skills -- -q`，确认单值场景输出 KPI、多行场景仍保留图表 |
+| 104 | 统一 skill slug 命名到 `chatbi-*`：将 `chatbi-chart-recommendation`、`chatbi-dashboard-orchestration` 的 `SKILL.md` frontmatter `name` 与 agent prompt 示例统一为新 slug，并让 `executor.find_skill()` 同时兼容 `name` 与目录名匹配；同步更新 ReAct prompt / visual-first 逻辑与测试中的旧 slug，避免 planner、runner、执行层混用新旧名字导致找不到技能或前端展示旧名 | 当前文档中仍有少量历史说明提到旧 slug，属说明文字不影响运行；若后续继续清理文档，可统一替换为新名字减少认知负担 | 本地执行 `PYTHONPATH=. .venv/bin/python scripts/format_code.py` 与 `PYTHONPATH=. .venv/bin/python scripts/run_tests.py foundation agent skills -- -q`，确认新旧命名链路都可正常执行 |
+| 105 | 修复 Docker 生产登录 CORS：`frontend/nginx.conf` 增加 `/api/` 与 `/api/chat` 反代到 `backend:8000`（SSE 关闭 buffering、拉长 read_timeout）；`docker-compose.yml` 与 `frontend/Dockerfile` 默认 `VITE_API_BASE_URL=/api`；`.env.example` 与 README 说明勿在 `.env` 保留旧的 `http://localhost:8000` 以免覆盖构建参数 | 同源 `/api` 后浏览器不再跨端口请求 `8000`；直连后端调试仍可用宿主机 `:8000` | `docker compose up -d --build`，确认 `.env` 中 `FRONTEND_API_BASE_URL` 为 `/api` 或省略；浏览器登录 admin |
+| 106 | 根因：根目录 `.env` 中 `FRONTEND_API_BASE_URL=http://localhost:8000` 参与 compose 插值会覆盖默认 `/api`，重建后 bundle 仍指向 8000；`docker-compose.yml` 改为构建参数**硬编码** `VITE_API_BASE_URL: /api`，与 `.env` 脱钩；同步 README / `.env.example` | 分域部署需自行 `docker build --build-arg VITE_API_BASE_URL=...` 或 compose override | `docker compose build --no-cache frontend && docker compose up -d` 后 Network 面板应出现 `/api/auth/login` |
+| 107 | 登录 500 排查：生产 MySQL 卷若早于当前 `init.sql` 初始化，会缺少 `chatbi_app`/`chatbi_admin`，`demo_user` 无法连 `chatbi_app` → `pymysql` 1044；README 增加「删除 `database/mysql-data` 后重建」说明 | 非应用代码缺陷，属数据卷与 init 一次性执行语义 | `docker compose down` → 删 `database/mysql-data` → `docker compose up -d`；`docker exec ... SHOW DATABASES` 应含 `chatbi_app` |

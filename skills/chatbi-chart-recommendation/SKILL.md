@@ -1,5 +1,5 @@
 ---
-name: chart-recommendation
+name: chatbi-chart-recommendation
 description: BI chart recommendation for ChatBI and analytics workflows. Use when Codex needs to choose chart types and emit frontend-ready chart recommendation JSON from a user's analysis intent, Query Intent JSON, SQL result metadata, or tabular data, especially after natural language to SQL to data pipelines.
 ---
 

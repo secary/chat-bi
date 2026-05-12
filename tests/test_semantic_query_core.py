@@ -142,6 +142,19 @@ def test_build_json_payload_builds_kpi_for_single_rate_metric():
     ]
 
 
+def test_build_json_payload_builds_kpi_for_single_row_grouped_metric():
+    payload = build_json_payload(
+        "线上渠道软件服务销售额是多少",
+        "SELECT ...",
+        [{"渠道": "线上", "销售额": "700000.00"}],
+    )
+
+    assert payload["kpis"] == [
+        {"label": "销售额", "value": "700000.00", "unit": "", "status": "neutral"}
+    ]
+    assert "chart_plan" not in payload
+
+
 def test_build_json_payload_treats_null_aggregate_as_no_data():
     payload = build_json_payload(
         "2024年销售额",

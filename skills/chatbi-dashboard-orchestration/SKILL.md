@@ -1,5 +1,5 @@
 ---
-name: dashboard-orchestration
+name: chatbi-dashboard-orchestration
 description: Dashboard auto-orchestration for ChatBI and analytics workflows. Use when Codex needs to generate a dashboard layout and frontend-ready dashboard JSON from multiple chart recommendations, Query Intent JSON objects, SQL result summaries, or BI analysis goals, especially when turning generated charts into a coherent dashboard.
 ---
 

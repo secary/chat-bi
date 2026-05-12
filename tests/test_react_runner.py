@@ -123,7 +123,7 @@ class ReactRunnerTest(unittest.TestCase):
     def test_visual_first_skill_suppresses_finish_text_and_keeps_chart(self):
         first = {
             "action": "call_skill",
-            "skill": "chart-recommendation",
+            "skill": "chatbi-chart-recommendation",
             "skill_args": [],
             "thought": "先做图表推荐",
         }

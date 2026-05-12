@@ -1,7 +1,7 @@
 interface:
   display_name: "Chart Recommendation"
   short_description: "Recommend BI charts from analysis intent, query intent, and result data."
-  default_prompt: "Use $chart-recommendation to recommend a chart spec for a BI query result."
+  default_prompt: "Use $chatbi-chart-recommendation to recommend a chart spec for a BI query result."
 
 policy:
   allow_implicit_invocation: true

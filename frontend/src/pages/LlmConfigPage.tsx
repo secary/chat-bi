@@ -8,6 +8,7 @@ import {
   putLlmProfile,
   putLlmProfilesActive,
   putLlmProfilesReorder,
+  putLlmSettings,
 } from '../api/client';
 import type { LlmProfilePublic, LlmSettingsView } from '../types/admin';
 import { logger } from '../lib/logger';
@@ -21,6 +22,7 @@ function profileToForm(p: LlmProfilePublic) {
     model: p.model ?? '',
     apiBase: p.api_base ?? '',
     apiKey: '',
+    supportsVision: p.supports_vision ?? false,
   };
 }
 
@@ -30,10 +32,12 @@ export function LlmConfigPage() {
   const [model, setModel] = useState('');
   const [apiBase, setApiBase] = useState('');
   const [apiKey, setApiKey] = useState('');
+  const [supportsVision, setSupportsVision] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState('');
   const [selectedKey, setSelectedKey] = useState<number | 'new'>('new');
   const [busyTest, setBusyTest] = useState<'all' | number | null>(null);
+  const [visionBusy, setVisionBusy] = useState(false);
 
   const profiles = view?.profiles ?? [];
   const activeProfileId =
@@ -64,6 +68,7 @@ export function LlmConfigPage() {
               setModel(f.model);
               setApiBase(f.apiBase);
               setApiKey('');
+              setSupportsVision(f.supportsVision);
               return;
             }
           }
@@ -73,6 +78,7 @@ export function LlmConfigPage() {
         setModel('');
         setApiBase('');
         setApiKey('');
+        setSupportsVision(false);
       } catch (e) {
         logger.error('llm settings', e);
       }
@@ -91,6 +97,7 @@ export function LlmConfigPage() {
     setModel(f.model);
     setApiBase(f.apiBase);
     setApiKey('');
+    setSupportsVision(f.supportsVision);
     setSaved('');
     setError('');
   };
@@ -111,6 +118,7 @@ export function LlmConfigPage() {
           api_base: apiBase.trim() || null,
         };
         if (apiKey.trim()) payload.api_key = apiKey.trim();
+        payload.supports_vision = supportsVision;
         await postLlmProfile(payload);
       } else {
         const payload: Parameters<typeof putLlmProfile>[1] = {
@@ -119,6 +127,7 @@ export function LlmConfigPage() {
           api_base: apiBase.trim() || null,
         };
         if (apiKey.trim()) payload.api_key = apiKey.trim();
+        payload.supports_vision = supportsVision;
         await putLlmProfile(selectedKey, payload);
       }
       const v = await refreshView();
@@ -199,6 +208,7 @@ export function LlmConfigPage() {
           setModel('');
           setApiBase('');
           setApiKey('');
+          setSupportsVision(false);
         }
       }
     } catch (e) {
@@ -222,6 +232,56 @@ export function LlmConfigPage() {
           API Key：{view?.effective_api_key_set ? '已配置' : '未配置'}
         </div>
       </div>
+      <div className="mb-4 max-w-xl rounded-xl border border-gray-200 bg-surface p-3.5 text-sm text-gray-800 shadow-card">
+        <div className="font-medium text-gray-900">图像识读</div>
+        {view?.vision_disabled_by_env ? (
+          <p className="mt-2 text-xs text-gray-600">
+            进程环境已设置 CHATBI_VISION_DISABLED，图像结构化抽取已关闭。
+          </p>
+        ) : null}
+        {!view?.vision_disabled_by_env && view && view.vision_extract_enabled === false ? (
+          <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            未配置专用视觉模型档案，且当前对话默认模型未标记「支持多模态图像」时，上传图片将无法结构化识读。请在下方选择专用视觉档案，或在档案表单中勾选「该模型支持多模态图像」。
+          </p>
+        ) : null}
+        {!view?.vision_disabled_by_env && view?.vision_extract_enabled ? (
+          <p className="mt-2 text-xs text-emerald-700">当前已具备图像识读所需的模型配置。</p>
+        ) : null}
+        <label className="mt-3 block text-xs text-gray-500">
+          <span className="mb-1 block text-sm text-gray-700">专用视觉模型档案（可选）</span>
+          <select
+            className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30 disabled:opacity-50"
+            disabled={visionBusy}
+            value={view?.vision_profile_id ?? ''}
+            onChange={(e) => {
+              const raw = e.target.value;
+              const next = raw === '' ? null : Number(raw);
+              if (raw !== '' && Number.isNaN(next)) return;
+              void (async () => {
+                try {
+                  setVisionBusy(true);
+                  await putLlmSettings({ vision_profile_id: next });
+                  await refreshView();
+                } catch (err) {
+                  logger.error('vision profile setting', err);
+                } finally {
+                  setVisionBusy(false);
+                }
+              })();
+            }}
+          >
+            <option value="">未配置（按主模型多模态选项）</option>
+            {profiles.map((p) => (
+              <option key={p.id} value={p.id}>
+                {(p.display_name || p.model).trim() || p.model} — {p.model}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="mt-2 text-xs text-gray-500">
+          若设置了专用视觉档案，识图将仅使用该档案，不会回退到列表中的其它模型。
+        </p>
+      </div>
       <p className="mb-4 max-w-4xl text-xs text-gray-500">
         保存多条模型后，右侧可切换「对话默认」；请求失败时会按列表顺序（当前选用优先，其余从上到下）自动尝试其它模型。
       </p>
@@ -240,6 +300,8 @@ export function LlmConfigPage() {
             setApiBase={setApiBase}
             apiKey={apiKey}
             setApiKey={setApiKey}
+            supportsVision={supportsVision}
+            setSupportsVision={setSupportsVision}
             selectedKey={selectedKey}
             profiles={profiles}
             saved={saved}
@@ -253,6 +315,7 @@ export function LlmConfigPage() {
               setModel('');
               setApiBase('');
               setApiKey('');
+              setSupportsVision(false);
               setSaved('');
               setError('');
             }}
@@ -271,6 +334,7 @@ export function LlmConfigPage() {
               setModel('');
               setApiBase('');
               setApiKey('');
+              setSupportsVision(false);
               setSaved('');
               setError('');
             }}

@@ -48,7 +48,9 @@ services:
     build:
       context: ./frontend
       args:
-        VITE_API_BASE_URL: ${FRONTEND_API_BASE_URL:-http://localhost:8000}
+        # Same-origin /api (see frontend/nginx.conf). Not taken from root .env to avoid
+        # stale FRONTEND_API_BASE_URL=http://localhost:8000 breaking the prod bundle.
+        VITE_API_BASE_URL: /api
     container_name: chatbi-prod-frontend
     restart: unless-stopped
     ports:

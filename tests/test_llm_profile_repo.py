@@ -20,12 +20,14 @@ class LlmProfileRepoTest(unittest.TestCase):
                 "health_status": "ok",
                 "health_detail": None,
                 "health_checked_at": None,
+                "supports_vision": 0,
                 "created_at": None,
                 "updated_at": None,
             }
         )
         self.assertEqual(view["id"], 3)
         self.assertTrue(view["api_key_set"])
+        self.assertFalse(view["supports_vision"])
         self.assertNotIn("api_key", view)
 
 

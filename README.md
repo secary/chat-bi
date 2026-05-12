@@ -17,6 +17,8 @@ docker compose up -d --build
 open http://localhost:5173
 ```
 
+前端通过 **同源路径 `/api`** 访问后端（nginx 反代到容器 `backend`），避免浏览器跨端口 CORS。`docker-compose.yml` 构建参数已**固定为 `/api`**，不再读取根目录 `.env` 里的 `FRONTEND_API_BASE_URL`，避免旧配置写成 `http://localhost:8000` 导致打包后仍直连 8000。单独构建前端镜像时可用 `--build-arg VITE_API_BASE_URL=...` 覆盖。
+
 服务端口：
 
 | 服务 | 宿主机端口 |
@@ -37,6 +39,21 @@ open http://localhost:5173
 | 密码 | `admin123` |
 
 对外或生产部署前请修改密码，并通过「用户管理」创建业务账号。
+
+### Docker：登录报 500（Internal Server Error）
+
+常见原因是 **MySQL 数据目录来自旧版本**：官方镜像只在**空数据目录**时执行一次 `database/init.sql`。若 `./database/mysql-data` 早已存在，升级仓库里的 `init.sql` 后也不会自动补库，导致缺少 `chatbi_app` / `chatbi_admin`，登录时后端连接 `chatbi_app` 会报 `1044 Access denied` 或类似错误（容器日志里可见 `pymysql.err.OperationalError`）。
+
+**处理（会清空该环境 MySQL 中的演示数据，请先备份需要保留的内容）：**
+
+```bash
+docker compose down
+# Windows PowerShell：Remove-Item -Recurse -Force .\database\mysql-data
+# 或手动删除/重命名项目下的 database/mysql-data 目录
+docker compose up -d
+```
+
+重新拉起后，确认容器内存在库 `chatbi_app`（含表 `app_user`）后再登录 `admin` / `admin123`。
 
 ## 本地开发启动
 
@@ -202,7 +219,7 @@ chat-bi/
 | `CHATBI_LOG_DB_USER` | 日志库用户 |
 | `CHATBI_LOG_DB_PASSWORD` | 日志库密码 |
 | `CHATBI_LOG_DB_NAME` | 日志库库名（默认 `chatbi_logs`） |
-| `FRONTEND_API_BASE_URL` | 前端指向的后端地址（默认 `http://localhost:8000`） |
+| `FRONTEND_API_BASE_URL` | 可选；本地备忘用。生产 compose **不再**用该变量参与前端构建（已固定 `/api`）。分域部署请对 `frontend` 镜像使用 `--build-arg VITE_API_BASE_URL=...` |
 
 数据库职责建议：
 

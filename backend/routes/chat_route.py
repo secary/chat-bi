@@ -181,7 +181,7 @@ async def chat(
         # --- End vision enrichment ---
 
         try:
-            # call llm to get response.
+            #call llm to get response.
             async for event in stream_chat(
                 messages,
                 trace_id=trace_id,

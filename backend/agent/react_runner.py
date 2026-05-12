@@ -5,6 +5,7 @@ from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from backend.agent.executor import (
     find_skill,
+    latest_user_upload_path,
     run_script,
     skill_result_log_payload,
     skill_args_for_execution,
@@ -82,6 +83,57 @@ def _sink_write(
         return
     sink["last_result"] = last_result
     sink["last_skill_name"] = last_skill_name
+
+
+def _rows_for_followup_chart(result: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    if not isinstance(result, dict):
+        return []
+    data = result.get("data")
+    if not isinstance(data, dict):
+        return []
+    rows = data.get("rows")
+    if isinstance(rows, list) and rows:
+        return rows
+    preview_rows = data.get("preview_rows")
+    if isinstance(preview_rows, list) and preview_rows:
+        return preview_rows
+    return []
+
+
+def _chart_recommendation_args(
+    user_text: str,
+    plan_args: List[str],
+    last_result: Optional[Dict[str, Any]],
+) -> List[str]:
+    rows = _rows_for_followup_chart(last_result)
+    if not rows:
+        return plan_args or [user_text]
+    payload = {"question": user_text, "rows": rows}
+    return [json.dumps(payload, ensure_ascii=False)]
+
+
+def _has_upload_context(messages: List[Dict[str, str]]) -> bool:
+    return bool(latest_user_upload_path(messages))
+
+
+def _is_visual_request(text: str) -> bool:
+    markers = ("画图", "图表", "可视化", "展示")
+    return bool(text) and any(marker in text for marker in markers)
+
+
+def _enforce_upload_skill(
+    skill_name: str,
+    user_text: str,
+    messages: List[Dict[str, str]],
+    last_result: Optional[Dict[str, Any]],
+) -> str:
+    if not _has_upload_context(messages):
+        return skill_name
+    if skill_name != "chatbi-semantic-query":
+        return skill_name
+    if _rows_for_followup_chart(last_result) and _is_visual_request(user_text):
+        return "chatbi-chart-recommendation"
+    return "chatbi-file-ingestion"
 
 
 async def stream_chat_react(
@@ -230,6 +282,7 @@ async def stream_chat_react(
             yield {"type": "error", "content": "call_skill 缺少有效的 skill 名称。"}
             yield {"type": "done", "content": None}
             return
+        skill_name = _enforce_upload_skill(skill_name, user_text, messages, last_result)
 
         skill_doc = find_skill(skills, skill_name)
         if not skill_doc:
@@ -249,7 +302,10 @@ async def stream_chat_react(
             return ["/tmp/chatbi-uploads/xxx.csv", "--sheet", "Sheet1"]
             assistant_note: {"action": "call_skill", "skill": "chatbi-file-ingestion", "skill_args": ["/tmp/chatbi-uploads/xxx.csv", "--sheet", "Sheet1"]}
         """
-        args = skill_args_for_execution(skill_name, plan.get("skill_args") or [], messages)
+        raw_args = plan.get("skill_args") or []
+        args = skill_args_for_execution(skill_name, raw_args, messages)
+        if skill_name == "chatbi-chart-recommendation":
+            args = _chart_recommendation_args(user_text, args, last_result)
         assistant_note = json.dumps(
             {"action": "call_skill", "skill": skill_name, "skill_args": args},
             ensure_ascii=False,

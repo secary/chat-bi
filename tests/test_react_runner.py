@@ -268,6 +268,169 @@ class ReactRunnerTest(unittest.TestCase):
 
         asyncio.run(run())
 
+    def test_chart_recommendation_receives_rows_from_previous_skill_result(self):
+        first = {
+            "action": "call_skill",
+            "skill": "chatbi-file-ingestion",
+            "skill_args": ["请分析上传文件并画图"],
+            "thought": "先读取上传文件",
+        }
+        second = {
+            "action": "call_skill",
+            "skill": "chatbi-chart-recommendation",
+            "skill_args": ["请生成图表"],
+            "thought": "基于结果推荐图表",
+        }
+        third = {
+            "action": "finish",
+            "text": "图表已生成。",
+            "chart_plan": None,
+            "kpi_cards": [],
+        }
+        file_result = {
+            "kind": "file_ingestion",
+            "text": "文件读取完成",
+            "data": {
+                "rows": [
+                    {"区域": "华东", "销售额": "613000"},
+                    {"区域": "华南", "销售额": "402000"},
+                ]
+            },
+        }
+        chart_result = {
+            "kind": "chart_recommendation",
+            "text": "推荐使用bar图展示当前结果。",
+            "data": {"recommendation": {"status": "ready", "recommended_chart": "bar"}},
+            "charts": [
+                {
+                    "xAxis": {"type": "category", "data": ["华东", "华南"]},
+                    "yAxis": {"type": "value"},
+                    "series": [{"type": "bar", "data": [613000, 402000]}],
+                }
+            ],
+        }
+
+        async def run():
+            cfg = replace(settings, agent_react=True, agent_max_steps=6)
+            with patch("backend.agent.react_runner.settings", cfg):
+                with patch(
+                    "backend.agent.react_runner.call_llm_for_react_step",
+                    new_callable=AsyncMock,
+                ) as mock_llm:
+                    mock_llm.side_effect = [first, second, third]
+                    seen_args = []
+
+                    def _run_script(skill_doc, args, **kwargs):
+                        seen_args.append((skill_doc.name, args))
+                        if skill_doc.name == "chatbi-file-ingestion":
+                            return file_result
+                        if skill_doc.name == "chatbi-chart-recommendation":
+                            return chart_result
+                        raise AssertionError(f"unexpected skill {skill_doc.name}")
+
+                    with patch("backend.agent.react_runner.run_script", side_effect=_run_script):
+                        events = await _collect(
+                            stream_chat_react(
+                                [
+                                    {
+                                        "role": "user",
+                                        "content": "请根据我上传的文件生成可视化图表",
+                                    }
+                                ],
+                                trace_id="t6",
+                            )
+                        )
+                        chart_call = next(
+                            args
+                            for name, args in seen_args
+                            if name == "chatbi-chart-recommendation"
+                        )
+                        self.assertEqual(len(chart_call), 1)
+                        self.assertIn('"rows"', chart_call[0])
+                        self.assertIn('"question"', chart_call[0])
+                        self.assertTrue([e for e in events if e.get("type") == "chart"])
+
+        asyncio.run(run())
+
+    def test_upload_context_rewrites_semantic_query_to_chart_recommendation(self):
+        first = {
+            "action": "call_skill",
+            "skill": "chatbi-file-ingestion",
+            "skill_args": ["请分析上传文件并画图"],
+            "thought": "先读取上传文件",
+        }
+        second = {
+            "action": "call_skill",
+            "skill": "chatbi-semantic-query",
+            "skill_args": ["生成可视化图表"],
+            "thought": "继续处理",
+        }
+        third = {
+            "action": "finish",
+            "text": "图表已生成。",
+            "chart_plan": None,
+            "kpi_cards": [],
+        }
+        file_result = {
+            "kind": "file_ingestion",
+            "text": "文件读取完成",
+            "data": {
+                "rows": [
+                    {"区域": "华东", "销售额": "613000"},
+                    {"区域": "华南", "销售额": "402000"},
+                ]
+            },
+        }
+        chart_result = {
+            "kind": "chart_recommendation",
+            "text": "推荐使用bar图展示当前结果。",
+            "data": {"recommendation": {"status": "ready", "recommended_chart": "bar"}},
+            "charts": [
+                {
+                    "xAxis": {"type": "category", "data": ["华东", "华南"]},
+                    "yAxis": {"type": "value"},
+                    "series": [{"type": "bar", "data": [613000, 402000]}],
+                }
+            ],
+        }
+
+        async def run():
+            cfg = replace(settings, agent_react=True, agent_max_steps=6)
+            with patch("backend.agent.react_runner.settings", cfg):
+                with patch(
+                    "backend.agent.react_runner.call_llm_for_react_step",
+                    new_callable=AsyncMock,
+                ) as mock_llm:
+                    mock_llm.side_effect = [first, second, third]
+                    seen = []
+
+                    def _run_script(skill_doc, args, **kwargs):
+                        seen.append(skill_doc.name)
+                        if skill_doc.name == "chatbi-file-ingestion":
+                            return file_result
+                        if skill_doc.name == "chatbi-chart-recommendation":
+                            return chart_result
+                        raise AssertionError(f"unexpected skill {skill_doc.name}")
+
+                    with patch("backend.agent.react_runner.run_script", side_effect=_run_script):
+                        events = await _collect(
+                            stream_chat_react(
+                                [
+                                    {
+                                        "role": "user",
+                                        "content": "请读取我上传的文件 /tmp/chatbi-uploads/sample.csv 然后生成可视化图表",
+                                    }
+                                ],
+                                trace_id="t7",
+                            )
+                        )
+                        self.assertEqual(
+                            seen, ["chatbi-file-ingestion", "chatbi-chart-recommendation"]
+                        )
+                        self.assertTrue([e for e in events if e.get("type") == "chart"])
+
+        asyncio.run(run())
+
 
 if __name__ == "__main__":
     unittest.main()

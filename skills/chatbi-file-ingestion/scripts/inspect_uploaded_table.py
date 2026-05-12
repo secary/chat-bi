@@ -14,7 +14,7 @@ SKILLS_DIR = SCRIPT_DIR.parents[1]
 sys.path.insert(0, str(SKILLS_DIR))
 
 from _shared.output import skill_response  # noqa: E402
-
+from _analysis import analyze_known_table, pandas_profile  # noqa: E402
 
 Schema = Dict[str, Dict[str, str]]
 
@@ -116,9 +116,7 @@ def normalize_headers(headers: List[str]) -> Dict[str, str]:
 
 
 def infer_table(fields: List[str]) -> Optional[str]:
-    scores = {
-        table: len(set(fields) & set(schema.keys())) for table, schema in SCHEMAS.items()
-    }
+    scores = {table: len(set(fields) & set(schema.keys())) for table, schema in SCHEMAS.items()}
     best_table, best_score = max(scores.items(), key=lambda item: item[1])
     return best_table if best_score > 0 else None
 
@@ -184,29 +182,55 @@ def inspect_file(
     headers, rows = read_table(path)
     header_map = normalize_headers(headers)
     normalized_fields = list(header_map.values())
-    target_table = table or infer_table(normalized_fields)
-    if not target_table:
-        raise ValueError("无法从表头识别 sales_order 或 customer_profile")
-    if target_table not in SCHEMAS:
-        raise ValueError(f"不支持的目标表：{target_table}")
-
-    required = set(SCHEMAS[target_table].keys())
-    present = set(normalized_fields)
-    missing = sorted(required - present)
     unknown = [header for header in headers if header not in header_map]
-    normalized_rows, type_errors = validate_rows(rows, header_map, target_table)
-    preview_rows = normalized_rows[:sample_size]
-    valid = not missing and not type_errors
-    text = (
-        f"已读取 {path.name}，识别为 {target_table}，"
-        f"共 {len(rows)} 行，校验{'通过' if valid else '未通过'}。"
-    )
+    target_table = table or infer_table(normalized_fields)
+    missing: List[str] = []
+    normalized_rows: List[Dict[str, Any]] = []
+    type_errors: List[Dict[str, Any]] = []
+    valid = False
+    analysis_mode = "pandas_fallback"
+    analysis: Dict[str, Any]
+    preview_rows: List[Dict[str, Any]]
+    rows_output: List[Dict[str, Any]]
+
+    if target_table in SCHEMAS:
+        required = set(SCHEMAS[target_table].keys())
+        present = set(normalized_fields)
+        missing = sorted(required - present)
+        normalized_rows, type_errors = validate_rows(rows, header_map, target_table)
+        valid = not missing and not type_errors
+
+    if valid and target_table:
+        analysis_mode = "schema_direct"
+        analysis = analyze_known_table(target_table, normalized_rows)
+        preview_rows = normalized_rows[:sample_size]
+        rows_output = normalized_rows if include_rows else []
+        text = (
+            f"已读取 {path.name}，匹配到业务表 {target_table}，共 {len(rows)} 行，"
+            "字段校验通过，已按现有库表口径直接分析。"
+        )
+    else:
+        fallback = pandas_profile(path, sample_size, include_rows)
+        analysis = fallback["analysis"]
+        preview_rows = fallback["preview_rows"]
+        rows_output = fallback["rows"] if include_rows else []
+        if target_table in SCHEMAS:
+            text = (
+                f"已读取 {path.name}，候选业务表为 {target_table}，共 {len(rows)} 行，"
+                "但字段校验未通过，已切换为 Pandas 通用分析。"
+            )
+        else:
+            text = (
+                f"已读取 {path.name}，共 {len(rows)} 行，未匹配到现有业务表，"
+                "已切换为 Pandas 通用分析。"
+            )
     return skill_response(
         "file_ingestion",
         text,
         data={
             "file": str(path),
             "table": target_table,
+            "requested_table": table,
             "row_count": len(rows),
             "headers": headers,
             "normalized_headers": header_map,
@@ -214,8 +238,10 @@ def inspect_file(
             "unknown_columns": unknown,
             "type_errors": type_errors[:50],
             "preview_rows": preview_rows,
-            "rows": normalized_rows if valid and include_rows else [],
+            "rows": rows_output,
             "valid": valid,
+            "analysis_mode": analysis_mode,
+            "analysis": analysis,
         },
     )
 
@@ -233,9 +259,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     try:
-        result = inspect_file(
-            Path(args.file_path), args.table, args.sample_size, args.include_rows
-        )
+        result = inspect_file(Path(args.file_path), args.table, args.sample_size, args.include_rows)
     except Exception as exc:
         if args.json:
             print(json.dumps(skill_response("error", str(exc)), ensure_ascii=False))

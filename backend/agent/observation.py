@@ -8,6 +8,11 @@ turn skill result into a compact json string format for llm input.
 """
 
 
+"""
+turn skill result into a compact json string format for llm input.
+"""
+
+
 def summarize_observation(skill_name: str, result: Dict[str, Any]) -> str:
     """Compact JSON string for LLM context; avoids dumping full wide tables."""
     kind = result.get("kind", "")

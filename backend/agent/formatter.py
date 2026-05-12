@@ -12,6 +12,13 @@ text, chart, charts, kpi_cards.
 """
 
 
+"""
+turn agent result into server event stream to show on the frontend page.
+text, chart, charts, kpi_cards.
+
+"""
+
+
 async def stream_result_events(
     skill_name: str, plan: Dict[str, Any], result: Dict[str, Any]
 ) -> AsyncGenerator[Dict[str, Any], None]:

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import stat
 import subprocess
 import tempfile
@@ -23,6 +22,7 @@ class BootstrapDevScriptTest(unittest.TestCase):
         (repo / "scripts/bootstrap_dev.sh").write_text(
             bootstrap_source.read_text(encoding="utf-8"),
             encoding="utf-8",
+            newline="\n",
         )
         (repo / "scripts/bootstrap_dev.sh").chmod(
             (repo / "scripts/bootstrap_dev.sh").stat().st_mode | stat.S_IEXEC
@@ -38,24 +38,21 @@ class BootstrapDevScriptTest(unittest.TestCase):
             python_bin = repo / ".venv/bin/python"
             python_bin.parent.mkdir(parents=True, exist_ok=True)
             python_bin.write_text(
-                "#!/usr/bin/env bash\n"
-                'echo "$@" > "${TMPDIR:-/tmp}/chatbi-bootstrap-format.log"\n',
+                "#!/usr/bin/env bash\n" 'echo "$@" > chatbi-bootstrap-format.log\n',
                 encoding="utf-8",
+                newline="\n",
             )
             python_bin.chmod(python_bin.stat().st_mode | stat.S_IEXEC)
 
             frontend_modules = repo / "frontend/node_modules"
             frontend_modules.mkdir(parents=True, exist_ok=True)
 
-            env = os.environ.copy()
-            env["TMPDIR"] = temp_dir
             result = subprocess.run(
                 ["bash", "scripts/bootstrap_dev.sh"],
                 cwd=repo,
                 check=True,
                 capture_output=True,
                 text=True,
-                env=env,
             )
 
             hook_path = subprocess.run(
@@ -67,7 +64,7 @@ class BootstrapDevScriptTest(unittest.TestCase):
             ).stdout.strip()
             self.assertEqual(hook_path, ".githooks")
 
-            log_file = Path(temp_dir) / "chatbi-bootstrap-format.log"
+            log_file = repo / "chatbi-bootstrap-format.log"
             self.assertTrue(log_file.is_file())
             self.assertIn("scripts/format_code.py", log_file.read_text(encoding="utf-8"))
             self.assertIn("[bootstrap] .env.dev found", result.stdout)

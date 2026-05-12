@@ -64,6 +64,7 @@ def scan_skills_for_slugs(skills_dir: Path, slugs: Sequence[str]) -> List[SkillD
             out.append(by_name[key])
     return out
 
+
 # Use for one round LLM search. (Not in used.)
 AGENT_SYSTEM_INSTRUCTION = """你是一个 ChatBI 数据分析助手，帮助用户用自然语言查询业务数据、管理语义别名、生成经营决策建议。
 
@@ -219,6 +220,7 @@ def _skills_markdown_lines(skills_docs: Sequence[SkillDoc]) -> List[str]:
             parts.append("```")
     return parts
 
+
 # used in one round llm search(Not in used.)
 def build_system_prompt(skills_docs: List[SkillDoc]) -> str:
     """Build the full system prompt including available skills (single-shot plan)."""
@@ -228,6 +230,7 @@ def build_system_prompt(skills_docs: List[SkillDoc]) -> str:
         *_skills_markdown_lines(skills_docs),
     ]
     return "\n".join(parts)
+
 
 # role + system prompt + skills_markdown_lines
 def build_react_system_prompt(skills_docs: List[SkillDoc]) -> str:

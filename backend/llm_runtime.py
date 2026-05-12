@@ -1,4 +1,5 @@
 """LiteLLM calls with multi-profile fallback."""
+
 # Auto fallback to other llm model if one model is not available.
 from __future__ import annotations
 

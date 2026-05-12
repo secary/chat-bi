@@ -10,7 +10,10 @@ from pydantic import BaseModel, Field
 from backend.app_llm import effective_llm_params, saved_settings_apply
 from backend import llm_profile_repo
 from backend import llm_settings_repo
-from backend.vision.vision_llm_runtime import compute_vision_extract_enabled, is_vision_disabled_by_env
+from backend.vision.vision_llm_runtime import (
+    compute_vision_extract_enabled,
+    is_vision_disabled_by_env,
+)
 from backend.http_utils import request_trace_id
 from backend.trace import log_event
 

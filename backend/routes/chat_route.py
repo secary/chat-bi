@@ -142,7 +142,7 @@ async def chat(
         acc: Dict[str, Any] = {"content": "", "thinking": []}
         disconnected = False
         try:
-            #call llm to get response.
+            # call llm to get response.
             async for event in stream_chat(
                 messages,
                 trace_id=trace_id,
@@ -212,6 +212,7 @@ async def chat(
                         str(exc),
                         level="WARN",
                     )
+
     # turn every stream_chat content into sse event.
     # it will turn yield contents into  text/event-stream
     # each data is a json string

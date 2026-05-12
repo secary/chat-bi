@@ -78,6 +78,14 @@ def _build_steps(
     ]
 
 
+"""
+The agent main entrance.
+if multi-agents mode is on, then goes to stream_chat_multi_agent
+otherwise, it goes to stream_chat_react. React(think-do-observe) mode.
+stream_chat_legacy is not in use by default. It is not ReAct mode.
+"""
+
+
 async def stream_chat(
     messages: List[Dict[str, str]],
     trace_id: str = "",

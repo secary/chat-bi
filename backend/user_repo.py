@@ -24,7 +24,7 @@ def get_by_id(user_id: int) -> Optional[Dict[str, Any]]:
 
 def list_users() -> List[Dict[str, Any]]:
     return app_fetch_all(
-        "SELECT id, username, role, is_active, created_at " "FROM app_user ORDER BY id ASC"
+        "SELECT id, username, role, is_active, created_at FROM app_user ORDER BY id ASC"
     )
 
 

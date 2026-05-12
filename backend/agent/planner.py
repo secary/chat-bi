@@ -4,15 +4,16 @@ import json
 import re
 from typing import Any, Dict, List, Optional
 
-from litellm import acompletion
+from backend.llm_runtime import chatbi_acompletion
 
-from backend.app_llm import effective_llm_params
+"""
+Each ReAct round, tell LLM should return "action", such as skill/finish/answer/done...
+"""
 
 
 async def call_llm_for_react_step(
     system_prompt: str, messages: List[Dict[str, str]]
 ) -> Optional[Dict[str, Any]]:
-    """One ReAct iteration: model returns JSON with `action` call_skill|finish."""
     llm_messages = [
         {"role": "system", "content": system_prompt},
         *messages,
@@ -23,8 +24,7 @@ async def call_llm_for_react_step(
     ]
 
     try:
-        resp = await acompletion(
-            **effective_llm_params(),
+        resp = await chatbi_acompletion(
             messages=llm_messages,
             response_format={"type": "json_object"},
             temperature=0.1,
@@ -36,6 +36,11 @@ async def call_llm_for_react_step(
     if not content:
         return None
     return parse_json_object(content)
+
+
+"""
+用于stream_chat_legacy中，默认不使用。
+"""
 
 
 async def call_llm_for_plan(
@@ -48,8 +53,7 @@ async def call_llm_for_plan(
     ]
 
     try:
-        resp = await acompletion(
-            **effective_llm_params(),
+        resp = await chatbi_acompletion(
             messages=llm_messages,
             response_format={"type": "json_object"},
             temperature=0.1,
@@ -61,6 +65,11 @@ async def call_llm_for_plan(
     if not content:
         return None
     return parse_json_object(content)
+
+
+"""
+
+"""
 
 
 def parse_json_object(content: str) -> Dict[str, Any]:

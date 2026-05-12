@@ -43,8 +43,7 @@ def update_session_title(session_id: int, user_id: int, title: str) -> None:
 
 def touch_session(session_id: int, user_id: int) -> None:
     app_execute(
-        "UPDATE chat_session SET updated_at = CURRENT_TIMESTAMP(6) "
-        "WHERE id = %s AND user_id = %s",
+        "UPDATE chat_session SET updated_at = CURRENT_TIMESTAMP(6) WHERE id = %s AND user_id = %s",
         (session_id, user_id),
     )
 

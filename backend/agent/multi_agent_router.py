@@ -5,11 +5,9 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, List, Optional
 
-from litellm import acompletion
-
 from backend.agent.multi_agent_registry import list_registry_agent_ids
 from backend.agent.planner import parse_json_object
-from backend.app_llm import effective_llm_params
+from backend.llm_runtime import chatbi_acompletion
 from backend.trace import log_event
 
 
@@ -51,8 +49,7 @@ async def call_route_llm(
         },
     ]
     try:
-        resp = await acompletion(
-            **effective_llm_params(),
+        resp = await chatbi_acompletion(
             messages=llm_messages,
             response_format={"type": "json_object"},
             temperature=0.1,

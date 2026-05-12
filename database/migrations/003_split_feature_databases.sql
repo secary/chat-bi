@@ -78,12 +78,30 @@ CREATE TABLE IF NOT EXISTS chatbi_admin.app_db_connection (
   UNIQUE KEY uq_app_db_connection_name (name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS chatbi_admin.llm_model_profile (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  display_name VARCHAR(128) NULL,
+  model VARCHAR(255) NOT NULL,
+  api_base VARCHAR(512) NULL,
+  api_key VARCHAR(512) NULL,
+  sort_order INT NOT NULL DEFAULT 0,
+  health_status VARCHAR(16) NOT NULL DEFAULT 'unknown',
+  health_detail VARCHAR(512) NULL,
+  health_checked_at DATETIME(6) NULL,
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  KEY idx_llm_model_profile_sort (sort_order, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS chatbi_admin.llm_settings (
   id INT PRIMARY KEY,
   model VARCHAR(255) NULL,
   api_base VARCHAR(512) NULL,
   api_key VARCHAR(512) NULL,
-  updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)
+  active_profile_id BIGINT NULL,
+  updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  CONSTRAINT fk_llm_settings_active_profile FOREIGN KEY (active_profile_id)
+    REFERENCES chatbi_admin.llm_model_profile (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT IGNORE INTO chatbi_app.app_user
@@ -127,12 +145,43 @@ ON DUPLICATE KEY UPDATE
   is_default = VALUES(is_default),
   created_at = VALUES(created_at);
 
+INSERT INTO chatbi_admin.llm_model_profile
+  (display_name, model, api_base, api_key, sort_order, health_status, created_at, updated_at)
+SELECT
+  NULL,
+  CASE
+    WHEN NULLIF(TRIM(ls.model), '') IS NOT NULL THEN TRIM(ls.model)
+    ELSE 'openai/gpt-4o-mini'
+  END,
+  NULLIF(TRIM(ls.api_base), ''),
+  NULLIF(TRIM(ls.api_key), ''),
+  0,
+  'unknown',
+  ls.updated_at,
+  ls.updated_at
+FROM chatbi_demo.llm_settings ls
+WHERE ls.id = 1
+  AND (
+    NULLIF(TRIM(ls.model), '') IS NOT NULL
+    OR NULLIF(TRIM(ls.api_base), '') IS NOT NULL
+    OR NULLIF(TRIM(ls.api_key), '') IS NOT NULL
+  )
+  AND NOT EXISTS (SELECT 1 FROM chatbi_admin.llm_model_profile);
+
 INSERT INTO chatbi_admin.llm_settings
-  (id, model, api_base, api_key, updated_at)
-SELECT id, model, api_base, api_key, updated_at
-FROM chatbi_demo.llm_settings
+  (id, model, api_base, api_key, active_profile_id, updated_at)
+SELECT
+  ls.id,
+  CASE WHEN EXISTS (SELECT 1 FROM chatbi_admin.llm_model_profile p) THEN NULL ELSE ls.model END,
+  CASE WHEN EXISTS (SELECT 1 FROM chatbi_admin.llm_model_profile p) THEN NULL ELSE ls.api_base END,
+  CASE WHEN EXISTS (SELECT 1 FROM chatbi_admin.llm_model_profile p) THEN NULL ELSE ls.api_key END,
+  (SELECT MIN(p.id) FROM chatbi_admin.llm_model_profile p),
+  ls.updated_at
+FROM chatbi_demo.llm_settings ls
+WHERE ls.id = 1
 ON DUPLICATE KEY UPDATE
   model = VALUES(model),
   api_base = VALUES(api_base),
   api_key = VALUES(api_key),
+  active_profile_id = VALUES(active_profile_id),
   updated_at = VALUES(updated_at);

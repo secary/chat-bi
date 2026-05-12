@@ -5,10 +5,8 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, List, Optional
 
-from litellm import acompletion
-
 from backend.agent.planner import parse_json_object
-from backend.app_llm import effective_llm_params
+from backend.llm_runtime import chatbi_acompletion
 from backend.trace import log_event
 
 SUMMARY_SYSTEM = """你是 ChatBI「汇总专线」：综合多条专线工具返回的 Observation 摘要，生成一份连贯、可执行的 Markdown 回答。
@@ -43,8 +41,7 @@ async def call_summarize_llm(
         {"role": "user", "content": body},
     ]
     try:
-        resp = await acompletion(
-            **effective_llm_params(),
+        resp = await chatbi_acompletion(
             messages=llm_messages,
             response_format={"type": "json_object"},
             temperature=0.2,

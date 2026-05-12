@@ -102,8 +102,7 @@ def upsert_long_term(user_id: int, content: str) -> None:
         )
         return
     app_execute(
-        "INSERT INTO user_memory (user_id, kind, title, content) "
-        "VALUES (%s, 'long_term', %s, %s)",
+        "INSERT INTO user_memory (user_id, kind, title, content) VALUES (%s, 'long_term', %s, %s)",
         (user_id, "用户习惯与偏好", content),
     )
 

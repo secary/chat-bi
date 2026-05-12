@@ -14,6 +14,7 @@ from backend.auth_deps import get_current_user, require_admin
 from backend.http_utils import request_trace_id
 from backend.routes.admin_db_route import router as admin_db_router
 from backend.routes.admin_llm_route import router as admin_llm_router
+from backend.routes.admin_llm_profiles_route import router as admin_llm_profiles_router
 from backend.routes.admin_multi_agents_route import router as admin_multi_agents_router
 from backend.routes.admin_skills_route import router as admin_skills_router
 from backend.routes.admin_users_route import router as admin_users_router
@@ -52,6 +53,7 @@ app.include_router(
 )
 app.include_router(sessions_router)
 app.include_router(admin_llm_router, dependencies=[Depends(require_admin)])
+app.include_router(admin_llm_profiles_router, dependencies=[Depends(require_admin)])
 app.include_router(admin_db_router, dependencies=[Depends(require_admin)])
 app.include_router(admin_skills_router, dependencies=[Depends(require_admin)])
 app.include_router(admin_multi_agents_router, dependencies=[Depends(require_admin)])

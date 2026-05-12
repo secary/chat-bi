@@ -88,6 +88,14 @@ def admin_execute(sql: str, args: Optional[tuple[Any, ...]] = None) -> int:
             return cur.execute(sql, args or ())
 
 
+def admin_execute_lastrowid(sql: str, args: Optional[tuple[Any, ...]] = None) -> int:
+    """Run INSERT on admin DB and return LAST_INSERT_ID from the same connection/session."""
+    with admin_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, args or ())
+            return int(cur.lastrowid)
+
+
 def test_mysql_connection(
     host: str,
     port: int,

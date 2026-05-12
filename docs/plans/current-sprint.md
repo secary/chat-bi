@@ -3,11 +3,13 @@
 > 状态标记：📋 待开始 | 🚧 进行中 | ✅ 已完成 | ❌ 有问题
 
 ## 迭代目标
+
 完成 ChatBI MVP：初始化演示数据库和语义层，验证 3 个 Skill 脚本，接入 Agent + FastAPI SSE，并实现 React 前端对话、思考步骤、图表和 KPI 卡片渲染。
 
 ## 任务清单
 
 ### 任务 1：数据库初始化
+
 - 状态：✅ 已完成
 - 验收标准：
   - [x] `docker compose up` 可以启动 MySQL 8.0
@@ -17,11 +19,13 @@
 - 复杂度：中
 
 ### 任务 2：Skill 脚本验证
+
 - 状态：📋 待开始（用户要求暂时跳过）
 - 验收标准同上
 - 复杂度：中
 
 ### 任务 3：Agent Skill 调度
+
 - 状态：✅ 已完成
 - 验收标准：
   - [x] AgentRunner 读取 `skills/*/SKILL.md`
@@ -33,6 +37,7 @@
 - 复杂度：高
 
 ### 任务 4：FastAPI SSE 接口
+
 - 状态：✅ 已完成
 - 验收标准：
   - [x] `POST /chat` 接收用户消息和会话历史
@@ -42,6 +47,7 @@
 - 复杂度：高
 
 ### 任务 5：前端对话界面
+
 - 状态：✅ 已完成
 - 验收标准：
   - [x] `useChat` 管理消息列表、SSE 连接、输入和 loading 状态
@@ -51,6 +57,7 @@
 - 复杂度：高
 
 ### 任务 6：图表与 KPI 渲染
+
 - 状态：✅ 已完成
 - 验收标准：
   - [x] 支持柱状图、折线图、饼图
@@ -62,6 +69,7 @@
 - 复杂度：中
 
 ### 任务 7：端到端联调验收
+
 - 状态：🔄 待开始（需先配置 LLM API Key）
 - 验收标准：
   - [ ] 跑通自然语言问数场景
@@ -72,6 +80,7 @@
 - 复杂度：高
 
 ### 任务 8：会话记忆 + 管理导航（MVP）
+
 - 状态：✅ 已完成
 - 验收标准：
   - [x] `chatbi_demo` 增加 `chat_session` / `chat_message` / `skill_registry` / `app_db_connection` / `llm_settings`；`database/migrations/001_app_tables.sql` 供旧库增量执行
@@ -84,6 +93,7 @@
 - 复杂度：高
 
 ### 任务 9：数据仪表盘
+
 - 状态：✅ 已完成
 - 验收标准：
   - [x] `GET /dashboard/overview` 基于生效业务库（与 Skill 相同的连接解析）只读聚合 `sales_order`、`customer_profile` 及语义层表行数
@@ -93,6 +103,7 @@
 - 复杂度：中
 
 ### 任务 11：Multi-Agent、多模态与 PDF 报告
+
 - 状态：✅ 已完成
 - 验收标准：
   - [x] `skills/_agents/registry.yaml` 定义风控 / 营销 / 分析与 Skill 白名单；路由 LLM 输出专线列表（上限见 registry）；顺序执行专线并按 Observation 汇总输出；`POST /chat` 支持 `multi_agents`
@@ -104,6 +115,7 @@
 - 复杂度：高
 
 ### 任务 10：用户鉴权与长短期记忆（OpenClaw 风格 MVP）
+
 - 状态：✅ 已完成
 - 验收标准：
   - [x] `database/init.sql` 与 `database/migrations/002_users_and_memory.sql`：`app_user`、`chat_session.user_id`、`user_memory`；种子管理员 `admin` / `admin123`（部署后请改密）
@@ -116,6 +128,7 @@
 - 复杂度：高
 
 ### 任务 12：多 Agents 注册表管理（管理员）
+
 - 状态：✅ 已完成
 - 验收标准：
   - [x] `GET/PUT /admin/multi-agents` 读写 `skills/_agents/registry.yaml`（原子写入），校验专线 id、至少一条专线、技能 slug 须存在于 `scan_skills`

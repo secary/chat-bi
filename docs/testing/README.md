@@ -6,6 +6,7 @@ ChatBI 的测试先按功能模块组织执行入口，暂时保留 `tests/` 扁
 
 ```bash
 # 代码格式与 lint
+.venv/bin/python scripts/format_code.py
 .venv/bin/ruff check backend/ scripts/ tests/
 .venv/bin/black --check backend/ scripts/ tests/
 
@@ -15,6 +16,21 @@ PYTHONPATH=. .venv/bin/python scripts/run_tests.py quick -- -q
 # 前端
 cd frontend && npm run lint && npm run test && npm run build
 ```
+
+格式化自动化：
+
+```bash
+# 一次性启用 Git 提交前自动排版
+git config core.hooksPath .githooks
+
+# 或直接使用仓库引导脚本
+bash scripts/bootstrap_dev.sh
+
+# 只格式化当前已暂存文件
+.venv/bin/python scripts/format_code.py --staged
+```
+
+VS Code 工作区也已启用保存时自动格式化：Python 走 Black，前端走 ESLint fix。
 
 ## E2E 烟雾测试
 

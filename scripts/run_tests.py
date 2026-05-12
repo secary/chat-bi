@@ -23,7 +23,9 @@ def python_executable() -> str:
 
 MODULE_SUITES: dict[str, list[str]] = {
     "foundation": [
+        "tests/test_bootstrap_dev_script.py",
         "tests/test_env_loader.py",
+        "tests/test_format_code_script.py",
         "tests/test_http_utils.py",
         "tests/test_observation.py",
         "tests/test_skill_result_log_payload.py",

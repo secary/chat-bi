@@ -95,6 +95,34 @@ class SkillProtocolTest(unittest.TestCase):
             "识别时间范围：`order_date` >= '2026-01-01' AND `order_date` < '2026-05-01'",
         )
 
+    def test_does_not_build_finish_kpis_for_multi_row_table(self):
+        result = {
+            "kind": "table",
+            "text": "查询完成，共返回 2 条结果。",
+            "data": {
+                "rows": [
+                    {"区域": "华东", "毛利率": "0.3650"},
+                    {"区域": "华南", "毛利率": "0.3620"},
+                ]
+            },
+        }
+        llm_plan = {
+            "kpi_cards": [
+                {"label": "最高区域", "field": "区域", "unit": "", "status": "neutral"},
+                {"label": "毛利率", "field": "毛利率", "unit": "%", "status": "neutral"},
+            ]
+        }
+
+        async def collect():
+            return [
+                event
+                async for event in stream_result_events("chatbi-semantic-query", llm_plan, result)
+            ]
+
+        events = asyncio.run(collect())
+        kpi_events = [event for event in events if event.get("type") == "kpi_cards"]
+        self.assertEqual(kpi_events, [])
+
 
 if __name__ == "__main__":
     unittest.main()

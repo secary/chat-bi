@@ -155,7 +155,7 @@ async def extract_chart_table_from_image(
     )
     return result
 
-
+# turn graph into structure table in order to understand graph menaing. 
 async def enrich_last_user_message_with_vision(
     messages: List[Dict[str, str]],
     trace_id: str = "",

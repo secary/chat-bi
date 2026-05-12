@@ -17,7 +17,7 @@ _UPLOAD_PATH_RE = re.compile(r"/tmp/chatbi-uploads/[A-Za-z0-9._-]+", re.IGNORECA
 def find_skill(skills: List[SkillDoc], name: str) -> Optional[SkillDoc]:
     lower = name.lower()
     for doc in skills:
-        if lower in doc.name.lower():
+        if lower in doc.name.lower() or lower in doc.skill_dir.name.lower():
             return doc
     return None
 
@@ -29,8 +29,8 @@ def skill_args_for_execution(
         "chatbi-semantic-query",
         "chatbi-decision-advisor",
         "chatbi-semantic-processing",
-        "chart-recommendation",
-        "dashboard-orchestration",
+        "chatbi-chart-recommendation",
+        "chatbi-dashboard-orchestration",
     }:
         latest_user = latest_user_content(messages)
         if latest_user:

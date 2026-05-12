@@ -24,7 +24,10 @@ from backend.config import settings
 from backend.trace import log_event
 
 OBS_HEADER = "以下为工具执行后的 Observation（JSON 摘要），请基于事实继续推理：\n"
-_VISUAL_FIRST_SKILLS = {"chart-recommendation", "dashboard-orchestration"}
+_VISUAL_FIRST_SKILLS = {
+    "chatbi-chart-recommendation",
+    "chatbi-dashboard-orchestration",
+}
 
 
 def _merge_finish_result(
@@ -55,8 +58,9 @@ def _should_suppress_finish_text(
     last_skill_name: Optional[str], result: Optional[Dict[str, Any]]
 ) -> bool:
     """
-    Returns True when the last skill is a visual-first skill (chart-recommendation,
-    dashboard-orchestration) and already produced charts or KPIs, so the LLM finish
+    Returns True when the last skill is a visual-first skill
+    (chatbi-chart-recommendation, chatbi-dashboard-orchestration) and already
+    produced charts or KPIs, so the LLM finish
     text should not overwrite the visual content.
     """
     if last_skill_name not in _VISUAL_FIRST_SKILLS:

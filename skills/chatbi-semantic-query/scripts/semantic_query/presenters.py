@@ -33,9 +33,15 @@ def build_single_value_kpis(rows: Sequence[Dict[str, str]]) -> list[Dict[str, st
     if len(rows) != 1:
         return []
     columns = list(rows[0].keys())
-    if len(columns) != 1:
+    if len(columns) == 1:
+        metric_name = columns[0]
+    elif len(columns) == 2:
+        # Single-row grouped results such as "渠道=线上, 销售额=700000" are
+        # still effectively a single-value summary and should render as KPI
+        # instead of a one-bar chart.
+        metric_name = columns[1]
+    else:
         return []
-    metric_name = columns[0]
     raw_value = rows[0].get(metric_name)
     if is_nullish(raw_value):
         return []
@@ -84,6 +90,10 @@ def infer_chart_plan(question: str, rows: Sequence[Dict[str, str]]) -> Optional[
     dimension = columns[0]
     metrics = [col for col in columns[1:]]
     if not metrics:
+        return None
+
+    # A single row with one metric is better expressed as a KPI summary.
+    if len(rows) == 1 and len(metrics) == 1:
         return None
 
     if any(word in question for word in ["占比", "构成", "贡献", "比例", "份额"]):

@@ -9,6 +9,8 @@ from backend.llm_runtime import chatbi_acompletion
 """
 Each ReAct round, tell LLM should return "action", such as skill/finish/answer/done...
 """
+
+
 async def call_llm_for_react_step(
     system_prompt: str, messages: List[Dict[str, str]]
 ) -> Optional[Dict[str, Any]]:
@@ -39,6 +41,8 @@ async def call_llm_for_react_step(
 """
 用于stream_chat_legacy中，默认不使用。
 """
+
+
 async def call_llm_for_plan(
     system_prompt: str, messages: List[Dict[str, str]]
 ) -> Optional[Dict[str, Any]]:
@@ -66,6 +70,8 @@ async def call_llm_for_plan(
 """
 
 """
+
+
 def parse_json_object(content: str) -> Dict[str, Any]:
     text = content.strip()
     fence_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)

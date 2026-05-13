@@ -8,7 +8,6 @@ import io
 from datetime import datetime, timezone
 from typing import Any, Dict, List
 
-from backend.report.pdf_chart_png import echarts_option_to_png_bytes
 from backend.report.pdf_summary import _markdown_to_html, summarize_session_for_pdf
 
 
@@ -166,10 +165,6 @@ def _render_pdf_with_reportlab(messages: List[Dict[str, Any]], session_title: st
 
     summary = summarize_session_for_pdf(messages)
     summary_html = _markdown_to_html(summary)
-    # Strip HTML tags for plain-text fallback in ReportLab
-    import re
-
-    plain_summary = re.sub(r"<[^>]+>", "", summary_html)
     pngs = _chart_pngs(messages)
 
     buffer = io.BytesIO()
@@ -309,7 +304,7 @@ def _render_pdf_with_reportlab(messages: List[Dict[str, Any]], session_title: st
             scale = min(1.0, max_w / float(iw))
             w = iw * scale
             h = ih * scale
-            story.append(Paragraph(f"图表 {i}", body_style))
+            story.append(Paragraph(f"图表 {i}", caption_style))
             story.append(Spacer(1, 4))
             story.append(Image(io.BytesIO(png_bytes), width=w, height=h))
             story.append(Spacer(1, 8))

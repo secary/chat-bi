@@ -49,7 +49,7 @@
 
 | 编号 | Gap | 下一步 |
 |---|---|---|
-| G1 | 外部日志库 `127.0.0.1:33067/chatbi_local_logs` 在当前机器未验证可连 | 启动日志 MySQL 后执行 `database/migrations/007_move_trace_logs_to_local_db.sql`，用固定 trace-id 做写入查询 |
+| G1 | 日志库连接已改回 dev 主 MySQL 实例双库模式，README 与专题文档仍可能残留旧的外部 33067 或独立日志库表述 | 调整日志库相关文档，明确 dev 环境默认由 `demo-mysql` 同时承载 `chatbi_demo` 与 `chatbi_local_logs` |
 | G2 | Python 依赖存在 `pyproject.toml` 与 `requirements.txt` 双事实源 | 新增依赖时同步两处；长期可考虑 Docker/CI 也切到 `uv sync` 后移除双写 |
 | G3 | 在线 E2E 不进默认 CI，依赖 LLM / DB / 后端运行状态 | 后端和 LLM 可用时跑 `python scripts/e2e_smoke.py --cases S1,S4,E1` 或按需全量 |
 | G4 | 上传文件复杂跨字段分析 / 风控建议仍偏轻量规则 | 如要增强，新增上传数据分析或风控建议 Skill，不复用演示库 decision-advisor |
@@ -59,6 +59,7 @@
 
 | 轮次 | 完成内容 | 验证 |
 |---|---|---|
+| 126 | `docker-compose.dev.yml` 调整为 dev 单 MySQL 实例双库模式：后端日志库改为直连 `demo-mysql/chatbi_local_logs` | `git diff docker-compose.dev.yml` |
 | 121 | `AGENTS.md` 写入团队/Agent 环境对齐流程 | `format_code.py`、foundation |
 | 122 | 精简 Agent 编程入口：`bootstrap_dev.sh` 增加 `--sync` / `--format` / `--full`，默认轻量化；`AGENTS.md` 压缩到 40 行 | `bootstrap_dev.sh`、`format_code.py`、foundation |
 | 123 | 压缩本文件：保留当前事实、活跃 Gap、最近变更，移除完整历史流水账 | `format_code.py`、foundation |

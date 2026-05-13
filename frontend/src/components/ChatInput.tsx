@@ -34,7 +34,7 @@ export function ChatInput({ onSend, loading, disabled = false }: ChatInputProps)
       const isImage = /\.(png|jpg|jpeg|webp)$/i.test(file.name);
       const prompt = isImage
         ? `请读取我上传的图像 ${uploaded.server_path}，纳入分析`
-        : `请读取我上传的文件 ${uploaded.server_path}，按数据库表结构校验`;
+        : `请读取我上传的文件 ${uploaded.server_path}，先校验结构；如果符合现有业务表就直接分析，不符合就按通用表分析`;
       setMessage((current) => (current.trim() ? `${current.trim()}\n${prompt}` : prompt));
       setPendingTraceId(uploaded.trace_id || traceId);
     } catch (err) {

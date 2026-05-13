@@ -1,6 +1,6 @@
 ---
 name: chatbi-file-ingestion
-description: Use when Codex or another agent needs to read a user-uploaded CSV or Excel file for ChatBI, infer whether it matches the existing sales_order or customer_profile database table shape, validate required columns and basic value types, normalize Chinese or database field headers, and return a safe preview before any database import.
+description: Use when Codex or another agent needs to read a user-uploaded CSV or Excel file for ChatBI, validate whether it matches the existing sales_order or customer_profile schema, directly analyze matched business tables, and fall back to pandas-based generic analysis when the uploaded structure does not fit the governed tables.
 ---
 
 # ChatBI File Ingestion
@@ -11,9 +11,10 @@ Use this skill when the user wants ChatBI to read their own uploaded CSV or Exce
 
 1. Ask the application or caller for the local uploaded file path, then pass that path to `scripts/inspect_uploaded_table.py`.
 2. Let the script infer the target table from headers, or pass `--table sales_order` / `--table customer_profile` when the user specified the table.
-3. Use `--json` for agent or UI integration. The output follows the shared SkillResult shape.
-4. Review `missing_columns`, `unknown_columns`, `type_errors`, and `preview_rows` before importing data anywhere.
-5. If validation passes and a separate import workflow needs row data, rerun with `--include-rows` to include normalized rows in JSON.
+3. The script always validates headers and basic value types first.
+4. If the file fully matches `sales_order` or `customer_profile`, the skill returns `analysis_mode = schema_direct` and emits deterministic business analysis based on the governed table schema.
+5. If the file does not fully match those tables, the skill returns `analysis_mode = pandas_fallback` and emits a pandas-based generic profile: shape, dtypes, null counts, numeric summary, categorical top values, and preview rows.
+6. Use `--json` for agent or UI integration. If downstream analysis or charting needs full row data, rerun with `--include-rows`.
 
 ## Commands
 
@@ -37,7 +38,12 @@ Headers may use database field names or the current Chinese business names, such
 
 ## Presentation Guidance
 
-This skill should return a validation summary and a small preview table. Do not create business charts from unimported uploaded data unless the user explicitly asks for exploratory preview charts.
+This skill should first explain whether the upload matched a governed business table.
+
+- `schema_direct`: summarize business metrics and highlights from the uploaded rows using the matched table semantics.
+- `pandas_fallback`: summarize the uploaded file as a general-purpose table without pretending it is one of the governed business tables.
+
+Return a small preview table in both modes. Do not create business charts from unimported uploaded data unless the user explicitly asks for exploratory preview charts.
 
 ## Safety
 

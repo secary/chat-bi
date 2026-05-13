@@ -49,22 +49,33 @@ def _extract_payload(text: str) -> Any:
 
 def build_dashboard_package(question: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     overview = normalize_overview(payload)
+    dashboard_spec = build_dashboard_spec(question, overview)
     if not overview:
+        # 无数据时仍返回完整布局框架，并给出结构化的下一步指引
         return skill_response(
             kind="dashboard_orchestration",
-            text="看板编排需要先提供概览数据、图表结果或 KPI 输入。",
+            text=f"已基于「{question}」生成看板布局框架。缺少数据，暂时展示空白卡片布局，数据就绪后可自动填充。",
             data={
                 "dashboard_spec": {
+                    **dashboard_spec,
                     "status": "need_clarification",
                     "dashboard_intent": infer_dashboard_intent(question),
                     "dashboard_title": build_title(question),
-                    "warnings": [],
-                    "missing_inputs": ["dashboard_source_data"],
+                    "confidence": 0.5,
+                    "missing_inputs": [
+                        "kpis",
+                        "sales_by_region",
+                        "sales_by_month",
+                        "customer_by_region",
+                    ],
+                    "suggested_skill": "chatbi-semantic-query",
+                    "suggested_action": "获取数据后重新调用编排，或直接查询数据后由系统自动生成看板",
                 }
             },
+            charts=[],
+            kpis=[],
         )
 
-    dashboard_spec = build_dashboard_spec(question, overview)
     charts = build_dashboard_charts(overview)
     kpis = build_dashboard_kpis(overview)
     return skill_response(
@@ -111,10 +122,32 @@ def build_dashboard_spec(question: str, overview: Dict[str, Any]) -> Dict[str, A
         "widgets": [
             widget("sales_kpi", "kpi", "销售总额", "summary", 0, 0, 3, 2, "kpi_total_sales"),
             widget("row_count_kpi", "kpi", "订单明细条数", "summary", 3, 0, 3, 2, "kpi_row_count"),
-            widget("region_count_kpi", "kpi", "覆盖区域数", "summary", 6, 0, 3, 2, "kpi_region_count"),
+            widget(
+                "region_count_kpi", "kpi", "覆盖区域数", "summary", 6, 0, 3, 2, "kpi_region_count"
+            ),
             widget("sales_trend", "chart", "销售额趋势", "trend", 0, 2, 7, 4, "chart_sales_trend"),
-            widget("region_share", "chart", "销售额占比（按区域）", "breakdown", 7, 2, 5, 4, "chart_region_share"),
-            widget("active_customer", "chart", "活跃客户（按区域）", "detail", 0, 6, 12, 4, "chart_active_customer"),
+            widget(
+                "region_share",
+                "chart",
+                "销售额占比（按区域）",
+                "breakdown",
+                7,
+                2,
+                5,
+                4,
+                "chart_region_share",
+            ),
+            widget(
+                "active_customer",
+                "chart",
+                "活跃客户（按区域）",
+                "detail",
+                0,
+                6,
+                12,
+                4,
+                "chart_active_customer",
+            ),
         ],
         "interactions": [
             {
@@ -142,13 +175,28 @@ def build_dashboard_charts(overview: Dict[str, Any]) -> List[Dict[str, Any]]:
     charts: List[Dict[str, Any]] = []
     month_rows = stringify_rows(overview.get("sales_by_month", []))
     if month_rows:
-        charts.append(plan_to_option({"chart_type": "line", "dimension": "month", "metrics": ["sales_amount"]}, month_rows))
+        charts.append(
+            plan_to_option(
+                {"chart_type": "line", "dimension": "month", "metrics": ["sales_amount"]},
+                month_rows,
+            )
+        )
     region_rows = stringify_rows(overview.get("sales_by_region", []))
     if region_rows:
-        charts.append(plan_to_option({"chart_type": "pie", "dimension": "region", "metrics": ["sales_amount"]}, region_rows))
+        charts.append(
+            plan_to_option(
+                {"chart_type": "pie", "dimension": "region", "metrics": ["sales_amount"]},
+                region_rows,
+            )
+        )
     customer_rows = stringify_rows(overview.get("customer_by_region", []))
     if customer_rows:
-        charts.append(plan_to_option({"chart_type": "bar", "dimension": "region", "metrics": ["active_customers"]}, customer_rows))
+        charts.append(
+            plan_to_option(
+                {"chart_type": "bar", "dimension": "region", "metrics": ["active_customers"]},
+                customer_rows,
+            )
+        )
     return charts
 
 
@@ -162,7 +210,17 @@ def build_dashboard_kpis(overview: Dict[str, Any]) -> List[Dict[str, str]]:
     ]
 
 
-def widget(widget_id: str, widget_type: str, title: str, section_id: str, x: int, y: int, w: int, h: int, data_ref: str) -> Dict[str, Any]:
+def widget(
+    widget_id: str,
+    widget_type: str,
+    title: str,
+    section_id: str,
+    x: int,
+    y: int,
+    w: int,
+    h: int,
+    data_ref: str,
+) -> Dict[str, Any]:
     return {
         "id": widget_id,
         "type": widget_type,
@@ -205,7 +263,11 @@ def decision_factors(overview: Dict[str, Any], kpis: Dict[str, Any]) -> List[str
 
 
 def stringify_rows(rows: Sequence[Dict[str, Any]]) -> List[Dict[str, str]]:
-    return [{key: str(value) if value is not None else "" for key, value in row.items()} for row in rows if isinstance(row, dict)]
+    return [
+        {key: str(value) if value is not None else "" for key, value in row.items()}
+        for row in rows
+        if isinstance(row, dict)
+    ]
 
 
 def fmt_num(value: Any) -> str:

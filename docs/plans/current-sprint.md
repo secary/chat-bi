@@ -36,6 +36,7 @@
 - `requirements.txt` 仅保留给 Docker/CI 兼容；新增 Python 依赖必须同步 `pyproject.toml`、`requirements.txt`，再执行 `uv lock`。
 - `bootstrap_dev.sh` 默认只配 Git hooks 和检查状态；不会自动跑 formatter。
 - 代码改动后显式跑 `scripts/format_code.py` 或 `bootstrap_dev.sh --format`，再跑相关测试套件。
+- 仅文档/说明改动不跑测试，只做必要自查。
 - 新增 `tests/test_*.py` 必须先注册到 `scripts/run_tests.py` 的 `MODULE_SUITES`。
 
 ## 维护规则
@@ -58,8 +59,8 @@
 
 | 轮次 | 完成内容 | 验证 |
 |---|---|---|
-| 119 | 对齐 uv：补 `pyproject.toml` 项目依赖，生成 `uv.lock`，Python 约束改为 `>=3.11` | `uv lock --check`、`uv sync --dry-run`、foundation |
-| 120 | 修复本地前端依赖损坏：`npm ci` 重建 `frontend/node_modules` | `bootstrap_dev.sh`、`format_code.py`、foundation |
 | 121 | `AGENTS.md` 写入团队/Agent 环境对齐流程 | `format_code.py`、foundation |
 | 122 | 精简 Agent 编程入口：`bootstrap_dev.sh` 增加 `--sync` / `--format` / `--full`，默认轻量化；`AGENTS.md` 压缩到 40 行 | `bootstrap_dev.sh`、`format_code.py`、foundation |
 | 123 | 压缩本文件：保留当前事实、活跃 Gap、最近变更，移除完整历史流水账 | `format_code.py`、foundation |
+| 124 | 同步 README 当前事实：uv/bootstrap、React 19/ECharts 6、Skill/目录与测试文档；修复 `bootstrap_dev.sh` 快速测试提示污染 | `format_code.py`、foundation |
+| 125 | 明确仅文档/说明改动不跑测试，只做必要自查 | 未跑测试（纯文档约定） |

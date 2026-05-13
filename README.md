@@ -60,10 +60,10 @@ docker compose up -d
 首次拉代码后，建议先执行一次：
 
 ```bash
-bash scripts/bootstrap_dev.sh
+bash scripts/bootstrap_dev.sh --sync
 ```
 
-它会为当前仓库配置 Git `pre-commit` hook、检查 `.venv` / `.env.dev` / `frontend/node_modules`，并在条件满足时先跑一遍本地 formatter。
+它会为当前仓库配置 Git `pre-commit` hook，并用 `uv sync` / `npm ci` 同步 Python 与前端依赖。日常进场可只运行 `bash scripts/bootstrap_dev.sh` 做轻量检查；需要本地清理时运行 `bash scripts/bootstrap_dev.sh --format`。
 
 ### 方式 A：Docker 热更新
 
@@ -94,12 +94,12 @@ open http://localhost:5174
 
 ```bash
 # Backend
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+uv sync
+source .venv/bin/activate
 uvicorn backend.main:app --reload --port 8000
 
 # Frontend（另开终端）
-cd frontend && npm install && npm run dev
+cd frontend && npm ci && npm run dev
 ```
 
 MySQL 仍需 Docker：
@@ -112,8 +112,8 @@ docker compose up -d demo-mysql
 
 | 层 | 技术 |
 |----|------|
-| 前端 | React 18 + TypeScript + Vite + Tailwind CSS + ECharts 5 |
-| 后端 | FastAPI + Python 3.11 + LiteLLM |
+| 前端 | React 19 + TypeScript + Vite + Tailwind CSS + ECharts 6 |
+| 后端 | FastAPI + Python 3.11+ + LiteLLM |
 | 数据库 | MySQL 8.0（Docker） |
 | 流式 | Server-Sent Events（SSE） |
 | 质量 | black + ruff；ESLint + Prettier |
@@ -135,13 +135,18 @@ chat-bi/
 │   ├── main.py                      # FastAPI 入口，POST /chat SSE + POST /upload
 │   ├── config.py                    # 环境变量读取（业务库 + 日志库）
 │   ├── trace.py                     # Trace-ID 链路日志写入（best-effort）
+│   ├── routes/                      # auth / sessions / dashboard / admin 等 HTTP 路由
 │   ├── agent/
 │   │   ├── protocol.py              # SkillResult 统一协议定义
 │   │   ├── prompt_builder.py        # 读取 SKILL.md，构造 System Prompt
 │   │   ├── planner.py               # LiteLLM 调用，生成 Skill 执行计划
 │   │   ├── executor.py              # 定位并执行 Skill 脚本，归一化结果
 │   │   ├── formatter.py             # SkillResult → SSE 消息
+│   │   ├── react_runner.py          # ReAct 多轮推理循环
+│   │   ├── multi_agent_runner.py    # 多 Agent 路由与执行
 │   │   └── runner.py                # plan → execute → format 主循环
+│   ├── report/                      # PDF 报告生成与降级导出
+│   ├── vision/                      # 图像 / 表格抽取门禁与 LLM 调用
 │   └── renderers/
 │       ├── chart.py                 # 构造 ECharts option
 │       └── kpi.py                   # 构造 KPI 卡片数据
@@ -150,6 +155,7 @@ chat-bi/
 │       ├── types/message.ts         # 消息类型定义
 │       ├── api/client.ts            # SSE 流式客户端（透传 X-Trace-Id）
 │       ├── hooks/useChat.ts         # 对话状态管理
+│       ├── pages/                   # 对话、仪表盘、数据源、LLM、用户、Skill、Multi-Agent 管理页
 │       └── components/
 │           ├── MessageBubble.tsx    # 消息分发渲染
 │           ├── ThinkingBubble.tsx   # 思考步骤（可折叠）
@@ -159,15 +165,20 @@ chat-bi/
 ├── skills/
 │   ├── _shared/                     # 脚本共用的数据库连接与协议输出工具
 │   ├── chatbi-semantic-query/       # 自然语言问数
+│   ├── chatbi-semantic-processing/  # 语义预处理与意图辅助
 │   ├── chatbi-alias-manager/        # 语义别名管理
 │   ├── chatbi-decision-advisor/     # 经营决策建议
+│   ├── chatbi-metric-explainer/     # 指标解释
 │   ├── chatbi-comparison/           # 环比分析（月对、全年、季度）
+│   ├── chatbi-chart-recommendation/ # 图表推荐
+│   ├── chatbi-dashboard-orchestration/ # 仪表盘编排
+│   ├── chatbi-database-overview/    # 数据库概览
 │   └── chatbi-file-ingestion/       # CSV/XLSX 文件导入校验
 └── tests/
     ├── test_agent_skill_protocol.py # SkillResult 协议单测
     ├── test_file_ingestion_skill.py # 文件导入 Skill 单测
-    ├── test_trace_logging.py        # 链路日志单测
-    └── test_upload_api.py           # 上传接口单测
+    ├── test_trace.py                # 链路日志单测
+    └── test_run_tests_script.py     # 测试套件清单校验
 ```
 
 ## 架构流程
@@ -199,9 +210,14 @@ chat-bi/
 | Skill | 功能 |
 |-------|------|
 | `chatbi-semantic-query` | 将自然语言转换为 SQL，查询 `chatbi_demo` 并返回表格与图表 |
+| `chatbi-semantic-processing` | 语义预处理、意图识别与查询辅助 |
 | `chatbi-alias-manager` | 维护 `alias_mapping`，将业务别名映射到标准字段名 |
 | `chatbi-decision-advisor` | 先计算指标事实，再按确定性规则生成经营决策建议 |
+| `chatbi-metric-explainer` | 解释指标口径、来源与使用场景 |
 | `chatbi-comparison` | 环比分析：支持最近两月对比、全年月度趋势、季度汇总三种模式 |
+| `chatbi-chart-recommendation` | 根据查询结果推荐图表类型和 ECharts 配置方向 |
+| `chatbi-dashboard-orchestration` | 编排仪表盘视图所需的指标、图表与摘要 |
+| `chatbi-database-overview` | 输出数据库表、字段和样例数据概览 |
 | `chatbi-file-ingestion` | 读取 CSV/XLSX，识别表头、校验类型并返回预览 JSON |
 
 每个 Skill 的触发条件、工作流和安全边界见 `skills/<skill-name>/SKILL.md`。
@@ -252,6 +268,7 @@ chat-bi/
 | 技术实现指南（Agent / Prompt / 记忆 / Skill） | [docs/tech-guide.md](docs/tech-guide.md) |
 | 系统架构与模块边界 | [docs/architecture/README.md](docs/architecture/README.md) |
 | 编码规范 | [docs/conventions/README.md](docs/conventions/README.md) |
+| 测试与 CI | [docs/testing/README.md](docs/testing/README.md)、[docs/ci-cd/README.md](docs/ci-cd/README.md) |
 | 当前迭代任务 | [docs/plans/current-sprint.md](docs/plans/current-sprint.md) |
 | 项目目标与验收标准 | [docs/goal.md](docs/goal.md) |
 | Skill 能力说明 | `skills/<skill-name>/SKILL.md` |

@@ -12,6 +12,8 @@ from backend.agent.protocol import normalize_skill_result
 from backend.config import settings
 
 _UPLOAD_PATH_RE = re.compile(r"/tmp/chatbi-uploads/[A-Za-z0-9._-]+", re.IGNORECASE)
+_FILE_INGESTION_VALUE_OPTIONS = {"--table", "--sample-size"}
+_FILE_INGESTION_FLAG_OPTIONS = {"--include-rows"}
 
 
 def find_skill(skills: List[SkillDoc], name: str) -> Optional[SkillDoc]:
@@ -51,7 +53,10 @@ def file_ingestion_args(args: List[str], messages: List[Dict[str, str]]) -> List
     upload_path = first_upload_path(args) or latest_user_upload_path(messages)
     if not upload_path:
         return args
-    return [upload_path, *option_args(args)]
+    options = file_ingestion_option_args(args)
+    if _should_include_rows_for_file_followup(messages, args) and "--include-rows" not in options:
+        options.append("--include-rows")
+    return [upload_path, *options]
 
 
 def first_upload_path(args: List[str]) -> str:
@@ -84,6 +89,43 @@ def option_args(args: List[str]) -> List[str]:
                 i += 1
         i += 1
     return kept
+
+
+def file_ingestion_option_args(args: List[str]) -> List[str]:
+    kept: List[str] = []
+    i = 0
+    while i < len(args):
+        token = str(args[i])
+        if token in _FILE_INGESTION_FLAG_OPTIONS:
+            kept.append(token)
+        elif token in _FILE_INGESTION_VALUE_OPTIONS:
+            kept.append(token)
+            if i + 1 < len(args) and not str(args[i + 1]).startswith("--"):
+                kept.append(str(args[i + 1]))
+                i += 1
+        i += 1
+    return kept
+
+
+def _should_include_rows_for_file_followup(messages: List[Dict[str, str]], args: List[str]) -> bool:
+    text = " ".join([latest_user_content(messages), *[str(arg) for arg in args]]).strip()
+    if not text:
+        return False
+    markers = (
+        "画图",
+        "图表",
+        "可视化",
+        "展示",
+        "分析",
+        "汇总",
+        "排行",
+        "趋势",
+        "对比",
+        "柱状图",
+        "折线图",
+        "饼图",
+    )
+    return any(marker in text for marker in markers)
 
 
 def run_script(

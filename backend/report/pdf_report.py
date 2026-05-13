@@ -12,6 +12,12 @@ from backend.report.pdf_chart_png import echarts_option_to_png_bytes
 from backend.report.pdf_summary import _markdown_to_html, summarize_session_for_pdf
 
 
+def _chart_to_png_bytes(chart: Any) -> bytes | None:
+    from backend.report.pdf_chart_png import echarts_option_to_png_bytes
+
+    return echarts_option_to_png_bytes(chart)
+
+
 def _kpi_table_row(card: Dict[str, Any]) -> str:
     label = html.escape(str(card.get("label") or ""))
     value = html.escape(str(card.get("value") or ""))
@@ -40,7 +46,7 @@ def _chart_pngs(messages: List[Dict[str, Any]]) -> List[bytes]:
         chart = msg.get("chart")
         if chart is None:
             continue
-        png = echarts_option_to_png_bytes(chart)
+        png = _chart_to_png_bytes(chart)
         if png:
             pngs.append(png)
     return pngs
@@ -70,7 +76,7 @@ def messages_to_html_document(messages: List[Dict[str, Any]], title: str) -> str
         chart = msg.get("chart")
         if chart is None:
             continue
-        png = echarts_option_to_png_bytes(chart)
+        png = _chart_to_png_bytes(chart)
         idx += 1
         if not png:
             chart_sections.append(

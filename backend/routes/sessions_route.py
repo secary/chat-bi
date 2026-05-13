@@ -11,7 +11,6 @@ from pydantic import BaseModel, Field
 from backend.auth_deps import get_current_user
 from backend.http_utils import request_trace_id
 from backend.memory_repo import suggested_prompts_for_user
-from backend.report.pdf_report import render_session_pdf_bytes
 from backend.session_repo import (
     create_session,
     delete_session,
@@ -91,6 +90,8 @@ def get_messages(
 def get_session_report_pdf(
     session_id: int, user: Dict[str, Any] = Depends(get_current_user)
 ) -> Response:
+    from backend.report.pdf_report import render_session_pdf_bytes
+
     sess = get_session_for_user(session_id, user["id"])
     if not sess:
         raise HTTPException(status_code=404, detail="会话不存在")

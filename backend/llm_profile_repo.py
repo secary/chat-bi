@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
+from backend.db_tables import LLM_MODEL_PROFILE, LLM_SETTINGS
 from backend.db_mysql import (
     admin_execute,
     admin_execute_lastrowid,
@@ -23,7 +24,7 @@ def list_ordered() -> List[Dict[str, Any]]:
         return admin_fetch_all(
             "SELECT id, display_name, model, api_base, api_key, sort_order, supports_vision, "
             "health_status, health_detail, health_checked_at, created_at, updated_at "
-            "FROM llm_model_profile ORDER BY sort_order ASC, id ASC"
+            f"FROM {LLM_MODEL_PROFILE} ORDER BY sort_order ASC, id ASC"
         )
     except Exception:
         return []
@@ -34,7 +35,7 @@ def get_by_id(profile_id: int) -> Optional[Dict[str, Any]]:
         return admin_fetch_one(
             "SELECT id, display_name, model, api_base, api_key, sort_order, supports_vision, "
             "health_status, health_detail, health_checked_at, created_at, updated_at "
-            "FROM llm_model_profile WHERE id = %s",
+            f"FROM {LLM_MODEL_PROFILE} WHERE id = %s",
             (profile_id,),
         )
     except Exception:
@@ -59,7 +60,7 @@ def public_row(row: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _next_sort_order() -> int:
-    r = admin_fetch_one("SELECT COALESCE(MAX(sort_order), -1) AS m FROM llm_model_profile")
+    r = admin_fetch_one(f"SELECT COALESCE(MAX(sort_order), -1) AS m FROM {LLM_MODEL_PROFILE}")
     if not r:
         return 0
     return int(r["m"]) + 1
@@ -76,7 +77,7 @@ def create(
     sv = 1 if supports_vision else 0
     # Must use same DB session as INSERT — LAST_INSERT_ID() is per-connection.
     return admin_execute_lastrowid(
-        "INSERT INTO llm_model_profile "
+        f"INSERT INTO {LLM_MODEL_PROFILE} "
         "(display_name, model, api_base, api_key, sort_order, supports_vision, health_status) "
         "VALUES (%s, %s, %s, %s, %s, %s, 'unknown')",
         (
@@ -115,7 +116,7 @@ def update(
     else:
         sv = 1 if supports_vision else 0
     admin_execute(
-        "UPDATE llm_model_profile SET display_name = %s, model = %s, api_base = %s, api_key = %s, "
+        f"UPDATE {LLM_MODEL_PROFILE} SET display_name = %s, model = %s, api_base = %s, api_key = %s, "
         "supports_vision = %s WHERE id = %s",
         (dn, m, b, k, sv, profile_id),
     )
@@ -123,7 +124,7 @@ def update(
 
 def set_health(profile_id: int, status: str, detail: Optional[str]) -> None:
     admin_execute(
-        "UPDATE llm_model_profile SET health_status = %s, health_detail = %s, "
+        f"UPDATE {LLM_MODEL_PROFILE} SET health_status = %s, health_detail = %s, "
         "health_checked_at = CURRENT_TIMESTAMP(6) WHERE id = %s",
         (status, detail, profile_id),
     )
@@ -132,14 +133,14 @@ def set_health(profile_id: int, status: str, detail: Optional[str]) -> None:
 def reorder(ordered_ids: List[int]) -> None:
     for i, pid in enumerate(ordered_ids):
         admin_execute(
-            "UPDATE llm_model_profile SET sort_order = %s WHERE id = %s",
+            f"UPDATE {LLM_MODEL_PROFILE} SET sort_order = %s WHERE id = %s",
             (i, pid),
         )
 
 
 def set_active_profile(profile_id: Optional[int]) -> None:
     admin_execute(
-        "UPDATE llm_settings SET active_profile_id = %s WHERE id = 1",
+        f"UPDATE {LLM_SETTINGS} SET active_profile_id = %s WHERE id = 1",
         (profile_id,),
     )
 
@@ -149,10 +150,10 @@ def delete_profile(profile_id: int) -> None:
 
     settings_row = llm_settings_repo.get_row()
     active = settings_row.get("active_profile_id") if settings_row else None
-    admin_execute("DELETE FROM llm_model_profile WHERE id = %s", (profile_id,))
+    admin_execute(f"DELETE FROM {LLM_MODEL_PROFILE} WHERE id = %s", (profile_id,))
     if active == profile_id:
         nxt = admin_fetch_one(
-            "SELECT id FROM llm_model_profile ORDER BY sort_order ASC, id ASC LIMIT 1"
+            f"SELECT id FROM {LLM_MODEL_PROFILE} ORDER BY sort_order ASC, id ASC LIMIT 1"
         )
         new_active: Optional[int] = int(nxt["id"]) if nxt and nxt.get("id") is not None else None
         set_active_profile(new_active)

@@ -24,6 +24,7 @@ def python_executable() -> str:
 MODULE_SUITES: dict[str, list[str]] = {
     "foundation": [
         "tests/test_bootstrap_dev_script.py",
+        "tests/test_config_db_defaults.py",
         "tests/test_env_loader.py",
         "tests/test_format_code_script.py",
         "tests/test_http_utils.py",
@@ -59,6 +60,7 @@ MODULE_SUITES: dict[str, list[str]] = {
     "admin": [
         "tests/test_admin_multi_agents.py",
         "tests/test_app_llm_saved.py",
+        "tests/test_config_db_defaults.py",
         "tests/test_chatbi_llm_fallback.py",
         "tests/test_db_mysql_targets.py",
         "tests/test_llm_profile_repo.py",
@@ -78,6 +80,7 @@ MODULE_SUITES: dict[str, list[str]] = {
         "tests/test_kpi_renderer.py",
     ],
     "data-sources": [
+        "tests/test_config_db_defaults.py",
         "tests/test_database_overview_skill.py",
         "tests/test_db_mysql_targets.py",
         "tests/test_executor_file_ingestion_args.py",

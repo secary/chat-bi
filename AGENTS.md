@@ -1,56 +1,40 @@
 # AGENTS.md
-> 这是给 AI Agent 看的项目地图，不是给人看的百科全书。保持在 100 行以内。
+> Agent 项目地图，保持短、准、可执行。
 
-## 项目简介
-ChatBI 是面向银行业务场景的对话式数据分析 Demo，让用户用中文自然语言完成问数、语义别名维护和经营决策建议生成。
+## 项目
+ChatBI 是银行场景的对话式数据分析 Demo，支持中文问数、语义别名维护、经营建议、上传文件分析、仪表盘和多 Agent 协作。
 
-## 技术栈
-- Backend: FastAPI + Python 3.11 + LiteLLM
+## 栈
+- Backend: FastAPI + Python 3.11+ + LiteLLM
 - Frontend: React 19 + TypeScript + Vite + Tailwind CSS + ECharts 6
-- Database: MySQL 8.0 via Docker Compose, local port 3307
-- Skills: `skills/<skill-name>/SKILL.md` + deterministic Python scripts + local `mysql` CLI
-- Streaming: SSE
-- Quality: Python black + ruff; TypeScript ESLint
+- Database: MySQL 8.0 via Docker Compose，本地默认 3307
+- Skills: `skills/<skill-name>/SKILL.md` + deterministic Python scripts
+- Quality: ruff + black + ESLint；测试入口 `scripts/run_tests.py`
 
-## 快速导航
-| 你想做什么 | 去哪里看 |
-|-----------|---------|
-| 了解系统架构与模块边界 | docs/architecture/README.md |
-| 了解编码规范 | docs/conventions/README.md |
-| 了解测试框架 | docs/testing/README.md |
-| 了解 CI/CD | docs/ci-cd/README.md |
-| 了解当前迭代 | docs/plans/current-sprint.md |
-| 了解功能设计 | docs/design/ |
+## 导航
+| 主题 | 文件 |
+|---|---|
+| 架构/边界 | docs/architecture/README.md |
+| 编码规范 | docs/conventions/README.md |
+| 测试/CI | docs/testing/README.md、docs/ci-cd/README.md |
+| 当前迭代 | docs/plans/current-sprint.md |
+| 设计 | docs/design/ |
 
-## 硬性规则（每次执行前必须遵守）
-1. 每次开始工作前，先读本文件 + docs/plans/current-sprint.md
-2. 依赖方向：types/ → lib/utils/ → services/ → app/（不得反向引用）
-3. 单文件不超过 300 行
-4. 每个新功能必须有对应测试文件
-5. 禁止使用 console.log，使用项目统一的 logger
-6. API 调用统一通过封装的 apiClient，禁止裸 fetch()
-7. 完成每个任务后，主动更新 docs/plans/current-sprint.md 的状态
+## 快速进入
+- 首次或依赖变动：`bash scripts/bootstrap_dev.sh --sync`
+- 日常进场：`bash scripts/bootstrap_dev.sh`
+- 本地清理：`bash scripts/bootstrap_dev.sh --format`
+- 快速测试：`PYTHONPATH=. .venv/bin/python scripts/run_tests.py foundation -- -q`
+- 开发启动：`docker compose --env-file .env.dev -f docker-compose.dev.yml up -d --build`
 
-## ChatBI 专属规则
-- 首次在本仓库协作前，先执行 `bash scripts/bootstrap_dev.sh`；它会配置 `.githooks`、检查 `.venv` / `.env.dev` / `frontend/node_modules`
-- Skill 新增删除只改 `skills/<skill-name>/SKILL.md` 与可选 `scripts/` 文件
-- 问数和决策建议脚本只执行 `SELECT`
-- `chatbi-alias-manager` 只允许向 `alias_mapping` 插入已验证别名
-- 决策建议必须先计算指标事实，再按确定性规则生成建议
-- 数据库连接通过 `CHATBI_DB_*` 环境变量覆盖默认值
-- 本地运行/测试默认优先读取 `.env.dev`（其次才是 `.env`），除非任务明确要求使用生产式环境
-- Python / 前端代码改动后，优先执行 `PYTHONPATH=. .venv/bin/python scripts/format_code.py` 做本地规范清洗
-- 提交时 `.githooks/pre-commit` 会自动再次执行 `ruff --fix` + `black` + `eslint --fix` 兜底
-- 执行 Python 测试优先使用项目内 `.venv/bin/python`（Windows 用 `.venv/Scripts/python.exe`），避免落到系统 Python
-- 包导入型测试优先用 `PYTHONPATH=. .venv/bin/python -m pytest ...`（Windows 对应 `.venv/Scripts/python.exe`）
-- 项目 `.venv` 由 `uv` 管理，可能没有 `python -m pip`；安装/查看依赖统一用 `uv pip --python .venv/bin/python ...`
-- 日常自动化测试优先用模块套件入口：`PYTHONPATH=. .venv/bin/python scripts/run_tests.py <suite>`，套件见 `docs/testing/README.md`
-- Agent 每次完成代码或测试改动后，必须至少跑一遍 `PYTHONPATH=. .venv/bin/python scripts/run_tests.py <suite> -- -q`
-- 如果新增 `tests/test_*.py`，必须先把文件注册到 `scripts/run_tests.py` 的 `MODULE_SUITES`，再运行本地测试
-
-## 工作方式（必须遵守）
-- 每次执行前：读取文件结构 + 对比验收标准 → 列出当前 Gap
-- 每次执行后：先运行 `scripts/format_code.py`，再运行 `scripts/run_tests.py` 对应套件 → 报告结果 → 说明下一个 Gap 是什么
-- 运行测试时：优先用项目虚拟环境解释器，并确保 dev 数据库环境变量生效
-- 不确定需求时：查阅 docs/design/ 对应设计文档，而不是自行假设
-- 不要问我确认细节，直接执行，完成后汇报
+## 必守规则
+- 开始工作先读本文件和 `docs/plans/current-sprint.md`，再按任务需要查对应 docs/design。
+- 依赖方向：types/ → lib/utils/ → services/ → app/；禁止反向引用。
+- 单文件不超过 300 行；新功能必须补测试并注册到 `scripts/run_tests.py` 的 `MODULE_SUITES`。
+- 禁止 `console.log`；前端 API 统一走 `apiClient`，禁止裸 `fetch()`。
+- Python 测试优先用 `.venv/bin/python`；本地环境默认 `.env.dev` 优先，其次 `.env`。
+- `.venv` 由 `uv sync` 按 `pyproject.toml` + `uv.lock` 管理；`requirements.txt` 仅兼容 Docker/CI。
+- 新增 Python 依赖必须同步 `pyproject.toml`、`requirements.txt`，再执行 `uv lock`。
+- Skill 新增/删除只改 `skills/<skill-name>/SKILL.md` 与可选 `scripts/`；问数/决策脚本只执行 `SELECT`。
+- 代码改动后跑 `scripts/format_code.py` 和相关测试套件；仅文档/说明改动不跑测试，只做必要自查。
+- 完成任务后更新 `docs/plans/current-sprint.md` 的 Gap 记录。

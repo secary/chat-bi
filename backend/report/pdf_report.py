@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 from backend.report.pdf_chart_png import echarts_option_to_png_bytes
-from backend.report.pdf_summary import summarize_session_for_pdf
+from backend.report.pdf_summary import _markdown_to_html, summarize_session_for_pdf
 
 
 def _kpi_table_row(card: Dict[str, Any]) -> str:
@@ -50,7 +50,7 @@ def messages_to_html_document(messages: List[Dict[str, Any]], title: str) -> str
     """精炼摘要 + KPI 汇总 + 图表 PNG（非全文复制对话）。"""
     safe_title = html.escape(title)
     summary = summarize_session_for_pdf(messages)
-    summary_html = html.escape(summary).replace("\n", "<br/>")
+    summary_html = _markdown_to_html(summary)
 
     kpis = _collect_kpi_cards(messages)
     kpi_block = ""

@@ -75,7 +75,7 @@ def summarize_session_for_pdf(messages: List[Dict[str, Any]]) -> str:
         )
         text = _completion_content(resp)
         if text:
-            return _markdownish_to_plain_paragraphs(text)
+            return _markdown_to_html(text)
         return _fallback_summary(messages)
     except Exception:
         return _fallback_summary(messages)
@@ -96,8 +96,62 @@ def _completion_content(resp: Any) -> str:
     return ""
 
 
-def _markdownish_to_plain_paragraphs(text: str) -> str:
-    """Strip minimal markdown so PDF shows readable plain structure."""
-    t = text.replace("\r\n", "\n")
-    t = re.sub(r"^#+\s*", "", t, flags=re.MULTILINE)
-    return t.strip()
+def _markdown_to_html(text: str) -> str:
+    """将 LLM 返回的 markdown 转换为可用于 PDF 的 HTML（仅处理常用格式）。"""
+    lines = text.split("\n")
+    in_ul = False
+    result: list[str] = []
+    i = 0
+
+    while i < len(lines):
+        line = lines[i]
+        # 跳过分隔行（如 |---|）
+        if re.match(r"^\|[-: |]+\|$", line) or re.match(r"^\|?\s*[-:]+\s*[-:|\s]*\|?$", line):
+            i += 1
+            continue
+        # h2 / h3 标题
+        m = re.match(r"^(#{2,3})\s+(.+)$", line)
+        if m:
+            if in_ul:
+                result.append("</ul>")
+                in_ul = False
+            level = len(m.group(1))
+            content = _process_inline_markdown(m.group(2))
+            result.append(f"<h{level}>{content}</h{level}>")
+            i += 1
+            continue
+        # 列表项
+        m = re.match(r"^[-*]\s+(.+)$", line)
+        if m:
+            if not in_ul:
+                result.append("<ul>")
+                in_ul = True
+            content = _process_inline_markdown(m.group(1))
+            result.append(f"<li>{content}</li>")
+            i += 1
+            continue
+        # 关闭未关闭的 ul
+        if in_ul:
+            result.append("</ul>")
+            in_ul = False
+        # 空行处理
+        if line.strip() == "":
+            i += 1
+            continue
+        # 普通段落
+        content = _process_inline_markdown(line)
+        result.append(f"<p>{content}</p>")
+        i += 1
+
+    if in_ul:
+        result.append("</ul>")
+    return "\n".join(result)
+
+
+def _process_inline_markdown(text: str) -> str:
+    """处理行内 markdown：加粗 **text** -> <strong>text</strong>"""
+    # 先处理加粗
+    text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text)
+    # 处理斜体（可选）
+    text = re.sub(r"\*(.+?)\*", r"<em>\1</em>", text)
+    return text

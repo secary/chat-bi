@@ -58,8 +58,9 @@
 
 | 轮次 | 完成内容 | 验证 |
 |---|---|---|
+| 125 | 上传文件通用分析改为语义槽位识别：逾期分析不再直接写死 demo 字段名，支持非标准列名贷款/支行类表 | `format_code.py`、`pytest tests/test_file_ingestion_skill.py -q` |
+| 124 | 修复上传文件跟进分析：`chatbi-file-ingestion` 支持逾期统计与建议输出，避免二次追问只返回通用文案 | `format_code.py`、`pytest tests/test_file_ingestion_skill.py tests/test_react_runner.py -q` |
 | 119 | 对齐 uv：补 `pyproject.toml` 项目依赖，生成 `uv.lock`，Python 约束改为 `>=3.11` | `uv lock --check`、`uv sync --dry-run`、foundation |
 | 120 | 修复本地前端依赖损坏：`npm ci` 重建 `frontend/node_modules` | `bootstrap_dev.sh`、`format_code.py`、foundation |
 | 121 | `AGENTS.md` 写入团队/Agent 环境对齐流程 | `format_code.py`、foundation |
 | 122 | 精简 Agent 编程入口：`bootstrap_dev.sh` 增加 `--sync` / `--format` / `--full`，默认轻量化；`AGENTS.md` 压缩到 40 行 | `bootstrap_dev.sh`、`format_code.py`、foundation |
-| 123 | 压缩本文件：保留当前事实、活跃 Gap、最近变更，移除完整历史流水账 | `format_code.py`、foundation |

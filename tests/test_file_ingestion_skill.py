@@ -180,6 +180,99 @@ class FileIngestionSkillTest(unittest.TestCase):
         self.assertIn("### 账户状态统计", result["text"])
         self.assertEqual(result["data"]["analysis"]["distribution_rows"][0]["账户状态"], "正常")
 
+    def test_pandas_fallback_answers_overdue_question_with_recommendations(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "loan.csv"
+            with path.open("w", encoding="utf-8", newline="") as handle:
+                writer = csv.writer(handle)
+                writer.writerow(
+                    [
+                        "loan_id",
+                        "loan_type",
+                        "principal",
+                        "outstanding_balance",
+                        "loan_status",
+                        "overdue_days",
+                        "branch_id",
+                    ]
+                )
+                writer.writerow(["L001", "房贷", "1000000", "800000", "正常", "0", "B001"])
+                writer.writerow(["L002", "经营贷", "500000", "300000", "逾期", "45", "B002"])
+                writer.writerow(["L003", "经营贷", "300000", "120000", "逾期", "12", "B002"])
+                writer.writerow(["L004", "信用贷", "100000", "60000", "正常", "0", "B003"])
+
+            proc = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    str(path),
+                    "--json",
+                    "--question",
+                    "分析逾期情况统计，并给出建议",
+                ],
+                cwd=ROOT,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                capture_output=True,
+                check=False,
+                env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+            )
+
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        result = json.loads(proc.stdout)
+        self.assertEqual(result["data"]["analysis_mode"], "pandas_fallback")
+        self.assertEqual(result["data"]["analysis"]["summary_title"], "逾期贷款分析")
+        self.assertEqual(result["data"]["analysis"]["overdue_summary"]["overdue_count"], 2)
+        self.assertEqual(result["data"]["analysis"]["overdue_summary"]["overdue_rate"], "50%")
+        self.assertEqual(result["data"]["analysis"]["distribution_rows"][0]["loan_type"], "经营贷")
+        self.assertTrue(result["data"]["analysis"]["recommendations"])
+        self.assertIn("## 逾期情况统计", result["text"])
+        self.assertIn("### 建议", result["text"])
+
+    def test_pandas_fallback_overdue_analysis_supports_non_demo_column_names(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "branch_loan.csv"
+            with path.open("w", encoding="utf-8", newline="") as handle:
+                writer = csv.writer(handle)
+                writer.writerow(
+                    [
+                        "业务品种",
+                        "未还本金",
+                        "账户状态",
+                        "拖欠天数",
+                        "支行名称",
+                    ]
+                )
+                writer.writerow(["房贷", "800000", "正常", "0", "浦东支行"])
+                writer.writerow(["经营贷", "300000", "逾期", "45", "南京东路支行"])
+                writer.writerow(["经营贷", "120000", "逾期", "12", "南京东路支行"])
+
+            proc = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    str(path),
+                    "--json",
+                    "--question",
+                    "分析逾期情况统计",
+                ],
+                cwd=ROOT,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                capture_output=True,
+                check=False,
+                env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+            )
+
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        result = json.loads(proc.stdout)
+        self.assertEqual(result["data"]["analysis"]["summary_title"], "逾期贷款分析")
+        self.assertEqual(result["data"]["analysis"]["overdue_summary"]["overdue_count"], 2)
+        self.assertEqual(result["data"]["analysis"]["distribution_rows"][0]["业务品种"], "经营贷")
+        self.assertIn("按业务品种分布", result["text"])
+
 
 if __name__ == "__main__":
     unittest.main()

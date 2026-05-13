@@ -6,11 +6,53 @@ from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 from typing import Any, Dict, List
 
+SEMANTIC_SLOT_RULES: Dict[str, Dict[str, List[str]]] = {
+    "status": {
+        "header_aliases": ["loan_status", "贷款状态", "状态", "逾期状态", "账户状态", "五级分类"],
+        "value_markers": ["逾期", "正常", "关注", "次级", "可疑", "损失"],
+    },
+    "overdue_days": {
+        "header_aliases": ["overdue_days", "逾期天数", "逾期日数", "拖欠天数", "dpd"],
+        "value_markers": [],
+    },
+    "principal": {
+        "header_aliases": ["principal", "本金", "贷款本金", "发放本金", "授信本金"],
+        "value_markers": [],
+    },
+    "balance": {
+        "header_aliases": ["outstanding_balance", "剩余本金", "贷款余额", "余额", "未还本金"],
+        "value_markers": [],
+    },
+    "loan_type": {
+        "header_aliases": ["loan_type", "贷款类型", "业务类型", "产品类型", "授信品种"],
+        "value_markers": ["房贷", "信用贷", "经营贷", "消费贷"],
+    },
+    "branch": {
+        "header_aliases": [
+            "branch_id",
+            "branch_name",
+            "网点编号",
+            "网点",
+            "支行",
+            "支行名称",
+            "机构",
+        ],
+        "value_markers": ["支行", "分行", "营业部"],
+    },
+}
+
 
 def _decimal(value: Any) -> Decimal:
     if value in (None, ""):
         return Decimal("0")
     return Decimal(str(value))
+
+
+def _safe_decimal(value: Any) -> Decimal:
+    try:
+        return _decimal(str(value).replace(",", ""))
+    except Exception:
+        return Decimal("0")
 
 
 def _format_decimal(value: Decimal, digits: int = 2) -> str:
@@ -164,6 +206,66 @@ def _normalize_question_text(text: str) -> str:
     return "".join(ch for ch in str(text or "") if not ch.isspace()).lower()
 
 
+def _normalize_name(text: str) -> str:
+    return "".join(ch for ch in str(text or "") if ch not in {" ", "_", "-", "\t"}).lower()
+
+
+def _find_alias_column(columns: List[str], aliases: List[str]) -> str:
+    normalized_columns = {_normalize_name(column): str(column) for column in columns}
+    for alias in aliases:
+        matched = normalized_columns.get(_normalize_name(alias))
+        if matched:
+            return matched
+    for alias in aliases:
+        normalized_alias = _normalize_name(alias)
+        for key, original in normalized_columns.items():
+            if normalized_alias and normalized_alias in key:
+                return original
+    return ""
+
+
+def _sample_column_values(dataframe: Any, column: str, limit: int = 20) -> List[str]:
+    values: List[str] = []
+    for raw in dataframe[column].head(limit).tolist():
+        text = str(raw).strip()
+        if text and text.lower() != "nan":
+            values.append(text)
+    return values
+
+
+def infer_semantic_columns(dataframe: Any) -> Dict[str, str]:
+    columns = [str(column) for column in dataframe.columns.tolist()]
+    resolved: Dict[str, str] = {}
+    used_columns: set[str] = set()
+
+    for slot, rule in SEMANTIC_SLOT_RULES.items():
+        header_match = _find_alias_column(columns, rule.get("header_aliases", []))
+        if header_match and header_match not in used_columns:
+            resolved[slot] = header_match
+            used_columns.add(header_match)
+            continue
+
+        value_markers = [marker for marker in rule.get("value_markers", []) if marker]
+        if not value_markers:
+            continue
+        best_column = ""
+        best_score = 0
+        for column in columns:
+            if column in used_columns:
+                continue
+            score = 0
+            for value in _sample_column_values(dataframe, column):
+                score += sum(1 for marker in value_markers if marker in value)
+            if score > best_score:
+                best_score = score
+                best_column = column
+        if best_column and best_score > 0:
+            resolved[slot] = best_column
+            used_columns.add(best_column)
+
+    return resolved
+
+
 def _match_focus_column(question: str, columns: List[str]) -> str:
     normalized_question = _normalize_question_text(question)
     if not normalized_question:
@@ -189,6 +291,186 @@ def _render_distribution_markdown(column: str, rows: List[Dict[str, Any]]) -> st
     for row in rows:
         lines.append(f"| {row[column]} | {row['笔数']} | {row['占比']} |")
     return "\n".join(lines)
+
+
+def _question_overdue_analysis(dataframe: Any, question: str) -> Dict[str, Any]:
+    normalized_question = _normalize_question_text(question)
+    if not normalized_question or "逾期" not in normalized_question:
+        return {}
+
+    semantic_columns = infer_semantic_columns(dataframe)
+    status_col = semantic_columns.get("status", "")
+    overdue_days_col = semantic_columns.get("overdue_days", "")
+    principal_col = semantic_columns.get("principal", "")
+    balance_col = semantic_columns.get("balance", "")
+    loan_type_col = semantic_columns.get("loan_type", "")
+    branch_col = semantic_columns.get("branch", "")
+
+    overdue_mask = None
+    if status_col:
+        status_series = dataframe[status_col].fillna("").astype(str).map(str.strip)
+        overdue_mask = status_series.str.contains("逾期", case=False, regex=False)
+    if overdue_mask is None and overdue_days_col:
+        overdue_days_series = dataframe[overdue_days_col].fillna(0)
+        overdue_days_numeric = overdue_days_series.astype(str).str.replace(",", "", regex=False)
+        overdue_days_numeric = overdue_days_numeric.map(_safe_decimal)
+        overdue_mask = overdue_days_numeric > 0
+    if overdue_mask is None:
+        return {}
+
+    total_count = int(len(dataframe.index))
+    overdue_frame = dataframe.loc[overdue_mask].copy()
+    overdue_count = int(len(overdue_frame.index))
+    if overdue_count <= 0:
+        return {
+            "text": f"已根据您的问题检查逾期情况，共 {total_count} 行数据，当前未发现逾期记录。",
+            "summary_title": "逾期贷款分析",
+            "focus_column": status_col or overdue_days_col or "逾期情况",
+            "distribution_rows": [],
+            "overdue_summary": {
+                "total_count": total_count,
+                "overdue_count": 0,
+                "overdue_rate": "0%",
+            },
+            "recommendations": ["当前未发现逾期贷款，建议继续保持贷后预警与到期提醒机制。"],
+        }
+
+    overdue_rate = _format_pct(overdue_count, total_count)
+    summary = {
+        "total_count": total_count,
+        "overdue_count": overdue_count,
+        "overdue_rate": overdue_rate,
+    }
+
+    lines = [
+        "## 逾期情况统计",
+        "",
+        f"- 总记录数：{total_count}",
+        f"- 逾期记录数：{overdue_count}",
+        f"- 逾期率：{overdue_rate}",
+    ]
+
+    overdue_days_numbers: List[Decimal] = []
+    if overdue_days_col:
+        cleaned_days = (
+            overdue_frame[overdue_days_col]
+            .fillna(0)
+            .astype(str)
+            .str.replace(",", "", regex=False)
+            .tolist()
+        )
+        for value in cleaned_days:
+            number = _safe_decimal(value)
+            overdue_days_numbers.append(number)
+        if overdue_days_numbers:
+            avg_days = sum(overdue_days_numbers, Decimal("0")) / Decimal(len(overdue_days_numbers))
+            max_days = max(overdue_days_numbers)
+            summary["avg_overdue_days"] = _format_decimal(avg_days)
+            summary["max_overdue_days"] = _format_decimal(max_days)
+            lines.append(f"- 平均逾期天数：{_format_decimal(avg_days)} 天")
+            lines.append(f"- 最大逾期天数：{_format_decimal(max_days)} 天")
+
+    if principal_col:
+        principal_values = (
+            overdue_frame[principal_col].fillna(0).astype(str).str.replace(",", "", regex=False)
+        )
+        total_principal = sum((_safe_decimal(value) for value in principal_values), Decimal("0"))
+        summary["overdue_principal_sum"] = _format_decimal(total_principal)
+        lines.append(f"- 逾期贷款本金合计：{_format_decimal(total_principal)}")
+
+    if balance_col:
+        balance_values = (
+            overdue_frame[balance_col].fillna(0).astype(str).str.replace(",", "", regex=False)
+        )
+        total_balance = sum((_safe_decimal(value) for value in balance_values), Decimal("0"))
+        summary["overdue_balance_sum"] = _format_decimal(total_balance)
+        lines.append(f"- 逾期剩余本金合计：{_format_decimal(total_balance)}")
+
+    distribution_rows: List[Dict[str, Any]] = []
+    distribution_label = ""
+    if loan_type_col:
+        type_counts = (
+            overdue_frame[loan_type_col]
+            .fillna("未知")
+            .astype(str)
+            .map(lambda value: value.strip() or "未知")
+            .value_counts(dropna=False)
+        )
+        distribution_rows = [
+            {
+                loan_type_col: str(value),
+                "笔数": int(count),
+                "占比": _format_pct(int(count), overdue_count),
+            }
+            for value, count in type_counts.head(10).items()
+        ]
+        distribution_label = loan_type_col
+    elif branch_col:
+        branch_counts = (
+            overdue_frame[branch_col]
+            .fillna("未知")
+            .astype(str)
+            .map(lambda value: value.strip() or "未知")
+            .value_counts(dropna=False)
+        )
+        distribution_rows = [
+            {
+                branch_col: str(value),
+                "笔数": int(count),
+                "占比": _format_pct(int(count), overdue_count),
+            }
+            for value, count in branch_counts.head(10).items()
+        ]
+        distribution_label = branch_col
+
+    if distribution_rows and distribution_label:
+        top_row = distribution_rows[0]
+        lines.extend(
+            [
+                "",
+                f"### 按{distribution_label}分布",
+                "",
+                f"当前逾期最集中的{distribution_label}为「{top_row[distribution_label]}」，"
+                f"共 {top_row['笔数']} 笔，占比 {top_row['占比']}。",
+                "",
+                _render_distribution_markdown(distribution_label, distribution_rows),
+            ]
+        )
+
+    recommendations: List[str] = []
+    overdue_rate_value = Decimal(overdue_count) / Decimal(total_count)
+    if overdue_rate_value >= Decimal("0.1"):
+        recommendations.append(
+            "逾期率已偏高，建议按网点或客户经理维度拉出逾期清单，优先处理高余额客户。"
+        )
+    else:
+        recommendations.append("逾期率整体可控，建议继续按周滚动监控新增逾期并跟踪回收进度。")
+    if overdue_days_numbers and max(overdue_days_numbers) >= Decimal("30"):
+        recommendations.append(
+            "存在较长账龄逾期，建议区分 30 天内和 30 天以上客户，分层制定提醒与催收策略。"
+        )
+    if distribution_rows and distribution_label:
+        top_row = distribution_rows[0]
+        recommendations.append(
+            f"可优先针对「{top_row[distribution_label]}」开展专项排查，因为该维度当前逾期占比最高。"
+        )
+    elif loan_type_col:
+        recommendations.append(
+            "建议进一步按贷款类型拆分逾期表现，识别高风险产品并收紧准入或额度策略。"
+        )
+
+    lines.extend(["", "### 建议", ""])
+    for item in recommendations:
+        lines.append(f"- {item}")
+
+    return {
+        "text": "\n".join(lines),
+        "summary_title": "逾期贷款分析",
+        "focus_column": distribution_label or status_col or overdue_days_col or "逾期情况",
+        "distribution_rows": distribution_rows,
+        "overdue_summary": summary,
+        "recommendations": recommendations,
+    }
 
 
 def _question_distribution(
@@ -299,14 +581,17 @@ def pandas_profile(
         ]
         categorical_summary.append({"column": str(column), "top_values": top_values})
 
-    question_distribution = _question_distribution(dataframe, question)
+    question_distribution = _question_overdue_analysis(dataframe, question)
+    if not question_distribution:
+        question_distribution = _question_distribution(dataframe, question)
 
     return {
         "preview_rows": preview_rows,
         "rows": rows,
         "text": question_distribution.get("text", ""),
         "analysis": {
-            "summary_title": (
+            "summary_title": question_distribution.get("summary_title")
+            or (
                 f"{question_distribution['focus_column']}分布分析"
                 if question_distribution.get("focus_column")
                 else "Pandas 通用表格分析"
@@ -323,5 +608,7 @@ def pandas_profile(
             "categorical_summary": categorical_summary,
             "focus_column": question_distribution.get("focus_column", ""),
             "distribution_rows": question_distribution.get("distribution_rows", []),
+            "overdue_summary": question_distribution.get("overdue_summary", {}),
+            "recommendations": question_distribution.get("recommendations", []),
         },
     }

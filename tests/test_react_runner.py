@@ -448,6 +448,7 @@ class ReactRunnerTest(unittest.TestCase):
             "kind": "file_ingestion",
             "text": "文件读取完成",
             "data": {
+                "file": "/tmp/chatbi-uploads/sample.csv",
                 "analysis_mode": "pandas_fallback",
                 "preview_rows": [{"门店": "南京东路店", "城市": "上海"}],
                 "rows": [{"门店": "南京东路店", "城市": "上海"}],
@@ -499,7 +500,7 @@ class ReactRunnerTest(unittest.TestCase):
                             for event in events
                             if event.get("type") == "thinking"
                         )
-                        self.assertIn("避免重复读取", thinking)
+                        self.assertIn("文件已解析完成，正在整理结果", thinking)
                         self.assertEqual(events[-1].get("type"), "done")
 
         asyncio.run(run())

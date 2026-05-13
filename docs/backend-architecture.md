@@ -24,18 +24,19 @@
   └────────┬────────┘                                    │ app_llm          │
            │                                             │ trace            │
   ┌────────┴────────┐                                    └──────────────────┘
-  │   MySQL 三个逻辑库 │
-  │ app / admin / business                                         │
+  │   MySQL 默认同库前缀表 │
+  │ business + app_* + admin_* + local logs                        │
   └─────────────────────────────────────────────────────────────────┘
 ```
 
-### 三层数据库职责
+### 数据库职责
 
 | 数据库 | 用途 | 主要表 |
 |--------|------|--------|
-| `chatbi_app` | 应用数据 | app_user, chat_session, chat_message, user_memory |
-| `chatbi_admin` | 管理员数据 | app_db_connection, llm_settings, skill_registry |
-| `chatbi_demo` (business) | BI业务数据 | 业务表, 语义表, 视图 |
+| `chatbi_demo` | BI 业务、应用、管理默认同库 | 业务表、语义表、视图、`chatbi_app_*`、`chatbi_admin_*` |
+| `chatbi_local_logs` | 链路日志 | `chatbi_logs_trace_log` |
+
+`CHATBI_APP_DB_*` / `CHATBI_ADMIN_DB_*` 仍保留为主动拆库时的兼容扩展点。
 
 ---
 
@@ -168,7 +169,7 @@ executor.run_script(skill_doc, args, trace_id, skill_db_overrides)
 | 文件 | 职责 |
 |------|------|
 | `memory_service.py` | 每轮对话后异步刷新记忆：`format_memory_for_prompt()` 构建上下文；`refresh_memory_after_turn()` 执行 LLM 生成 session summary、trim 摘要、merge long-term profile |
-| `trace.py` | 分布式追踪日志：所有模块调用 `log_event()`，通过 subprocess `mysql` CLI 写入 `chatbi_logs.chatbi_trace_log` |
+| `trace.py` | 分布式追踪日志：所有模块调用 `log_event()`，通过 subprocess `mysql` CLI 写入 `chatbi_local_logs.chatbi_logs_trace_log`（或 `CHATBI_LOG_DB_*` 指定的目标） |
 | `app_llm.py` | `effective_llm_params()`: 合并 `config.py` 默认值 + `llm_settings_repo` DB 值 |
 | `dashboard_overview.py` | `build_dashboard_overview()`: 从业务库查询 KPI 指标（总销售额/行数/日期范围/区域数）、按区域/月份销售、语义表统计 |
 
@@ -352,7 +353,7 @@ Skill 通过环境变量获得数据库凭证，**主进程不直接访问业务
 |------|------|
 | Web 框架 | FastAPI + Starlette |
 | LLM 接口 | LiteLLM（统一封装 OpenAI/DeepSeek/阿里等） |
-| 数据库 | MySQL (三个逻辑库) |
+| 数据库 | MySQL（默认同库前缀表 + 独立日志库） |
 | 认证 | JWT (PyJWT) + bcrypt |
 | 密码学 | passlib (bcrypt) |
 | 实时通信 | SSE (sse_starlette) |

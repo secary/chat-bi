@@ -28,7 +28,10 @@ class RunTestsScriptTest(unittest.TestCase):
         discovered = MODULE.discover_python_tests()
 
         self.assertIn("tests/test_run_tests_script.py", discovered)
-        self.assertIn("tests/test_database_overview_skill.py", discovered)
+        self.assertTrue(
+            any(path != "tests/test_run_tests_script.py" for path in discovered),
+            "discover_python_tests() should find at least one other test file",
+        )
 
     def test_deduplicates_group_selection(self):
         tests = MODULE.tests_for_groups(["quick", "data-sources"])

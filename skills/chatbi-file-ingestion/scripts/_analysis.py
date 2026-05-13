@@ -160,7 +160,89 @@ def _sanitize_value(value: Any) -> Any:
     return value
 
 
-def pandas_profile(path: Path, sample_size: int, include_rows: bool) -> Dict[str, Any]:
+def _normalize_question_text(text: str) -> str:
+    return "".join(ch for ch in str(text or "") if not ch.isspace()).lower()
+
+
+def _match_focus_column(question: str, columns: List[str]) -> str:
+    normalized_question = _normalize_question_text(question)
+    if not normalized_question:
+        return ""
+    for column in columns:
+        if (
+            _normalize_question_text(column)
+            and _normalize_question_text(column) in normalized_question
+        ):
+            return str(column)
+    return ""
+
+
+def _format_pct(numerator: int, denominator: int) -> str:
+    if denominator <= 0:
+        return "0%"
+    ratio = (Decimal(numerator) / Decimal(denominator)) * Decimal("100")
+    return f"{_format_decimal(ratio)}%"
+
+
+def _render_distribution_markdown(column: str, rows: List[Dict[str, Any]]) -> str:
+    lines = [f"### {column}统计", "", f"| {column} | 笔数 | 占比 |", "|---|---:|---:|"]
+    for row in rows:
+        lines.append(f"| {row[column]} | {row['笔数']} | {row['占比']} |")
+    return "\n".join(lines)
+
+
+def _question_distribution(
+    dataframe: Any,
+    question: str,
+) -> Dict[str, Any]:
+    focus_column = _match_focus_column(
+        question, [str(column) for column in dataframe.columns.tolist()]
+    )
+    if not focus_column:
+        return {}
+    normalized_question = _normalize_question_text(question)
+    markers = ("统计", "分布", "占比", "构成", "分析")
+    if not any(marker in normalized_question for marker in markers):
+        return {}
+
+    series = (
+        dataframe[focus_column]
+        .fillna("空值")
+        .astype(str)
+        .map(lambda value: value.strip() or "空值")
+    )
+    counts = series.value_counts(dropna=False)
+    total = int(counts.sum())
+    distribution_rows = [
+        {
+            focus_column: str(value),
+            "笔数": int(count),
+            "占比": _format_pct(int(count), total),
+        }
+        for value, count in counts.head(20).items()
+    ]
+    if not distribution_rows:
+        return {}
+
+    top_row = distribution_rows[0]
+    text = (
+        f"已根据您的问题对字段「{focus_column}」做分布统计，共 {total} 行。"
+        f"当前最多的是「{top_row[focus_column]}」，共 {top_row['笔数']} 条，占比 {top_row['占比']}。\n\n"
+        f"{_render_distribution_markdown(focus_column, distribution_rows)}"
+    )
+    return {
+        "text": text,
+        "focus_column": focus_column,
+        "distribution_rows": distribution_rows,
+    }
+
+
+def pandas_profile(
+    path: Path,
+    sample_size: int,
+    include_rows: bool,
+    question: str = "",
+) -> Dict[str, Any]:
     try:
         import pandas as pd
     except ImportError as exc:
@@ -217,11 +299,18 @@ def pandas_profile(path: Path, sample_size: int, include_rows: bool) -> Dict[str
         ]
         categorical_summary.append({"column": str(column), "top_values": top_values})
 
+    question_distribution = _question_distribution(dataframe, question)
+
     return {
         "preview_rows": preview_rows,
         "rows": rows,
+        "text": question_distribution.get("text", ""),
         "analysis": {
-            "summary_title": "Pandas 通用表格分析",
+            "summary_title": (
+                f"{question_distribution['focus_column']}分布分析"
+                if question_distribution.get("focus_column")
+                else "Pandas 通用表格分析"
+            ),
             "shape": {"rows": int(len(dataframe.index)), "columns": int(len(dataframe.columns))},
             "columns": [str(column) for column in dataframe.columns.tolist()],
             "dtypes": {str(key): str(value) for key, value in dataframe.dtypes.astype(str).items()},
@@ -232,5 +321,7 @@ def pandas_profile(path: Path, sample_size: int, include_rows: bool) -> Dict[str
             },
             "numeric_summary": numeric_summary,
             "categorical_summary": categorical_summary,
+            "focus_column": question_distribution.get("focus_column", ""),
+            "distribution_rows": question_distribution.get("distribution_rows", []),
         },
     }

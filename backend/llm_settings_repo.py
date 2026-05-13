@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
+from backend.db_tables import LLM_SETTINGS
 from backend.db_mysql import admin_execute, admin_fetch_one
 
 
@@ -11,7 +12,7 @@ def get_row() -> Optional[Dict[str, Any]]:
     try:
         return admin_fetch_one(
             "SELECT id, model, api_base, api_key, active_profile_id, vision_profile_id, updated_at "
-            "FROM llm_settings WHERE id = 1"
+            f"FROM {LLM_SETTINGS} WHERE id = 1"
         )
     except Exception:
         return None
@@ -30,12 +31,12 @@ def save_merged(
     vals = (_blank_to_none(m), _blank_to_none(b), _blank_to_none(k))
     if row:
         admin_execute(
-            "UPDATE llm_settings SET model = %s, api_base = %s, api_key = %s WHERE id = 1",
+            f"UPDATE {LLM_SETTINGS} SET model = %s, api_base = %s, api_key = %s WHERE id = 1",
             vals,
         )
         return
     admin_execute(
-        "INSERT INTO llm_settings (id, model, api_base, api_key) VALUES (1, %s, %s, %s)",
+        f"INSERT INTO {LLM_SETTINGS} (id, model, api_base, api_key) VALUES (1, %s, %s, %s)",
         vals,
     )
 
@@ -76,6 +77,6 @@ def public_view(row: Optional[Dict[str, Any]]) -> Dict[str, Any]:
 def set_vision_profile_id(profile_id: Optional[int]) -> None:
     """Set optional dedicated vision LLM profile (FK); None clears."""
     admin_execute(
-        "UPDATE llm_settings SET vision_profile_id = %s WHERE id = 1",
+        f"UPDATE {LLM_SETTINGS} SET vision_profile_id = %s WHERE id = 1",
         (profile_id,),
     )

@@ -175,7 +175,11 @@ def validate_rows(
 
 
 def inspect_file(
-    path: Path, table: Optional[str], sample_size: int, include_rows: bool
+    path: Path,
+    table: Optional[str],
+    sample_size: int,
+    include_rows: bool,
+    question: str = "",
 ) -> Dict[str, Any]:
     if not path.exists():
         raise FileNotFoundError(f"文件不存在：{path}")
@@ -210,10 +214,11 @@ def inspect_file(
             "字段校验通过，已按现有库表口径直接分析。"
         )
     else:
-        fallback = pandas_profile(path, sample_size, include_rows)
+        fallback = pandas_profile(path, sample_size, include_rows, question=question)
         analysis = fallback["analysis"]
         preview_rows = fallback["preview_rows"]
         rows_output = fallback["rows"] if include_rows else []
+        question_text = str(fallback.get("text") or "").strip()
         if target_table in SCHEMAS:
             text = (
                 f"已读取 {path.name}，候选业务表为 {target_table}，共 {len(rows)} 行，"
@@ -224,6 +229,8 @@ def inspect_file(
                 f"已读取 {path.name}，共 {len(rows)} 行，未匹配到现有业务表，"
                 "已切换为 Pandas 通用分析。"
             )
+        if question_text:
+            text = text + "\n\n" + question_text
     return skill_response(
         "file_ingestion",
         text,
@@ -252,6 +259,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--table", choices=sorted(SCHEMAS.keys()))
     parser.add_argument("--sample-size", type=int, default=5)
     parser.add_argument("--include-rows", action="store_true")
+    parser.add_argument("--question", default="")
     parser.add_argument("--json", action="store_true")
     return parser.parse_args()
 
@@ -259,7 +267,13 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     try:
-        result = inspect_file(Path(args.file_path), args.table, args.sample_size, args.include_rows)
+        result = inspect_file(
+            Path(args.file_path),
+            args.table,
+            args.sample_size,
+            args.include_rows,
+            question=str(args.question or ""),
+        )
     except Exception as exc:
         if args.json:
             print(json.dumps(skill_response("error", str(exc)), ensure_ascii=False))

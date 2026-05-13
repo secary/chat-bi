@@ -3,20 +3,15 @@
 from __future__ import annotations
 
 import io
-import sys
+import os
+import tempfile
 from typing import Any, Dict, List, Optional, Tuple
-
-# Headless backend before pyplot import
-import matplotlib
-from matplotlib import font_manager
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
 
 
 def _select_sans_fonts(installed: Optional[set[str]] = None) -> List[str]:
     names = installed
     if names is None:
+        _, font_manager = _get_matplotlib_runtime()
         names = {f.name for f in font_manager.fontManager.ttflist}
     # Put CJK fonts before generic latin fonts to avoid tofu squares.
     candidates = [
@@ -37,12 +32,39 @@ def _select_sans_fonts(installed: Optional[set[str]] = None) -> List[str]:
     return picked
 
 
-if sys.platform == "win32":
-    plt.rcParams["font.sans-serif"] = _select_sans_fonts()
-else:
-    plt.rcParams["font.sans-serif"] = _select_sans_fonts()
-plt.rcParams["font.family"] = "sans-serif"
-plt.rcParams["axes.unicode_minus"] = False
+_PLT = None
+_FONT_MANAGER = None
+
+
+def _get_matplotlib_runtime():
+    global _PLT, _FONT_MANAGER
+    if _PLT is not None and _FONT_MANAGER is not None:
+        return _PLT, _FONT_MANAGER
+
+    _ensure_matplotlib_cache_dirs()
+
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib import font_manager
+
+    plt.rcParams["font.sans-serif"] = _select_sans_fonts(
+        {font.name for font in font_manager.fontManager.ttflist}
+    )
+    plt.rcParams["font.family"] = "sans-serif"
+    plt.rcParams["axes.unicode_minus"] = False
+
+    _PLT = plt
+    _FONT_MANAGER = font_manager
+    return _PLT, _FONT_MANAGER
+
+
+def _ensure_matplotlib_cache_dirs() -> None:
+    base_cache = os.path.join(tempfile.gettempdir(), "chatbi-matplotlib-cache")
+    os.makedirs(base_cache, exist_ok=True)
+    os.environ.setdefault("MPLCONFIGDIR", base_cache)
+    os.environ.setdefault("XDG_CACHE_HOME", base_cache)
 
 
 def _get_categories(option: Dict[str, Any]) -> List[str]:
@@ -119,6 +141,7 @@ def echarts_option_to_png_bytes(option: Any, dpi: int = 120) -> Optional[bytes]:
     """Return PNG bytes for supported chart types, or None."""
     if not isinstance(option, dict):
         return None
+    plt, _ = _get_matplotlib_runtime()
 
     fig, ax = plt.subplots(figsize=(6, 3.5), dpi=dpi)
 
@@ -187,6 +210,7 @@ def _chart_title(option: Dict[str, Any]) -> str:
 
 
 def _fig_to_png(fig: Any) -> bytes:
+    plt, _ = _get_matplotlib_runtime()
     buf = io.BytesIO()
     fig.savefig(buf, format="png", bbox_inches="tight", pad_inches=0.15)
     plt.close(fig)

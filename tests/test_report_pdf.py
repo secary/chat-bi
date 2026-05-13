@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import importlib
 import io
 import os
+import sys
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -14,6 +16,44 @@ except ImportError:
 
 
 class ReportPdfTest(unittest.TestCase):
+    def test_pdf_report_import_is_lazy_about_matplotlib(self) -> None:
+        module_name = "backend.report.pdf_report"
+        original = sys.modules.pop(module_name, None)
+        try:
+            real_import = __import__
+
+            def fake_import(name, *args, **kwargs):
+                if name.startswith("matplotlib"):
+                    raise AssertionError("pdf_report import should not load matplotlib eagerly")
+                return real_import(name, *args, **kwargs)
+
+            with patch("builtins.__import__", side_effect=fake_import):
+                module = importlib.import_module(module_name)
+            self.assertTrue(hasattr(module, "messages_to_html_document"))
+        finally:
+            sys.modules.pop(module_name, None)
+            if original is not None:
+                sys.modules[module_name] = original
+
+    def test_sessions_route_import_is_lazy_about_pdf_stack(self) -> None:
+        module_name = "backend.routes.sessions_route"
+        original = sys.modules.pop(module_name, None)
+        try:
+            real_import = __import__
+
+            def fake_import(name, *args, **kwargs):
+                if name.startswith("matplotlib"):
+                    raise AssertionError("sessions_route import should not load matplotlib eagerly")
+                return real_import(name, *args, **kwargs)
+
+            with patch("builtins.__import__", side_effect=fake_import):
+                module = importlib.import_module(module_name)
+            self.assertTrue(hasattr(module, "get_session_report_pdf"))
+        finally:
+            sys.modules.pop(module_name, None)
+            if original is not None:
+                sys.modules[module_name] = original
+
     def test_select_sans_fonts_prefers_cjk(self) -> None:
         from backend.report.pdf_chart_png import _select_sans_fonts
 

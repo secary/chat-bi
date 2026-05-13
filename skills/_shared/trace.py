@@ -6,8 +6,8 @@ import subprocess
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-
 MAX_PAYLOAD_LENGTH = 6000
+TRACE_LOG_TABLE = "chatbi_logs_trace_log"
 
 
 def log_skill_event(
@@ -24,7 +24,7 @@ def log_skill_event(
         _run_sql(_create_trace_db_sql())
         _run_sql(_create_trace_table_sql(), database=_log_db_name())
         _run_sql(
-            "INSERT INTO chatbi_trace_log "
+            f"INSERT INTO {TRACE_LOG_TABLE} "
             "(trace_id, span_name, event_name, level, message, payload, created_at) "
             f"VALUES ({_quote(trace_id)}, {_quote(span_name)}, {_quote(event_name)}, "
             f"{_quote(level)}, {_quote(message[:500])}, "
@@ -36,7 +36,7 @@ def log_skill_event(
 
 
 def _log_db_name() -> str:
-    return os.getenv("CHATBI_LOG_DB_NAME", "chatbi_logs")
+    return os.getenv("CHATBI_LOG_DB_NAME", os.getenv("CHATBI_DB_NAME", "chatbi_demo"))
 
 
 def _log_db_config() -> Dict[str, str]:
@@ -59,8 +59,8 @@ CREATE DATABASE IF NOT EXISTS `{_safe_ident(_log_db_name())}`
 
 
 def _create_trace_table_sql() -> str:
-    return """
-CREATE TABLE IF NOT EXISTS chatbi_trace_log (
+    return f"""
+CREATE TABLE IF NOT EXISTS {TRACE_LOG_TABLE} (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   trace_id VARCHAR(64) NOT NULL,
   span_name VARCHAR(80) NOT NULL,
@@ -127,5 +127,5 @@ def _quote(value: str) -> str:
 
 def _safe_ident(value: str) -> str:
     if not value or "`" in value or "\x00" in value:
-        return "chatbi_logs"
+        return "chatbi_demo"
     return value

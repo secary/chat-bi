@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
+
+from backend.db_tables import APP_USER
 from backend.db_mysql import app_connection, app_execute, app_fetch_all, app_fetch_one
 
 
 def get_by_username(username: str) -> Optional[Dict[str, Any]]:
     return app_fetch_one(
         "SELECT id, username, password_hash, role, is_active, created_at "
-        "FROM app_user WHERE username = %s",
+        f"FROM {APP_USER} WHERE username = %s",
         (username,),
     )
 
@@ -17,14 +19,14 @@ def get_by_username(username: str) -> Optional[Dict[str, Any]]:
 def get_by_id(user_id: int) -> Optional[Dict[str, Any]]:
     return app_fetch_one(
         "SELECT id, username, password_hash, role, is_active, created_at "
-        "FROM app_user WHERE id = %s",
+        f"FROM {APP_USER} WHERE id = %s",
         (user_id,),
     )
 
 
 def list_users() -> List[Dict[str, Any]]:
     return app_fetch_all(
-        "SELECT id, username, role, is_active, created_at FROM app_user ORDER BY id ASC"
+        f"SELECT id, username, role, is_active, created_at FROM {APP_USER} ORDER BY id ASC"
     )
 
 
@@ -32,7 +34,7 @@ def create_user(username: str, password_hash: str, role: str) -> int:
     with app_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "INSERT INTO app_user (username, password_hash, role) VALUES (%s, %s, %s)",
+                f"INSERT INTO {APP_USER} (username, password_hash, role) VALUES (%s, %s, %s)",
                 (username, password_hash, role),
             )
             return int(cur.lastrowid)
@@ -59,8 +61,8 @@ def update_user(
     if not parts:
         return
     args.append(user_id)
-    app_execute(f"UPDATE app_user SET {', '.join(parts)} WHERE id = %s", tuple(args))
+    app_execute(f"UPDATE {APP_USER} SET {', '.join(parts)} WHERE id = %s", tuple(args))
 
 
 def delete_user(user_id: int) -> None:
-    app_execute("DELETE FROM app_user WHERE id = %s", (user_id,))
+    app_execute(f"DELETE FROM {APP_USER} WHERE id = %s", (user_id,))

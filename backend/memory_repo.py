@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Optional
 
+from backend.db_tables import USER_MEMORY
 from backend.db_mysql import app_connection, app_execute, app_fetch_all, app_fetch_one
 
 _UPLOAD_PATH_RE = re.compile(r"/tmp/chatbi-uploads/[A-Za-z0-9._-]+", re.IGNORECASE)
@@ -35,7 +36,7 @@ def _prompt_is_noise(text: str) -> bool:
 def suggested_prompts_for_user(user_id: int, limit: int = 5) -> List[str]:
     try:
         rows = app_fetch_all(
-            "SELECT title FROM user_memory "
+            f"SELECT title FROM {USER_MEMORY} "
             "WHERE user_id = %s AND kind = 'session_summary' "
             "AND title IS NOT NULL AND TRIM(title) <> '' "
             "ORDER BY updated_at DESC LIMIT %s",
@@ -64,12 +65,12 @@ def insert_session_summary(
     with app_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "DELETE FROM user_memory WHERE user_id = %s AND kind = 'session_summary' "
+                f"DELETE FROM {USER_MEMORY} WHERE user_id = %s AND kind = 'session_summary' "
                 "AND source_session_id = %s",
                 (user_id, session_id),
             )
             cur.execute(
-                "INSERT INTO user_memory (user_id, kind, title, content, source_session_id) "
+                f"INSERT INTO {USER_MEMORY} (user_id, kind, title, content, source_session_id) "
                 "VALUES (%s, 'session_summary', %s, %s, %s)",
                 (user_id, title[:500], content, session_id),
             )
@@ -78,8 +79,8 @@ def insert_session_summary(
 
 def list_recent_session_summaries(user_id: int, limit: int = 5) -> List[Dict[str, Any]]:
     return app_fetch_all(
-        "SELECT id, title, content, source_session_id, updated_at "
-        "FROM user_memory WHERE user_id = %s AND kind = 'session_summary' "
+        f"SELECT id, title, content, source_session_id, updated_at "
+        f"FROM {USER_MEMORY} WHERE user_id = %s AND kind = 'session_summary' "
         "ORDER BY updated_at DESC LIMIT %s",
         (user_id, limit),
     )
@@ -87,7 +88,7 @@ def list_recent_session_summaries(user_id: int, limit: int = 5) -> List[Dict[str
 
 def get_long_term_row(user_id: int) -> Optional[Dict[str, Any]]:
     return app_fetch_one(
-        "SELECT id, content, updated_at FROM user_memory "
+        f"SELECT id, content, updated_at FROM {USER_MEMORY} "
         "WHERE user_id = %s AND kind = 'long_term' LIMIT 1",
         (user_id,),
     )
@@ -97,23 +98,23 @@ def upsert_long_term(user_id: int, content: str) -> None:
     existing = get_long_term_row(user_id)
     if existing:
         app_execute(
-            "UPDATE user_memory SET content = %s WHERE id = %s",
+            f"UPDATE {USER_MEMORY} SET content = %s WHERE id = %s",
             (content, existing["id"]),
         )
         return
     app_execute(
-        "INSERT INTO user_memory (user_id, kind, title, content) VALUES (%s, 'long_term', %s, %s)",
+        f"INSERT INTO {USER_MEMORY} (user_id, kind, title, content) VALUES (%s, 'long_term', %s, %s)",
         (user_id, "用户习惯与偏好", content),
     )
 
 
 def trim_session_summaries(user_id: int, keep: int = 30) -> None:
     rows = app_fetch_all(
-        "SELECT id FROM user_memory WHERE user_id = %s AND kind = 'session_summary' "
+        f"SELECT id FROM {USER_MEMORY} WHERE user_id = %s AND kind = 'session_summary' "
         "ORDER BY updated_at DESC",
         (user_id,),
     )
     if len(rows) <= keep:
         return
     for row in rows[keep:]:
-        app_execute("DELETE FROM user_memory WHERE id = %s", (int(row["id"]),))
+        app_execute(f"DELETE FROM {USER_MEMORY} WHERE id = %s", (int(row["id"]),))

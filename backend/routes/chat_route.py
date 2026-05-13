@@ -134,13 +134,29 @@ async def chat(
         },
     )
 
-    messages = await enrich_last_user_message_with_vision(messages, trace_id)
+    # Vision enrichment moved into event_gen() to allow sending thinking event before LLM call
     messages = augment_messages_for_upload_followup(messages)
 
     async def event_gen() -> AsyncGenerator[dict, None]:
         started_at = perf_counter()
         acc: Dict[str, Any] = {"content": "", "thinking": []}
         disconnected = False
+        nonlocal messages
+
+        # --- Vision enrichment with early thinking event ---
+        if messages and messages[-1].get("role") == "user":
+            last_content = messages[-1].get("content") or ""
+            if re.search(r"[^\s]+\.(?:png|jpg|jpeg|webp)", last_content, re.IGNORECASE):
+                yield {
+                    "event": "message",
+                    "data": json.dumps(
+                        {"type": "thinking", "content": "正在读取上传的图像..."},
+                        ensure_ascii=False,
+                    ),
+                }
+                messages = await enrich_last_user_message_with_vision(messages, trace_id)
+        # --- End vision enrichment ---
+
         try:
             # call llm to get response.
             async for event in stream_chat(

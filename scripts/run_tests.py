@@ -88,6 +88,7 @@ MODULE_SUITES: dict[str, list[str]] = {
         "tests/test_file_ingestion_skill.py",
         "tests/test_upload_context.py",
         "tests/test_vision_extract.py",
+        "tests/test_vision_llm_runtime.py",
     ],
     "report": [
         "tests/test_report_pdf.py",

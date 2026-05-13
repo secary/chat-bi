@@ -373,6 +373,7 @@ export async function putLlmSettings(payload: {
   model?: string | null;
   api_base?: string | null;
   api_key?: string | null;
+  vision_profile_id?: number | null;
 }): Promise<LlmSettingsView> {
   return requestJson<LlmSettingsView>('/admin/llm-settings', {
     method: 'PUT',
@@ -385,6 +386,7 @@ export async function postLlmProfile(payload: {
   model: string;
   api_base?: string | null;
   api_key?: string | null;
+  supports_vision?: boolean;
 }): Promise<{ profile: LlmProfilePublic }> {
   return requestJson<{ profile: LlmProfilePublic }>('/admin/llm-profiles', {
     method: 'POST',
@@ -399,6 +401,7 @@ export async function putLlmProfile(
     model?: string | null;
     api_base?: string | null;
     api_key?: string | null;
+    supports_vision?: boolean;
   },
 ): Promise<{ profile: LlmProfilePublic }> {
   return requestJson<{ profile: LlmProfilePublic }>(`/admin/llm-profiles/${id}`, {

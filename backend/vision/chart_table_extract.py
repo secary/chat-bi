@@ -10,8 +10,11 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from backend.llm_runtime import chatbi_acompletion
 from backend.trace import log_event
+from backend.vision.vision_llm_runtime import (
+    resolve_vision_litellm_base_params,
+    vision_acompletion,
+)
 
 _IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
 
@@ -86,6 +89,13 @@ async def extract_chart_table_from_image(
             "confidence": 0.0,
             "notes": "文件不存在或不可读",
         }
+    if resolve_vision_litellm_base_params() is None:
+        return {
+            "columns": [],
+            "rows": [],
+            "confidence": 0.0,
+            "notes": "未配置专用视觉模型，且当前主模型未标记支持多模态图像（或已禁用视觉功能），无法识图。",
+        }
     mime = mimetypes.guess_type(str(image_path))[0] or "image/png"
     b64 = base64.standard_b64encode(image_path.read_bytes()).decode("ascii")
     data_url = f"data:{mime};base64,{b64}"
@@ -100,7 +110,7 @@ async def extract_chart_table_from_image(
         },
     ]
     try:
-        resp = await chatbi_acompletion(
+        resp = await vision_acompletion(
             messages=messages,
             response_format={"type": "json_object"},
             temperature=0.1,
@@ -156,6 +166,7 @@ async def extract_chart_table_from_image(
     return result
 
 
+# turn graph into structure table in order to understand graph menaing.
 async def enrich_last_user_message_with_vision(
     messages: List[Dict[str, str]],
     trace_id: str = "",
@@ -167,6 +178,15 @@ async def enrich_last_user_message_with_vision(
         "yes",
         "on",
     ):
+        return messages
+    if resolve_vision_litellm_base_params() is None:
+        log_event(
+            trace_id,
+            "vision.extract",
+            "skipped",
+            "no_vision_capability",
+            level="INFO",
+        )
         return messages
     if not messages:
         return messages

@@ -11,6 +11,8 @@ export interface LlmConfigEditorCardProps {
   setApiBase: (v: string) => void;
   apiKey: string;
   setApiKey: (v: string) => void;
+  supportsVision: boolean;
+  setSupportsVision: (v: boolean) => void;
   selectedKey: number | 'new';
   profiles: LlmProfilePublic[];
   saved: string;
@@ -30,6 +32,8 @@ export function LlmConfigEditorCard({
   setApiBase,
   apiKey,
   setApiKey,
+  supportsVision,
+  setSupportsVision,
   selectedKey,
   profiles,
   saved,
@@ -142,6 +146,20 @@ export function LlmConfigEditorCard({
             }
             onChange={(e) => setApiKey(e.target.value)}
           />
+        </label>
+        <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-gray-200 bg-gray-50/80 px-3 py-2.5">
+          <input
+            type="checkbox"
+            className="mt-0.5 h-4 w-4 rounded border-gray-300 text-accent focus:ring-accent/40"
+            checked={supportsVision}
+            onChange={(e) => setSupportsVision(e.target.checked)}
+          />
+          <span className="text-gray-700">
+            该模型支持多模态图像
+            <span className="mt-0.5 block text-xs font-normal text-gray-500">
+              未配置下方「专用视觉模型档案」时，将使用标记为支持多模态的对话默认档案进行上传图结构化识读。
+            </span>
+          </span>
         </label>
         <div className="flex flex-wrap gap-2">
           <button

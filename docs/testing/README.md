@@ -156,6 +156,7 @@ uv pip --python .venv/bin/python install -r requirements.txt
 ### Upload / Vision / Report
 
 - `test_vision_extract.py::*`：Vision 抽取空结果归一化、行数截断。
+- `test_vision_llm_runtime.py::*`：视觉门禁（环境禁用、无 DB 时 `CHATBI_VISION_ALLOW_ENV_MAIN`）、无能力时 enrich 短路。
 - `test_report_pdf.py::*`：PDF HTML 文档、chart base64、WeasyPrint 成功路径、ReportLab fallback、CJK 字体优先、LLM 摘要 mock。
 
 ## 迁移方向

@@ -113,23 +113,4 @@ fi
 log "Recommended next steps:"
 log "1. First setup: bash scripts/bootstrap_dev.sh --sync"
 log "2. Code cleanup: bash scripts/bootstrap_dev.sh --format"
-log "3. Quick tests: PYTHONPATH=INSERT INTO chatbi_logs_trace_log (
-    id,
-    trace_id,
-    span_name,
-    event_name,
-    level,
-    message,
-    payload,
-    created_at
-  )
-VALUES (
-    'id:bigint',
-    'trace_id:varchar',
-    'span_name:varchar',
-    'event_name:varchar',
-    'level:varchar',
-    'message:varchar',
-    'payload:json',
-    'created_at:datetime'
-  );. .venv/bin/python scripts/run_tests.py foundation -- -q"
+log "3. Quick tests: PYTHONPATH=. .venv/bin/python scripts/run_tests.py foundation -- -q"

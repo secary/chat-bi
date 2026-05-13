@@ -32,8 +32,8 @@ services:
     environment:
       CHATBI_DB_HOST: demo-mysql
       CHATBI_DB_PORT: 3306
-      CHATBI_LOG_DB_HOST: host.docker.internal
-      CHATBI_LOG_DB_PORT: 33067
+      CHATBI_LOG_DB_HOST: demo-mysql
+      CHATBI_LOG_DB_PORT: 3306
       CHATBI_LOG_DB_NAME: chatbi_local_logs
       CHATBI_MYSQL_CMD: mysql
       WATCHFILES_FORCE_POLLING: "true"

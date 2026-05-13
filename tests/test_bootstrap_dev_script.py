@@ -69,6 +69,11 @@ class BootstrapDevScriptTest(unittest.TestCase):
             self.assertIn("Skipping formatter.", result.stdout)
             self.assertIn("[bootstrap] .env.dev found", result.stdout)
             self.assertIn("[bootstrap] frontend/node_modules found", result.stdout)
+            self.assertIn(
+                "Quick tests: PYTHONPATH=. .venv/bin/python scripts/run_tests.py foundation -- -q",
+                result.stdout,
+            )
+            self.assertNotIn("INSERT INTO", result.stdout)
 
     def test_bootstrap_runs_formatter_with_format_flag(self):
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -1,3 +1,33 @@
+[project]
+name = "chat-bi"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0,<1.0.0",
+    "uvicorn[standard]>=0.32.0,<1.0.0",
+    "sse-starlette>=2.0.0,<3.0.0",
+    "litellm>=1.50.0,<2.0.0",
+    "pydantic>=2.0.0,<3.0.0",
+    "python-dotenv>=1.0.0,<2.0.0",
+    "openpyxl>=3.1.0,<4.0.0",
+    "pandas>=2.2.0,<3.0.0",
+    "python-multipart>=0.0.20,<1.0.0",
+    "pymysql>=1.1.0,<2.0.0",
+    "cryptography>=42.0.0,<46.0.0",
+    "passlib[bcrypt]>=1.7.4,<2.0.0",
+    "PyJWT>=2.8.0,<3.0.0",
+    "bcrypt>=4.1.0,<5.0.0",
+    "pyyaml>=6.0.0,<7.0.0",
+    "weasyprint>=62.0,<63.0",
+    "pypdf>=5.0.0,<6.0.0",
+    "reportlab>=4.0.0,<5.0.0",
+    "matplotlib>=3.8.0,<4.0.0",
+    "pillow>=10.0.0,<12.0.0",
+    "pytest>=8.0.0,<9.0.0",
+    "ruff>=0.4.0,<1.0.0",
+    "black>=26.0.0,<27.0.0",
+]
+
 [tool.ruff]
 line-length = 100
 
@@ -10,3 +40,4 @@ ignore = ["E501"]
 
 [tool.black]
 line-length = 100
+target-version = ["py311"]

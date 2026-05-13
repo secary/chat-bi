@@ -12,7 +12,7 @@ from backend.agent.protocol import normalize_skill_result
 from backend.config import settings
 
 _UPLOAD_PATH_RE = re.compile(r"/tmp/chatbi-uploads/[A-Za-z0-9._-]+", re.IGNORECASE)
-_FILE_INGESTION_VALUE_OPTIONS = {"--table", "--sample-size"}
+_FILE_INGESTION_VALUE_OPTIONS = {"--table", "--sample-size", "--question"}
 _FILE_INGESTION_FLAG_OPTIONS = {"--include-rows"}
 
 
@@ -54,6 +54,13 @@ def file_ingestion_args(args: List[str], messages: List[Dict[str, str]]) -> List
     if not upload_path:
         return args
     options = file_ingestion_option_args(args)
+    latest_user = latest_user_content(messages)
+    if (
+        latest_user
+        and "--question" not in options
+        and _should_pass_question_to_file_ingestion(latest_user)
+    ):
+        options.extend(["--question", latest_user])
     if _should_include_rows_for_file_followup(messages, args) and "--include-rows" not in options:
         options.append("--include-rows")
     return [upload_path, *options]
@@ -124,6 +131,25 @@ def _should_include_rows_for_file_followup(messages: List[Dict[str, str]], args:
         "柱状图",
         "折线图",
         "饼图",
+    )
+    return any(marker in text for marker in markers)
+
+
+def _should_pass_question_to_file_ingestion(latest_user: str) -> bool:
+    text = str(latest_user or "").strip()
+    if not text:
+        return False
+    markers = (
+        "分析",
+        "统计",
+        "分布",
+        "占比",
+        "构成",
+        "汇总",
+        "排行",
+        "趋势",
+        "对比",
+        "字段",
     )
     return any(marker in text for marker in markers)
 

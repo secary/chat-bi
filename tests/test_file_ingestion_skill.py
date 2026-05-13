@@ -144,6 +144,42 @@ class FileIngestionSkillTest(unittest.TestCase):
         self.assertEqual(result["data"]["analysis"]["shape"]["rows"], 2)
         self.assertIn("评分", result["data"]["analysis"]["columns"])
 
+    def test_pandas_fallback_answers_question_with_distribution_stats(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "deposit.csv"
+            with path.open("w", encoding="utf-8", newline="") as handle:
+                writer = csv.writer(handle)
+                writer.writerow(["账户状态", "账户类型", "余额"])
+                writer.writerow(["正常", "活期", "1000"])
+                writer.writerow(["正常", "定期", "2000"])
+                writer.writerow(["冻结", "活期", "300"])
+
+            proc = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    str(path),
+                    "--json",
+                    "--question",
+                    "请按账户状态做统计",
+                ],
+                cwd=ROOT,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                capture_output=True,
+                check=False,
+                env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+            )
+
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        result = json.loads(proc.stdout)
+        self.assertEqual(result["data"]["analysis_mode"], "pandas_fallback")
+        self.assertEqual(result["data"]["analysis"]["focus_column"], "账户状态")
+        self.assertEqual(result["data"]["analysis"]["summary_title"], "账户状态分布分析")
+        self.assertIn("### 账户状态统计", result["text"])
+        self.assertEqual(result["data"]["analysis"]["distribution_rows"][0]["账户状态"], "正常")
+
 
 if __name__ == "__main__":
     unittest.main()

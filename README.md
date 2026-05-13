@@ -42,7 +42,7 @@ open http://localhost:5173
 
 ### Docker：登录报 500（Internal Server Error）
 
-常见原因是 **MySQL 数据目录来自旧版本**：官方镜像只在**空数据目录**时执行一次 `database/init.sql`。若 `./database/mysql-data` 早已存在，升级仓库里的 `init.sql` 后也不会自动补库，导致缺少 `chatbi_app` / `chatbi_admin`，登录时后端连接 `chatbi_app` 会报 `1044 Access denied` 或类似错误（容器日志里可见 `pymysql.err.OperationalError`）。
+常见原因是 **MySQL 数据目录来自旧版本**：官方镜像只在**空数据目录**时执行一次 `database/init.sql`。若 `./database/mysql-data` 早已存在，升级仓库里的 `init.sql` 后也不会自动补表，可能导致缺少 `chatbi_app_user` / `chatbi_admin_llm_settings` 等前缀表，登录时后端会报表不存在或权限类错误（容器日志里可见 `pymysql.err.OperationalError`）。
 
 **处理（会清空该环境 MySQL 中的演示数据，请先备份需要保留的内容）：**
 
@@ -53,7 +53,7 @@ docker compose down
 docker compose up -d
 ```
 
-重新拉起后，确认容器内存在库 `chatbi_app`（含表 `app_user`）后再登录 `admin` / `admin123`。
+重新拉起后，确认容器内 `chatbi_demo` 含 `chatbi_app_user`，且 `chatbi_local_logs` 含 `chatbi_logs_trace_log` 后再登录 `admin` / `admin123`。
 
 ## 本地开发启动
 
@@ -191,7 +191,7 @@ chat-bi/
        → SSE 流式返回
   → 前端渲染（thinking / text / chart / kpi_cards / error）
   → 会话消息落库（chat_session / chat_message）
-  → trace.py 将各节点日志写入 MySQL chatbi_logs（best-effort）
+  → trace.py 将各节点日志写入 MySQL chatbi_local_logs.chatbi_logs_trace_log（best-effort）
 ```
 
 ## Skills
@@ -220,21 +220,21 @@ chat-bi/
 | `CHATBI_DB_USER` | 业务库用户（默认 `demo_user`） |
 | `CHATBI_DB_PASSWORD` | 业务库密码（默认 `demo_pass`） |
 | `CHATBI_DB_NAME` | 业务库库名（默认 `chatbi_demo`） |
-| `CHATBI_APP_DB_HOST/PORT/USER/PASSWORD/NAME` | 前端用户与会话库（默认 `chatbi_app`） |
-| `CHATBI_ADMIN_DB_HOST/PORT/USER/PASSWORD/NAME` | 前端配置与技能开关库（默认 `chatbi_admin`） |
+| `CHATBI_APP_DB_HOST/PORT/USER/PASSWORD/NAME` | 可选；前端用户与会话表默认沿用 `CHATBI_DB_*` |
+| `CHATBI_ADMIN_DB_HOST/PORT/USER/PASSWORD/NAME` | 可选；配置与技能开关表默认沿用 `CHATBI_DB_*` |
 | `CHATBI_LOG_DB_HOST` | 日志库主机（未配置时回退到业务库） |
 | `CHATBI_LOG_DB_PORT` | 日志库端口 |
 | `CHATBI_LOG_DB_USER` | 日志库用户 |
 | `CHATBI_LOG_DB_PASSWORD` | 日志库密码 |
-| `CHATBI_LOG_DB_NAME` | 日志库库名（默认 `chatbi_logs`） |
+| `CHATBI_LOG_DB_NAME` | 日志库库名；未配置时回退到 `CHATBI_DB_NAME`，本地示例使用 `chatbi_local_logs` |
 | `FRONTEND_API_BASE_URL` | 可选；本地备忘用。生产 compose **不再**用该变量参与前端构建（已固定 `/api`）。分域部署请对 `frontend` 镜像使用 `--build-arg VITE_API_BASE_URL=...` |
 
-数据库职责建议：
+默认数据库职责：
 
-- `chatbi_demo`：演示业务数据与语义层元数据
-- `chatbi_app`：前端用户、会话、消息、记忆
-- `chatbi_admin`：数据源连接、LLM 设置、Skill 开关
-- `chatbi_logs`：链路日志
+- `chatbi_demo`：演示业务数据、语义层元数据、应用表 `chatbi_app_*`、管理表 `chatbi_admin_*`
+- `chatbi_local_logs`：链路日志表 `chatbi_logs_trace_log`
+
+如需主动拆分应用库或管理库，可显式设置 `CHATBI_APP_DB_*` / `CHATBI_ADMIN_DB_*`。
 
 环境文件建议：
 

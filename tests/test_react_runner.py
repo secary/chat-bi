@@ -431,6 +431,79 @@ class ReactRunnerTest(unittest.TestCase):
 
         asyncio.run(run())
 
+    def test_repeated_file_ingestion_is_short_circuited_after_first_result(self):
+        first = {
+            "action": "call_skill",
+            "skill": "chatbi-file-ingestion",
+            "skill_args": ["请分析上传文件"],
+            "thought": "先读取文件",
+        }
+        second = {
+            "action": "call_skill",
+            "skill": "chatbi-file-ingestion",
+            "skill_args": ["继续分析上传文件"],
+            "thought": "再读取一次文件",
+        }
+        file_result = {
+            "kind": "file_ingestion",
+            "text": "文件读取完成",
+            "data": {
+                "analysis_mode": "pandas_fallback",
+                "preview_rows": [{"门店": "南京东路店", "城市": "上海"}],
+                "rows": [{"门店": "南京东路店", "城市": "上海"}],
+            },
+        }
+
+        async def run():
+            cfg = replace(settings, agent_react=True, agent_max_steps=6)
+            with patch("backend.agent.react_runner.settings", cfg):
+                with patch(
+                    "backend.agent.react_runner.call_llm_for_react_step",
+                    new_callable=AsyncMock,
+                ) as mock_llm:
+                    mock_llm.side_effect = [first, second]
+                    seen = []
+
+                    def _run_script(skill_doc, args, **kwargs):
+                        seen.append((skill_doc.name, args))
+                        return file_result
+
+                    with patch("backend.agent.react_runner.run_script", side_effect=_run_script):
+                        events = await _collect(
+                            stream_chat_react(
+                                [
+                                    {
+                                        "role": "user",
+                                        "content": "请读取我上传的文件 /tmp/chatbi-uploads/sample.csv 并分析逾期贷款分布",
+                                    }
+                                ],
+                                trace_id="t8",
+                            )
+                        )
+                        self.assertEqual(
+                            seen,
+                            [
+                                (
+                                    "chatbi-file-ingestion",
+                                    [
+                                        "/tmp/chatbi-uploads/sample.csv",
+                                        "--question",
+                                        "请读取我上传的文件 /tmp/chatbi-uploads/sample.csv 并分析逾期贷款分布",
+                                        "--include-rows",
+                                    ],
+                                )
+                            ],
+                        )
+                        thinking = " ".join(
+                            event.get("content", "")
+                            for event in events
+                            if event.get("type") == "thinking"
+                        )
+                        self.assertIn("避免重复读取", thinking)
+                        self.assertEqual(events[-1].get("type"), "done")
+
+        asyncio.run(run())
+
 
 if __name__ == "__main__":
     unittest.main()

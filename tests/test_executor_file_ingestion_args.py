@@ -39,3 +39,13 @@ def test_file_ingestion_filters_unsupported_llm_options():
         messages,
     )
     assert out == [path, "--include-rows"]
+
+
+def test_file_ingestion_passes_latest_user_question_for_followup_analysis():
+    path = "/tmp/chatbi-uploads/deposit_ready.csv"
+    messages = [
+        {"role": "user", "content": f"我上传了文件 {path}"},
+        {"role": "user", "content": "请按账户状态做统计"},
+    ]
+    out = skill_args_for_execution("chatbi-file-ingestion", ["请继续分析"], messages)
+    assert out == [path, "--question", "请按账户状态做统计", "--include-rows"]

@@ -37,7 +37,11 @@ class Settings:
             "CHATBI_APP_DB_PASSWORD", os.getenv("CHATBI_DB_PASSWORD", "demo_pass")
         )
     )
-    app_db_name: str = field(default_factory=lambda: os.getenv("CHATBI_APP_DB_NAME", "chatbi_app"))
+    app_db_name: str = field(
+        default_factory=lambda: os.getenv(
+            "CHATBI_APP_DB_NAME", os.getenv("CHATBI_DB_NAME", "chatbi_demo")
+        )
+    )
     admin_db_host: str = field(
         default_factory=lambda: os.getenv(
             "CHATBI_ADMIN_DB_HOST",
@@ -63,7 +67,10 @@ class Settings:
         )
     )
     admin_db_name: str = field(
-        default_factory=lambda: os.getenv("CHATBI_ADMIN_DB_NAME", "chatbi_admin")
+        default_factory=lambda: os.getenv(
+            "CHATBI_ADMIN_DB_NAME",
+            os.getenv("CHATBI_APP_DB_NAME", os.getenv("CHATBI_DB_NAME", "chatbi_demo")),
+        )
     )
     log_db_host: str = field(
         default_factory=lambda: os.getenv(
@@ -83,7 +90,12 @@ class Settings:
             "CHATBI_LOG_DB_PASSWORD", os.getenv("CHATBI_DB_PASSWORD", "demo_pass")
         )
     )
-    log_db_name: str = field(default_factory=lambda: os.getenv("CHATBI_LOG_DB_NAME", "chatbi_logs"))
+    log_db_name: str = field(
+        default_factory=lambda: os.getenv(
+            "CHATBI_LOG_DB_NAME",
+            os.getenv("CHATBI_DB_NAME", "chatbi_demo"),
+        )
+    )
 
     agent_react: bool = field(
         default_factory=lambda: os.getenv("CHATBI_AGENT_REACT", "1").strip().lower()

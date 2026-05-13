@@ -138,7 +138,8 @@ def _render_pdf_with_reportlab(messages: List[Dict[str, Any]], session_title: st
         from reportlab.lib.units import inch
         from reportlab.pdfbase import pdfmetrics
         from reportlab.pdfbase.cidfonts import UnicodeCIDFont
-        from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer
+        from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+        from reportlab.lib import colors
     except Exception as exc:
         raise RuntimeError(
             "PDF 导出依赖加载失败：请安装 weasyprint 系统依赖，或确保 reportlab / pillow 可用。"
@@ -151,6 +152,10 @@ def _render_pdf_with_reportlab(messages: List[Dict[str, Any]], session_title: st
         font_name = "Helvetica"
 
     summary = summarize_session_for_pdf(messages)
+    summary_html = _markdown_to_html(summary)
+    # Strip HTML tags for plain-text fallback in ReportLab
+    import re
+    plain_summary = re.sub(r"<[^>]+>", "", summary_html)
     pngs = _chart_pngs(messages)
 
     buffer = io.BytesIO()
@@ -162,41 +167,120 @@ def _render_pdf_with_reportlab(messages: List[Dict[str, Any]], session_title: st
         topMargin=36,
         bottomMargin=36,
     )
-    style = ParagraphStyle(
+    body_style = ParagraphStyle(
         name="Body",
         fontName=font_name,
         fontSize=10,
+        leading=15,
+    )
+    h2_style = ParagraphStyle(
+        name="H2",
+        fontName=font_name,
+        fontSize=13,
+        leading=18,
+        spaceBefore=14,
+        spaceAfter=6,
+    )
+    h3_style = ParagraphStyle(
+        name="H3",
+        fontName=font_name,
+        fontSize=11,
+        leading=15,
+        spaceBefore=10,
+        spaceAfter=4,
+    )
+    li_style = ParagraphStyle(
+        name="Li",
+        fontName=font_name,
+        fontSize=10,
         leading=14,
+        leftIndent=16,
+        bulletIndent=8,
     )
     title_style = ParagraphStyle(
         name="Title",
         fontName=font_name,
-        fontSize=14,
-        leading=18,
-        spaceAfter=12,
+        fontSize=16,
+        leading=20,
+        spaceAfter=8,
     )
+    caption_style = ParagraphStyle(
+        name="Caption",
+        fontName=font_name,
+        fontSize=8,
+        leading=10,
+        textColor=colors.grey,
+    )
+
+    def _parse_summary_to_flowables(text: str) -> List[Any]:
+        """Parse minimal HTML from _markdown_to_html into ReportLab flowables."""
+        import re
+        flowables: List[Any] = []
+        # Split on HTML block tags
+        parts = re.split(r"(?=<[uhlp][^>]*>)", text)
+        for part in parts:
+            part = part.strip()
+            if not part:
+                continue
+            m = re.match(r"^<h([23])>(.+)</h\1>$", part)
+            if m:
+                level = int(m.group(1))
+                content = re.sub(r"<[^>]+>", "", m.group(2))
+                style = h2_style if level == 2 else h3_style
+                flowables.append(Paragraph(content, style))
+                continue
+            m = re.match(r"^<p>(.*)</p>$", part)
+            if m:
+                content = m.group(1).replace("<strong>", "<b>").replace("</strong>", "</b>")
+                content = re.sub(r"<[^>]+>", "", content)
+                if content:
+                    flowables.append(Paragraph(content, body_style))
+                continue
+            m = re.match(r"^<li>(.*)</li>$", part)
+            if m:
+                content = re.sub(r"<[^>]+>", "", m.group(1))
+                flowables.append(Paragraph(f"• {content}", li_style))
+                continue
+            # fallback: strip tags
+            clean = re.sub(r"<[^>]+>", "", part)
+            if clean.strip():
+                flowables.append(Paragraph(clean, body_style))
+        return flowables
 
     story: List[Any] = []
     story.append(Paragraph(html.escape(session_title), title_style))
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    story.append(Paragraph(html.escape(f"导出时间: {ts}"), style))
-    story.append(Spacer(1, 12))
-    story.append(Paragraph(html.escape("摘要"), title_style))
-    for para in summary.split("\n"):
-        line = para.strip() or " "
-        story.append(Paragraph(html.escape(line), style))
-    story.append(Spacer(1, 12))
+    story.append(Paragraph(html.escape(f"导出时间: {ts}"), body_style))
+    story.append(Spacer(1, 10))
+    story.append(Paragraph("摘要", h2_style))
+    story.extend(_parse_summary_to_flowables(summary_html))
+    story.append(Spacer(1, 10))
 
     kpis = _collect_kpi_cards(messages)
     if kpis:
-        story.append(Paragraph(html.escape("关键指标"), title_style))
+        story.append(Paragraph("关键指标", h2_style))
+        kpi_data = [["指标", "数值", "单位"]]
         for card in kpis:
-            line = f"{card.get('label', '')}: {card.get('value', '')}{card.get('unit', '')}"
-            story.append(Paragraph(html.escape(line), style))
-        story.append(Spacer(1, 12))
+            kpi_data.append([
+                str(card.get("label", "")),
+                str(card.get("value", "")),
+                str(card.get("unit", "")),
+            ])
+        kpi_table = Table(kpi_data, colWidths=[2.5 * inch, 1.8 * inch, 1.2 * inch])
+        kpi_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+            ("FONTNAME", (0, 0), (-1, 0), font_name),
+            ("FONTNAME", (0, 1), (-1, -1), font_name),
+            ("FONTSIZE", (0, 0), (-1, -1), 9),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+            ("PADDING", (0, 0), (-1, -1), 5),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ]))
+        story.append(kpi_table)
+        story.append(Spacer(1, 10))
 
     if pngs:
-        story.append(Paragraph(html.escape("可视化图表"), title_style))
+        story.append(Paragraph("可视化图表", h2_style))
         max_w = 6 * inch
         for i, png_bytes in enumerate(pngs, start=1):
             pil_img = PILImage.open(io.BytesIO(png_bytes))
@@ -204,10 +288,10 @@ def _render_pdf_with_reportlab(messages: List[Dict[str, Any]], session_title: st
             scale = min(1.0, max_w / float(iw))
             w = iw * scale
             h = ih * scale
-            story.append(Paragraph(html.escape(f"图表 {i}"), style))
-            story.append(Spacer(1, 6))
+            story.append(Paragraph(f"图表 {i}", body_style))
+            story.append(Spacer(1, 4))
             story.append(Image(io.BytesIO(png_bytes), width=w, height=h))
-            story.append(Spacer(1, 12))
+            story.append(Spacer(1, 8))
 
     doc.build(story)
     return buffer.getvalue()

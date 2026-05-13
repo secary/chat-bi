@@ -4,7 +4,12 @@ CREATE DATABASE IF NOT EXISTS chatbi_demo
   DEFAULT CHARACTER SET utf8mb4
   DEFAULT COLLATE utf8mb4_unicode_ci;
 
+CREATE DATABASE IF NOT EXISTS chatbi_local_logs
+  DEFAULT CHARACTER SET utf8mb4
+  DEFAULT COLLATE utf8mb4_unicode_ci;
+
 GRANT ALL PRIVILEGES ON chatbi_demo.* TO 'demo_user'@'%';
+GRANT ALL PRIVILEGES ON chatbi_local_logs.* TO 'demo_user'@'%';
 
 USE chatbi_demo;
 
@@ -253,7 +258,6 @@ VALUES
 DROP TABLE IF EXISTS chatbi_app_user_memory;
 DROP TABLE IF EXISTS chatbi_app_chat_message;
 DROP TABLE IF EXISTS chatbi_app_chat_session;
-DROP TABLE IF EXISTS chatbi_logs_trace_log;
 DROP TABLE IF EXISTS chatbi_admin_llm_settings;
 DROP TABLE IF EXISTS chatbi_admin_llm_model_profile;
 DROP TABLE IF EXISTS chatbi_admin_app_db_connection;
@@ -374,6 +378,10 @@ INSERT INTO chatbi_admin_llm_settings (id, model, api_base, api_key, active_prof
 VALUES (1, NULL, NULL, NULL, NULL, NULL)
 ON DUPLICATE KEY UPDATE id = id;
 
+USE chatbi_local_logs;
+
+DROP TABLE IF EXISTS chatbi_logs_trace_log;
+
 CREATE TABLE chatbi_logs_trace_log (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   trace_id VARCHAR(64) NOT NULL,
@@ -386,3 +394,5 @@ CREATE TABLE chatbi_logs_trace_log (
   KEY idx_trace_log_trace_id (trace_id),
   KEY idx_trace_log_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+USE chatbi_demo;

@@ -11,6 +11,15 @@ from backend.db_tables import TRACE_LOG
 MAX_PAYLOAD_LENGTH = 6000
 
 
+def create_trace_database_sql(database: str) -> str:
+    safe_database = _safe_ident(database)
+    return (
+        f"CREATE DATABASE IF NOT EXISTS `{safe_database}` "
+        "DEFAULT CHARACTER SET utf8mb4 "
+        "DEFAULT COLLATE utf8mb4_unicode_ci;"
+    )
+
+
 def create_trace_log_table_sql() -> str:
     return f"""
 CREATE TABLE IF NOT EXISTS {TRACE_LOG} (
@@ -39,6 +48,7 @@ def log_event(
     if not trace_id:
         return
     try:
+        _run_sql(create_trace_database_sql(settings.log_db_name))
         _run_sql(create_trace_log_table_sql(), database=settings.log_db_name)
         _run_sql(
             f"INSERT INTO {TRACE_LOG} "
@@ -106,5 +116,5 @@ def _quote(value: str) -> str:
 
 def _safe_ident(value: str) -> str:
     if not value or "`" in value or "\x00" in value:
-        return "chatbi_demo"
+        return "chatbi_local_logs"
     return value

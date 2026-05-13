@@ -144,7 +144,14 @@ def _render_pdf_with_reportlab(messages: List[Dict[str, Any]], session_title: st
         from reportlab.lib.units import inch
         from reportlab.pdfbase import pdfmetrics
         from reportlab.pdfbase.cidfonts import UnicodeCIDFont
-        from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+        from reportlab.platypus import (
+            Image,
+            Paragraph,
+            SimpleDocTemplate,
+            Spacer,
+            Table,
+            TableStyle,
+        )
         from reportlab.lib import colors
     except Exception as exc:
         raise RuntimeError(
@@ -161,6 +168,7 @@ def _render_pdf_with_reportlab(messages: List[Dict[str, Any]], session_title: st
     summary_html = _markdown_to_html(summary)
     # Strip HTML tags for plain-text fallback in ReportLab
     import re
+
     plain_summary = re.sub(r"<[^>]+>", "", summary_html)
     pngs = _chart_pngs(messages)
 
@@ -221,6 +229,7 @@ def _render_pdf_with_reportlab(messages: List[Dict[str, Any]], session_title: st
     def _parse_summary_to_flowables(text: str) -> List[Any]:
         """Parse minimal HTML from _markdown_to_html into ReportLab flowables."""
         import re
+
         flowables: List[Any] = []
         # Split on HTML block tags
         parts = re.split(r"(?=<[uhlp][^>]*>)", text)
@@ -267,21 +276,27 @@ def _render_pdf_with_reportlab(messages: List[Dict[str, Any]], session_title: st
         story.append(Paragraph("关键指标", h2_style))
         kpi_data = [["指标", "数值", "单位"]]
         for card in kpis:
-            kpi_data.append([
-                str(card.get("label", "")),
-                str(card.get("value", "")),
-                str(card.get("unit", "")),
-            ])
+            kpi_data.append(
+                [
+                    str(card.get("label", "")),
+                    str(card.get("value", "")),
+                    str(card.get("unit", "")),
+                ]
+            )
         kpi_table = Table(kpi_data, colWidths=[2.5 * inch, 1.8 * inch, 1.2 * inch])
-        kpi_table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
-            ("FONTNAME", (0, 0), (-1, 0), font_name),
-            ("FONTNAME", (0, 1), (-1, -1), font_name),
-            ("FONTSIZE", (0, 0), (-1, -1), 9),
-            ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-            ("PADDING", (0, 0), (-1, -1), 5),
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ]))
+        kpi_table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+                    ("FONTNAME", (0, 0), (-1, 0), font_name),
+                    ("FONTNAME", (0, 1), (-1, -1), font_name),
+                    ("FONTSIZE", (0, 0), (-1, -1), 9),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                    ("PADDING", (0, 0), (-1, -1), 5),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ]
+            )
+        )
         story.append(kpi_table)
         story.append(Spacer(1, 10))
 

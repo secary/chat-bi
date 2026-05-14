@@ -49,3 +49,13 @@ def test_file_ingestion_passes_latest_user_question_for_followup_analysis():
     ]
     out = skill_args_for_execution("chatbi-file-ingestion", ["请继续分析"], messages)
     assert out == [path, "--question", "请按账户状态做统计", "--include-rows"]
+
+
+def test_file_ingestion_includes_rows_after_metric_confirmation():
+    path = "/tmp/chatbi-uploads/auto_analysis_ready.csv"
+    messages = [
+        {"role": "user", "content": f"我上传了文件 {path}"},
+        {"role": "user", "content": "采纳全部指标并生成看板"},
+    ]
+    out = skill_args_for_execution("chatbi-file-ingestion", ["继续"], messages)
+    assert out == [path, "--question", "采纳全部指标并生成看板", "--include-rows"]

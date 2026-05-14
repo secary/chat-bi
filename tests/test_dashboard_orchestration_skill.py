@@ -43,6 +43,28 @@ class DashboardOrchestrationSkillTest(unittest.TestCase):
         payload = MODULE.build_dashboard_package("生成仪表盘", {})
         self.assertEqual(payload["data"]["dashboard_spec"]["status"], "need_clarification")
 
+    def test_builds_dashboard_middleware_from_auto_analysis_payload(self):
+        payload = MODULE.build_dashboard_package(
+            "上传文件自动分析",
+            {
+                "auto_analysis": {
+                    "profile": {"row_count": 3, "domain_guess": "generic_table"},
+                    "metrics": [
+                        {
+                            "id": "llm_metric",
+                            "name": "LLM 指标",
+                            "rows": [{"月份": "2026-01", "LLM 指标": 10}],
+                        }
+                    ],
+                    "charts": [{"xAxis": {"data": ["2026-01"]}, "series": []}],
+                }
+            },
+        )
+
+        self.assertEqual(payload["kind"], "dashboard_orchestration")
+        self.assertEqual(payload["data"]["dashboard_spec"]["status"], "ready")
+        self.assertEqual(payload["data"]["dashboard_middleware"]["widgets"][0]["id"], "llm_metric")
+
     def test_parse_input_supports_natural_language_plus_json(self):
         question, payload = MODULE.parse_input(
             "请帮我生成一个经营概览看板，并直接给出可视化结果："

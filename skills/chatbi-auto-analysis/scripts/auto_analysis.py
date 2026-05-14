@@ -21,13 +21,17 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Auto-analyze uploaded table rows")
     parser.add_argument("input_terms", nargs="*", help="Question or JSON payload string")
     parser.add_argument("--input", help="Question or JSON payload; overrides positional args")
+    parser.add_argument("--input-file", help="Read question/rows JSON payload from a file")
     parser.add_argument("--json", action="store_true", help="Print structured SkillResult JSON")
     return parser.parse_args(argv)
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parse_args(argv)
-    raw_input = args.input if args.input is not None else " ".join(args.input_terms)
+    if args.input_file:
+        raw_input = Path(args.input_file).read_text(encoding="utf-8")
+    else:
+        raw_input = args.input if args.input is not None else " ".join(args.input_terms)
     if not raw_input.strip():
         print("ERROR: input is required", file=sys.stderr)
         return 1

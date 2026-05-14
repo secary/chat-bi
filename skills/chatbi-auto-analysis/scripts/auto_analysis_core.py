@@ -74,10 +74,15 @@ def execute_analysis(
             {"status": "need_confirmation", "analysis_proposal": proposal},
         )
 
+    accept_all = any(word in (question or "") for word in ["采纳全部", "全部指标", "全部采纳"])
     selected_ids = (
         set(accepted_metric_ids)
         or extract_requested_metric_ids(question, proposals)
-        or {str(item["id"]) for item in proposals if item.get("selected")}
+        or (
+            {str(item["id"]) for item in proposals}
+            if accept_all
+            else {str(item["id"]) for item in proposals if item.get("selected")}
+        )
     )
     selected = [item for item in proposals if item["id"] in selected_ids]
     if not selected:

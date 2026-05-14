@@ -14,7 +14,7 @@ SKILLS_DIR = SCRIPT_DIR.parents[1]
 sys.path.insert(0, str(SKILLS_DIR))
 
 from _shared.output import skill_response  # noqa: E402
-from _analysis import analyze_known_table, pandas_profile  # noqa: E402
+from table_profile import build_table_profile  # noqa: E402
 
 Schema = Dict[str, Dict[str, str]]
 
@@ -192,10 +192,10 @@ def inspect_file(
     normalized_rows: List[Dict[str, Any]] = []
     type_errors: List[Dict[str, Any]] = []
     valid = False
-    analysis_mode = "pandas_fallback"
-    analysis: Dict[str, Any]
+    analysis_mode = "profile_only"
     preview_rows: List[Dict[str, Any]]
     rows_output: List[Dict[str, Any]]
+    table_profile = build_table_profile(headers, rows)
 
     if target_table in SCHEMAS:
         required = set(SCHEMAS[target_table].keys())
@@ -205,32 +205,26 @@ def inspect_file(
         valid = not missing and not type_errors
 
     if valid and target_table:
-        analysis_mode = "schema_direct"
-        analysis = analyze_known_table(target_table, normalized_rows)
+        analysis_mode = "schema_validated"
         preview_rows = normalized_rows[:sample_size]
         rows_output = normalized_rows if include_rows else []
         text = (
             f"已读取 {path.name}，匹配到业务表 {target_table}，共 {len(rows)} 行，"
-            "字段校验通过，已按现有库表口径直接分析。"
+            "字段校验通过，已生成结构画像。"
         )
     else:
-        fallback = pandas_profile(path, sample_size, include_rows, question=question)
-        analysis = fallback["analysis"]
-        preview_rows = fallback["preview_rows"]
-        rows_output = fallback["rows"] if include_rows else []
-        question_text = str(fallback.get("text") or "").strip()
+        preview_rows = rows[:sample_size]
+        rows_output = rows if include_rows else []
         if target_table in SCHEMAS:
             text = (
                 f"已读取 {path.name}，候选业务表为 {target_table}，共 {len(rows)} 行，"
-                "但字段校验未通过，已切换为 Pandas 通用分析。"
+                "但字段校验未通过，已生成通用结构画像。"
             )
         else:
             text = (
                 f"已读取 {path.name}，共 {len(rows)} 行，未匹配到现有业务表，"
-                "已切换为 Pandas 通用分析。"
+                "已生成通用结构画像。"
             )
-        if question_text:
-            text = text + "\n\n" + question_text
     return skill_response(
         "file_ingestion",
         text,
@@ -248,7 +242,12 @@ def inspect_file(
             "rows": rows_output,
             "valid": valid,
             "analysis_mode": analysis_mode,
-            "analysis": analysis,
+            "table_profile": table_profile,
+            "analysis": {
+                "summary_title": "表结构画像",
+                "shape": {"rows": len(rows), "columns": len(headers)},
+                "columns": headers,
+            },
         },
     )
 

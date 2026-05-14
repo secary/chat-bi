@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import os
 from typing import Any, Dict, List, Sequence
@@ -21,20 +23,22 @@ def propose_metrics_with_llm(question: str, profile: Dict[str, Any]) -> List[Dic
     try:
         from backend.llm_runtime import chatbi_completion
 
-        resp = chatbi_completion(
-            messages=[
-                {"role": "system", "content": AUTO_ANALYSIS_PLANNER_PROMPT},
-                {
-                    "role": "user",
-                    "content": json.dumps(
-                        {"question": question, "table_profile": profile},
-                        ensure_ascii=False,
-                    ),
-                },
-            ],
-            temperature=0.1,
-            timeout=8,
-        )
+        _buf = io.StringIO()
+        with contextlib.redirect_stdout(_buf):
+            resp = chatbi_completion(
+                messages=[
+                    {"role": "system", "content": AUTO_ANALYSIS_PLANNER_PROMPT},
+                    {
+                        "role": "user",
+                        "content": json.dumps(
+                            {"question": question, "table_profile": profile},
+                            ensure_ascii=False,
+                        ),
+                    },
+                ],
+                temperature=0.1,
+                timeout=8,
+            )
         payload = extract_json(completion_content(resp))
         plans = payload.get("metric_plans") if isinstance(payload, dict) else None
         return [item for item in plans or [] if isinstance(item, dict)]

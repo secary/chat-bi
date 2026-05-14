@@ -34,10 +34,12 @@ def validate_metric_plans(
                 "selected": bool(plan.get("selected", True)),
             }
         )
-    return valid[:5]
+    return valid[:10]
 
 
 def derive_metric(metric_plan: Dict[str, Any], rows: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
+    if str(metric_plan.get("formula", {}).get("op") or "").lower() == "funnel":
+        return {**metric_plan, "rows": derive_funnel_rows(metric_plan, rows)}
     grouped = group_rows(rows, metric_plan.get("group_by") or [])
     metric_name = str(metric_plan.get("name") or "指标值")
     derived = []
@@ -46,6 +48,26 @@ def derive_metric(metric_plan: Dict[str, Any], rows: Sequence[Dict[str, Any]]) -
         row[metric_name] = float(eval_formula(metric_plan["formula"], group))
         derived.append(row)
     return {**metric_plan, "rows": derived}
+
+
+def derive_funnel_rows(
+    metric_plan: Dict[str, Any], rows: Sequence[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
+    formula = metric_plan.get("formula") or {}
+    stage_dimension = str(formula.get("stage_dimension") or "阶段")
+    metric_name = str(metric_plan.get("name") or "指标值")
+    stages = [item for item in formula.get("stages", []) if isinstance(item, dict)]
+    derived = []
+    for stage in stages:
+        label = str(stage.get("label") or "阶段")
+        stage_formula = stage.get("formula") or {}
+        derived.append(
+            {
+                stage_dimension: label,
+                metric_name: float(eval_formula(stage_formula, rows)),
+            }
+        )
+    return derived
 
 
 def group_rows(
@@ -87,6 +109,11 @@ def eval_formula(formula: Dict[str, Any], rows: Sequence[Dict[str, Any]]) -> Dec
             return Decimal("0")
         value = eval_formula(formula.get("numerator") or {}, rows) / denominator
         return value * Decimal("100") if op == "ratio_percent" else value
+    if op == "funnel":
+        stages = [item for item in formula.get("stages", []) if isinstance(item, dict)]
+        if not stages:
+            return Decimal("0")
+        return eval_formula(stages[0].get("formula") or {}, rows)
     return Decimal("0")
 
 
@@ -137,6 +164,9 @@ def formula_fields(formula: Any) -> set[str]:
     fields = {str(formula["field"])} if formula.get("field") else set()
     for key in ("left", "right", "numerator", "denominator"):
         fields |= formula_fields(formula.get(key))
+    for stage in formula.get("stages") or []:
+        if isinstance(stage, dict):
+            fields |= formula_fields(stage.get("formula"))
     fields |= filter_fields(formula.get("filter"))
     return fields
 

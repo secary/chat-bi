@@ -222,9 +222,19 @@ def inspect_file(
             )
         else:
             text = (
-                f"已读取 {path.name}，共 {len(rows)} 行，未匹配到现有业务表，"
-                "已生成通用结构画像。"
+                f"已读取 {path.name}，共 {len(rows)} 行，未匹配到现有业务表，已生成通用结构画像。"
             )
+    # Build column_labels: canonical field name → Chinese display label.
+    # For schema-matched tables use the schema label; for generic tables fall back to
+    # the original CSV header (which may already be Chinese).
+    column_labels: Dict[str, str] = {}
+    if target_table in SCHEMAS:
+        for field, config in SCHEMAS[target_table].items():
+            column_labels[field] = config["label"]
+    for original_header, canonical in header_map.items():
+        if canonical not in column_labels:
+            column_labels[canonical] = original_header
+
     return skill_response(
         "file_ingestion",
         text,
@@ -235,6 +245,7 @@ def inspect_file(
             "row_count": len(rows),
             "headers": headers,
             "normalized_headers": header_map,
+            "column_labels": column_labels,
             "missing_columns": missing,
             "unknown_columns": unknown,
             "type_errors": type_errors[:50],

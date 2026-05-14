@@ -124,13 +124,23 @@ def _should_include_rows_for_file_followup(messages: List[Dict[str, str]], args:
         "可视化",
         "展示",
         "分析",
+        "统计",
         "汇总",
         "排行",
+        "排名",
         "趋势",
         "对比",
+        "分布",
+        "占比",
+        "比例",
+        "百分比",
         "柱状图",
         "折线图",
         "饼图",
+        "计算",
+        "总计",
+        "求和",
+        "平均",
     )
     return any(marker in text for marker in markers)
 

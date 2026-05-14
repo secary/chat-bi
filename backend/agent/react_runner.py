@@ -21,6 +21,11 @@ from backend.agent.prompt_builder import (
 )
 from backend.agent.query_decision import is_query_plus_decision_text
 from backend.agent.react_followup import run_decision_followup
+from backend.agent.upload_context import (
+    cache_file_data,
+    get_cached_file_data,
+    get_cached_rows,
+)
 from backend.config import settings
 from backend.trace import log_event
 
@@ -108,12 +113,18 @@ def _should_short_circuit_repeated_file_ingestion(
     skill_name: str,
     last_skill_name: Optional[str],
     last_result: Optional[Dict[str, Any]],
+    messages: Optional[List[Dict[str, str]]] = None,
 ) -> bool:
-    return (
-        skill_name == "chatbi-file-ingestion"
-        and last_skill_name == "chatbi-file-ingestion"
-        and _is_file_ingestion_result(last_result)
-    )
+    if skill_name != "chatbi-file-ingestion" or last_skill_name != "chatbi-file-ingestion":
+        return False
+    if not _is_file_ingestion_result(last_result):
+        return False
+    # If we have cached rows for the upload path, use them without re-reading
+    if messages:
+        upload_path = latest_user_upload_path(messages)
+        if upload_path and get_cached_file_data(upload_path):
+            return True
+    return False
 
 
 def _chart_recommendation_args(
@@ -303,6 +314,7 @@ async def stream_chat_react(
             skill_name,
             last_skill_name,
             last_result,
+            messages,
         ):
             yield {
                 "type": "thinking",
@@ -370,6 +382,11 @@ async def stream_chat_react(
             last_skill_name = skill_name
             last_result = result
             called_skills.append(skill_name)
+            # Cache file data for cross-turn reuse
+            if skill_name == "chatbi-file-ingestion" and _is_file_ingestion_result(result):
+                upload_path = latest_user_upload_path(messages)
+                if upload_path and result.get("data"):
+                    cache_file_data(upload_path, result)
             obs = summarize_observation(skill_name, result)
         except Exception as exc:
             log_event(

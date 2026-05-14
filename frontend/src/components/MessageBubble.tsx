@@ -1,3 +1,4 @@
+import ReactECharts from 'echarts-for-react';
 import type { ChatMessage } from '../types/message';
 import { ThinkingBubble } from './ThinkingBubble';
 import { ChartRenderer } from './ChartRenderer';
@@ -7,6 +8,169 @@ import { parseMarkdownBlocks } from '../lib/markdownBlocks';
 
 interface MessageBubbleProps {
   message: ChatMessage;
+}
+
+function formatAxisNumber(value: unknown): string {
+  const num = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(num)) return String(value ?? '');
+  const abs = Math.abs(num);
+  if (abs >= 1e8) {
+    return `${trimZero((num / 1e8).toFixed(1))}亿`;
+  }
+  if (abs >= 1e4) {
+    return `${trimZero((num / 1e4).toFixed(1))}万`;
+  }
+  return trimZero(num.toFixed(abs >= 100 ? 0 : 1));
+}
+
+function trimZero(value: string): string {
+  return value.replace(/\.0+$/, '').replace(/(\.\d*[1-9])0+$/, '$1');
+}
+
+function wrapCategoryLabel(value: unknown): string {
+  const text = String(value ?? '').trim();
+  if (!text) return '';
+  if (text.length <= 4) return text;
+  const parts: string[] = [];
+  for (let index = 0; index < text.length; index += 4) {
+    parts.push(text.slice(index, index + 4));
+  }
+  return parts.slice(0, 2).join('\n');
+}
+
+function withDashboardTheme(option: Record<string, unknown>): Record<string, unknown> {
+  const next = structuredClone(option);
+  const palette = ['#0ea5e9', '#22c55e', '#8b5cf6', '#f59e0b', '#f43f5e', '#14b8a6'];
+
+  next.backgroundColor = 'transparent';
+  next.textStyle = { color: '#334155' };
+  next.color = Array.isArray(next.color) && next.color.length > 0 ? next.color : palette;
+
+  const tooltip = (next.tooltip ?? {}) as Record<string, unknown>;
+  next.tooltip = {
+    ...tooltip,
+    backgroundColor: 'rgba(255, 255, 255, 0.98)',
+    borderColor: 'rgba(148, 163, 184, 0.24)',
+    borderWidth: 1,
+    textStyle: { color: '#334155' },
+  };
+
+  const legend = (next.legend ?? {}) as Record<string, unknown>;
+  next.legend = {
+    ...legend,
+    textStyle: { color: '#64748b' },
+    itemWidth: 12,
+    itemHeight: 8,
+  };
+
+  const grid = (next.grid ?? {}) as Record<string, unknown>;
+  next.grid = {
+    ...grid,
+    left: 48,
+    right: 24,
+    top: 36,
+    bottom: 40,
+  };
+
+  const xAxisRaw = next.xAxis;
+  const xAxes = Array.isArray(xAxisRaw) ? xAxisRaw : xAxisRaw ? [xAxisRaw] : [];
+  next.xAxis = xAxes.map((axis) => ({
+    ...(axis as Record<string, unknown>),
+    axisLine: { lineStyle: { color: 'rgba(148, 163, 184, 0.22)' } },
+    axisTick: { show: false },
+    axisLabel: {
+      color: '#64748b',
+      margin: 10,
+      rotate: 0,
+      interval: 0,
+      formatter: wrapCategoryLabel,
+      ...(((axis as Record<string, unknown>).axisLabel as Record<string, unknown>) ?? {}),
+    },
+    splitLine: { show: false },
+  }));
+
+  const yAxisRaw = next.yAxis;
+  const yAxes = Array.isArray(yAxisRaw) ? yAxisRaw : yAxisRaw ? [yAxisRaw] : [];
+  next.yAxis = yAxes.map((axis) => ({
+    ...(axis as Record<string, unknown>),
+    axisLine: { show: false },
+    axisTick: { show: false },
+    axisLabel: {
+      color: '#64748b',
+      margin: 10,
+      formatter: formatAxisNumber,
+      ...(((axis as Record<string, unknown>).axisLabel as Record<string, unknown>) ?? {}),
+    },
+    splitLine: {
+      lineStyle: { color: 'rgba(148, 163, 184, 0.16)' },
+      ...(((axis as Record<string, unknown>).splitLine as Record<string, unknown>) ?? {}),
+    },
+  }));
+
+  const seriesRaw = Array.isArray(next.series) ? next.series : [];
+  next.series = seriesRaw.map((item, index) => {
+    const series = item as Record<string, unknown>;
+    const color = palette[index % palette.length];
+    const isSingleSeriesBar = series.type === 'bar' && seriesRaw.length === 1;
+    if (series.type === 'line') {
+      return {
+        ...series,
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 8,
+        lineStyle: { width: 3, color, ...(series.lineStyle as Record<string, unknown> | undefined) },
+        itemStyle: { color, borderColor: '#ffffff', borderWidth: 2, ...(series.itemStyle as Record<string, unknown> | undefined) },
+        areaStyle: {
+          color: {
+            type: 'linear',
+            x: 0,
+            y: 0,
+            x2: 0,
+            y2: 1,
+            colorStops: [
+              { offset: 0, color: `${color}66` },
+              { offset: 1, color: `${color}05` },
+            ],
+          },
+        },
+      };
+    }
+    if (series.type === 'bar') {
+      return {
+        ...series,
+        barMaxWidth: 26,
+        label: {
+          show: true,
+          position: 'top',
+          color: '#64748b',
+          fontSize: 11,
+          formatter: ({ value }: { value: unknown }) => formatAxisNumber(value),
+          ...(series.label as Record<string, unknown> | undefined),
+        },
+        itemStyle: {
+          color: isSingleSeriesBar
+            ? ({ dataIndex }: { dataIndex: number }) => palette[dataIndex % palette.length]
+            : color,
+          borderRadius: [8, 8, 0, 0],
+          shadowBlur: 14,
+          shadowColor: `${color}44`,
+          ...(series.itemStyle as Record<string, unknown> | undefined),
+        },
+      };
+    }
+    if (series.type === 'pie') {
+      return {
+        ...series,
+        radius: ['42%', '72%'],
+        label: { color: '#334155', ...(series.label as Record<string, unknown> | undefined) },
+        labelLine: { lineStyle: { color: 'rgba(148, 163, 184, 0.4)' } },
+        itemStyle: { borderColor: '#ffffff', borderWidth: 2, ...(series.itemStyle as Record<string, unknown> | undefined) },
+      };
+    }
+    return series;
+  });
+
+  return next;
 }
 
 function renderInline(content: string) {
@@ -137,19 +301,166 @@ function DashboardMiddlewareCard({
 }: {
   dashboard: NonNullable<ChatMessage['dashboardReady']>;
 }) {
+  const kpis = dashboard.kpi_values ?? [];
+  const charts = dashboard.charts ?? [];
+  const tableRows = dashboard.table_rows ?? [];
+  const tableCols = dashboard.table_columns ?? [];
+  const chartCols = charts.length <= 1 ? 'grid-cols-1' : 'grid-cols-2';
+  const domainLabel = dashboard.dataset.domain_label || dashboard.dataset.domain_guess;
+
   return (
-    <div className="mt-3 rounded-xl border border-sky-200 bg-sky-50/60 px-4 py-3">
-      <FormattedContent content={dashboard.markdown} />
-      <div className="mt-3 grid gap-2 md:grid-cols-2">
-        {dashboard.widgets.map((widget) => (
-          <div key={widget.id} className="rounded-lg border border-sky-200 bg-white px-3 py-2">
-            <div className="text-sm font-semibold text-gray-950">{widget.title}</div>
-            <div className="mt-1 text-xs text-gray-500">
-              {widget.type} · 图表 #{widget.chart_index + 1}
+    <div className="mt-3 overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.08),_transparent_28%),linear-gradient(180deg,_#ffffff_0%,_#f8fafc_100%)] shadow-[0_18px_50px_rgba(148,163,184,0.18)]">
+      <div className="border-b border-slate-200/90 px-5 py-4 md:px-6">
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex h-2.5 w-2.5 rounded-full bg-sky-500 shadow-[0_0_12px_rgba(14,165,233,0.35)]" />
+              <span className="text-[11px] font-medium uppercase tracking-[0.32em] text-slate-500">
+                Auto Analysis Board
+              </span>
+            </div>
+            <div className="mt-2 text-lg font-semibold tracking-wide text-slate-900 md:text-xl">
+              {dashboard.title}
+            </div>
+            <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+              {dashboard.dataset.row_count > 0 && <span>{dashboard.dataset.row_count} 行数据</span>}
+              <span>{domainLabel}</span>
+              <span>已采纳 {dashboard.widgets.length} 个指标</span>
             </div>
           </div>
-        ))}
+          <div className="flex flex-wrap gap-2">
+            <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[11px] font-medium text-sky-700">
+              自动生成看板
+            </span>
+            <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-medium text-slate-600">
+              上传文件分析
+            </span>
+          </div>
+        </div>
       </div>
+
+      {kpis.length > 0 && (
+        <div className="grid gap-3 border-b border-slate-200/90 px-5 py-4 md:grid-cols-2 md:px-6 xl:grid-cols-4">
+          {kpis.map((k, i) => (
+            <div
+              key={i}
+              className="relative overflow-hidden rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,_rgba(255,255,255,0.96),_rgba(248,250,252,0.96))] px-4 py-4 shadow-[0_8px_30px_rgba(148,163,184,0.12)]"
+            >
+              <div className="absolute right-0 top-0 h-20 w-20 rounded-full bg-sky-100 blur-2xl" />
+              <div className="relative text-[11px] font-medium uppercase tracking-[0.24em] text-slate-500">
+                {k.label}
+              </div>
+              <div className="relative mt-3 text-3xl font-semibold tracking-tight text-slate-900">
+                {k.value}
+                {k.unit && (
+                  <span className="ml-1 text-sm font-normal text-slate-500">{k.unit}</span>
+                )}
+              </div>
+              <div className="relative mt-3 h-1.5 w-24 rounded-full bg-slate-200">
+                <div
+                  className="h-full rounded-full bg-[linear-gradient(90deg,_#0ea5e9,_#22c55e)] shadow-[0_0_10px_rgba(14,165,233,0.2)]"
+                  style={{ width: `${Math.min(90, 42 + i * 12)}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {charts.length > 0 && (
+        <div className={`grid gap-4 border-b border-slate-200/90 px-5 py-5 md:px-6 ${chartCols}`}>
+          {charts.map((chart, i) => {
+            const opt = withDashboardTheme(chart as Record<string, unknown>);
+            const w = dashboard.widgets[i];
+            if (!opt?.series || (Array.isArray(opt.series) && opt.series.length === 0)) return null;
+            return (
+              <div
+                key={i}
+                className="overflow-hidden rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,_#ffffff,_#f8fafc)] shadow-[0_10px_32px_rgba(148,163,184,0.14)]"
+              >
+                <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+                  <div>
+                    <div className="text-[10px] font-medium uppercase tracking-[0.28em] text-slate-400">
+                      Chart Module
+                    </div>
+                    <div className="mt-1 text-sm font-semibold text-slate-900">
+                      {w?.title || `图表 ${i + 1}`}
+                    </div>
+                  </div>
+                  <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] text-slate-500">
+                    {Array.isArray(opt.series) ? `${opt.series.length} series` : '1 series'}
+                  </span>
+                </div>
+                <ReactECharts
+                  option={opt}
+                  style={{ height: 360, width: '100%' }}
+                  notMerge
+                  opts={{ renderer: 'canvas' }}
+                  className="px-2 py-2"
+                />
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {tableRows.length > 0 && tableCols.length > 0 && (
+        <div className="px-5 py-5 md:px-6">
+          <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,_#ffffff,_#f8fafc)] shadow-[0_10px_32px_rgba(148,163,184,0.14)]">
+            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+              <div>
+                <div className="text-[10px] font-medium uppercase tracking-[0.28em] text-slate-400">
+                  Detail Table
+                </div>
+                <div className="mt-1 text-sm font-semibold text-slate-900">明细数据</div>
+              </div>
+              <div className="flex gap-2 text-[10px] text-slate-500">
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1">
+                  {tableRows.length} records
+                </span>
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1">
+                  {tableCols.length} columns
+                </span>
+              </div>
+            </div>
+            <div className="max-h-80 overflow-x-auto overflow-y-auto">
+              <table className="min-w-full text-sm">
+                <thead className="sticky top-0 bg-slate-50/95 backdrop-blur">
+                  <tr>
+                    {tableCols.map((col) => (
+                      <th
+                        key={col}
+                        className="whitespace-nowrap border-b border-slate-200 px-4 py-3 text-left text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500"
+                      >
+                        {col}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {tableRows.slice(0, 20).map((row, i) => (
+                    <tr
+                      key={i}
+                      className="border-b border-slate-100 transition-colors odd:bg-slate-50/50 hover:bg-sky-50"
+                    >
+                      {tableCols.map((col) => (
+                        <td key={col} className="whitespace-nowrap px-4 py-3 text-slate-700">
+                          {row[col] ?? ''}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {tableRows.length > 20 && (
+              <div className="border-t border-slate-200 px-4 py-3 text-center text-xs text-slate-500">
+                共 {tableRows.length} 条 · 显示前 20 条
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -165,9 +476,17 @@ export function MessageBubble({ message }: MessageBubbleProps) {
     );
   }
 
+  const isWideDashboard = Boolean(message.dashboardReady);
+
   return (
     <div className="mb-4 animate-fade-in">
-      <div className="max-w-[90%]">
+      <div
+        className={
+          isWideDashboard
+            ? 'relative left-1/2 w-[min(88vw,1400px)] max-w-none -translate-x-1/2'
+            : 'max-w-[90%]'
+        }
+      >
         <div className="mb-1 flex items-center gap-2">
           <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 text-xs font-semibold text-gray-500">
             AI

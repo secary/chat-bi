@@ -26,9 +26,19 @@ class DashboardOrchestrationSkillTest(unittest.TestCase):
                     "max_date": "2026-04-24",
                     "region_count": 4,
                 },
-                "sales_by_region": [{"region": "华东", "sales_amount": 613000}],
-                "sales_by_month": [{"month": "2026-01", "sales_amount": 355000}],
-                "customer_by_region": [{"region": "华东", "active_customers": 171}],
+                "sales_by_region": [
+                    {"region": "华东", "sales_amount": 613000},
+                    {"region": "华南", "sales_amount": 402000},
+                ],
+                "sales_by_month": [
+                    {"month": "2026-01", "sales_amount": 355000},
+                    {"month": "2026-02", "sales_amount": 394000},
+                    {"month": "2026-03", "sales_amount": 421000},
+                ],
+                "customer_by_region": [
+                    {"region": "华东", "active_customers": 171},
+                    {"region": "华南", "active_customers": 142},
+                ],
                 "semantic_counts": {"alias_mapping": 20},
                 "warnings": [],
             },
@@ -37,7 +47,8 @@ class DashboardOrchestrationSkillTest(unittest.TestCase):
         self.assertEqual(payload["kind"], "dashboard_orchestration")
         self.assertEqual(payload["data"]["dashboard_spec"]["status"], "ready")
         self.assertEqual(len(payload["charts"]), 3)
-        self.assertEqual(payload["kpis"][0]["label"], "销售总额")
+        self.assertGreaterEqual(len(payload["kpis"]), 3)
+        self.assertEqual(payload["data"]["dashboard_spec"]["sections"][0]["title"], "关键指标")
 
     def test_requires_source_data(self):
         payload = MODULE.build_dashboard_package("生成仪表盘", {})
@@ -64,6 +75,9 @@ class DashboardOrchestrationSkillTest(unittest.TestCase):
         self.assertEqual(payload["kind"], "dashboard_orchestration")
         self.assertEqual(payload["data"]["dashboard_spec"]["status"], "ready")
         self.assertEqual(payload["data"]["dashboard_middleware"]["widgets"][0]["id"], "llm_metric")
+        self.assertEqual(
+            payload["data"]["dashboard_middleware"]["dataset"]["domain_label"], "通用业务表"
+        )
 
     def test_parse_input_supports_natural_language_plus_json(self):
         question, payload = MODULE.parse_input(

@@ -148,11 +148,14 @@ def _auto_analysis_args(
     plan_args: List[str],
     last_result: Optional[Dict[str, Any]],
     cached_rows: Optional[List[Dict[str, Any]]] = None,
+    column_labels: Optional[Dict[str, Any]] = None,
 ) -> List[str]:
     rows = _rows_for_followup_chart(last_result) or (cached_rows or [])
     if not rows:
         return plan_args or [user_text]
     payload: Dict[str, Any] = {"question": user_text, "rows": rows}
+    if column_labels:
+        payload["column_labels"] = column_labels
     if _is_confirmation_request(user_text):
         payload["mode"] = "execute"
     return ["--input-file", _write_auto_analysis_payload(payload)]
@@ -292,6 +295,7 @@ async def stream_chat_react(
     last_result: Optional[Dict[str, Any]] = None
     called_skills: list[str] = []
     last_ingestion_rows: List[Dict[str, Any]] = []
+    last_ingestion_column_labels: Optional[Dict[str, Any]] = None
 
     yield {"type": "thinking", "content": "正在分析您的问题（ReAct 多步推理）..."}
 
@@ -416,7 +420,11 @@ async def stream_chat_react(
         args = skill_args_for_execution(skill_name, raw_args, messages)
         if skill_name == "chatbi-auto-analysis":
             args = _auto_analysis_args(
-                user_text, args, last_result, cached_rows=last_ingestion_rows or None
+                user_text,
+                args,
+                last_result,
+                cached_rows=last_ingestion_rows or None,
+                column_labels=last_ingestion_column_labels,
             )
         if skill_name == "chatbi-chart-recommendation":
             args = _chart_recommendation_args(user_text, args, last_result)
@@ -472,6 +480,9 @@ async def stream_chat_react(
                 ingested = _rows_for_followup_chart(result)
                 if ingested:
                     last_ingestion_rows = ingested
+                cl = (result.get("data") or {}).get("column_labels")
+                if isinstance(cl, dict):
+                    last_ingestion_column_labels = cl
             if _is_terminal_auto_analysis_result(skill_name, result):
                 yield {
                     "type": "thinking",

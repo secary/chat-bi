@@ -43,7 +43,7 @@ class ChartRecommendationSkillTest(unittest.TestCase):
         self.assertEqual(payload["data"]["recommendation"]["status"], "need_clarification")
 
     def test_parse_input_supports_natural_language_plus_json(self):
-        question, rows = MODULE.parse_input(
+        question, rows, preferred_chart = MODULE.parse_input(
             "请把下面结果用最合适的图表可视化出来："
             '{"question":"2026年1-4月销售额趋势","rows":['
             '{"月份":"2026-01","销售额":"355000"},'
@@ -53,6 +53,68 @@ class ChartRecommendationSkillTest(unittest.TestCase):
         self.assertEqual(question, "2026年1-4月销售额趋势")
         self.assertEqual(len(rows), 2)
         self.assertEqual(rows[0]["月份"], "2026-01")
+        self.assertIsNone(preferred_chart)
+
+    def test_prefers_pie_for_small_composition_rows(self):
+        payload = MODULE.recommend_chart(
+            "贷款类型结构分布",
+            [
+                {"贷款类型": "房贷", "本金余额": "1494820302.39"},
+                {"贷款类型": "经营贷", "本金余额": "580122122.28"},
+                {"贷款类型": "车贷", "本金余额": "44646767.15"},
+            ],
+            preferred_chart="pie",
+        )
+
+        self.assertEqual(payload["data"]["recommendation"]["recommended_chart"], "pie")
+        self.assertEqual(payload["charts"][0]["series"][0]["type"], "pie")
+
+    def test_recommends_heatmap_for_two_categories_and_one_metric(self):
+        payload = MODULE.recommend_chart(
+            "区域渠道转化对比",
+            [
+                {"区域": "华东", "渠道": "直销", "成交率": "12.5"},
+                {"区域": "华东", "渠道": "代理商", "成交率": "8.2"},
+                {"区域": "华南", "渠道": "直销", "成交率": "9.3"},
+                {"区域": "华南", "渠道": "代理商", "成交率": "7.1"},
+            ],
+        )
+
+        self.assertEqual(payload["data"]["recommendation"]["recommended_chart"], "heatmap")
+        self.assertEqual(payload["charts"][0]["series"][0]["type"], "heatmap")
+
+    def test_recommends_funnel_for_single_row_stage_metrics(self):
+        payload = MODULE.recommend_chart(
+            "转化漏斗",
+            [
+                {
+                    "统计期": "2026-04",
+                    "leads_count": "5405",
+                    "qualified_leads_count": "2009",
+                    "proposals_count": "1011",
+                    "closed_won_count": "385",
+                    "closed_lost_count": "626",
+                }
+            ],
+        )
+
+        self.assertEqual(payload["data"]["recommendation"]["recommended_chart"], "funnel")
+        self.assertEqual(payload["charts"][0]["series"][0]["type"], "funnel")
+
+    def test_recommends_funnel_for_stage_rows(self):
+        payload = MODULE.recommend_chart(
+            "销售转化漏斗",
+            [
+                {"阶段": "线索", "转化漏斗": "5405"},
+                {"阶段": "有效线索", "转化漏斗": "2009"},
+                {"阶段": "方案/商机", "转化漏斗": "1011"},
+                {"阶段": "成交", "转化漏斗": "385"},
+                {"阶段": "流失", "转化漏斗": "626"},
+            ],
+        )
+
+        self.assertEqual(payload["data"]["recommendation"]["recommended_chart"], "funnel")
+        self.assertEqual(payload["charts"][0]["series"][0]["type"], "funnel")
 
 
 if __name__ == "__main__":

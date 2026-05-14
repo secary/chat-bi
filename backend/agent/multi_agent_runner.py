@@ -52,6 +52,16 @@ def _pick_route_agents(route: Optional[Dict[str, Any]]) -> List[str]:
     return out
 
 
+def _has_structured_auto_analysis(result: Optional[Dict[str, Any]]) -> bool:
+    if not isinstance(result, dict):
+        return False
+    data = result.get("data")
+    return isinstance(data, dict) and (
+        isinstance(data.get("analysis_proposal"), dict)
+        or isinstance(data.get("dashboard_middleware"), dict)
+    )
+
+
 async def stream_chat_multi_agent(
     messages: List[Dict[str, str]],
     trace_id: str = "",
@@ -171,6 +181,21 @@ async def stream_chat_multi_agent(
         )
 
     q = _latest_user_question(messages)
+    if _has_structured_auto_analysis(last_result):
+        yield {"type": "thinking", "content": "[汇总] 已生成结构化分析中间件，直接输出。"}
+        async for event in stream_result_events(
+            last_skill_name or "chatbi-auto-analysis", {}, last_result or {}
+        ):
+            yield event
+        log_event(
+            trace_id,
+            "agent.multi",
+            "completed",
+            payload={"agents": chosen, "short_circuit": "auto_analysis_middleware"},
+        )
+        yield {"type": "done", "content": None}
+        return
+
     yield {"type": "thinking", "content": "[汇总] 正在整合各专线结论..."}
     """
     summarize the observations from all agents.

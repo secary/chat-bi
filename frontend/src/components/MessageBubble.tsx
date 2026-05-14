@@ -101,6 +101,59 @@ function FormattedContent({ content }: { content: string }) {
   );
 }
 
+function AnalysisProposalCard({
+  proposal,
+}: {
+  proposal: NonNullable<ChatMessage['analysisProposal']>;
+}) {
+  return (
+    <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-3">
+      <FormattedContent content={proposal.markdown} />
+      <div className="mt-3 grid gap-2 md:grid-cols-2">
+        {proposal.proposed_metrics.map((metric) => (
+          <div key={metric.id} className="rounded-lg border border-emerald-200 bg-white px-3 py-2">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-gray-950">{metric.name}</div>
+                <div className="mt-1 text-xs text-gray-600">{metric.description}</div>
+              </div>
+              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                {Math.round(metric.confidence * 100)}%
+              </span>
+            </div>
+            <div className="mt-2 text-xs text-gray-600">{metric.formula_md}</div>
+            <div className="mt-2 text-xs text-gray-500">
+              ID: <span className="font-mono">{metric.id}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DashboardMiddlewareCard({
+  dashboard,
+}: {
+  dashboard: NonNullable<ChatMessage['dashboardReady']>;
+}) {
+  return (
+    <div className="mt-3 rounded-xl border border-sky-200 bg-sky-50/60 px-4 py-3">
+      <FormattedContent content={dashboard.markdown} />
+      <div className="mt-3 grid gap-2 md:grid-cols-2">
+        {dashboard.widgets.map((widget) => (
+          <div key={widget.id} className="rounded-lg border border-sky-200 bg-white px-3 py-2">
+            <div className="text-sm font-semibold text-gray-950">{widget.title}</div>
+            <div className="mt-1 text-xs text-gray-500">
+              {widget.type} · 图表 #{widget.chart_index + 1}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function MessageBubble({ message }: MessageBubbleProps) {
   if (message.role === 'user') {
     return (
@@ -132,6 +185,8 @@ export function MessageBubble({ message }: MessageBubbleProps) {
 
         {message.chart && <ChartRenderer option={message.chart} />}
         {message.kpiCards && <KPICards cards={message.kpiCards} />}
+        {message.analysisProposal && <AnalysisProposalCard proposal={message.analysisProposal} />}
+        {message.dashboardReady && <DashboardMiddlewareCard dashboard={message.dashboardReady} />}
 
         {message.error && (
           <div className="mt-2 rounded-xl border border-red-200 bg-red-50/80 px-4 py-3 text-sm text-red-700">

@@ -20,6 +20,7 @@ agents:
     role_prompt: 你代表【分析】专线：侧重跨维度对比、趋势拆解、环比与综合诊断；可结合上传数据做分析。
     skills:
     - chatbi-alias-manager
+    - chatbi-auto-analysis
     - chatbi-chart-recommendation
     - chatbi-comparison
     - chatbi-dashboard-orchestration

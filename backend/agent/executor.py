@@ -31,6 +31,7 @@ def skill_args_for_execution(
         "chatbi-semantic-query",
         "chatbi-decision-advisor",
         "chatbi-semantic-processing",
+        "chatbi-auto-analysis",
         "chatbi-chart-recommendation",
         "chatbi-dashboard-orchestration",
     }:
@@ -141,6 +142,11 @@ def _should_include_rows_for_file_followup(messages: List[Dict[str, str]], args:
         "总计",
         "求和",
         "平均",
+        "指标",
+        "看板",
+        "仪表盘",
+        "采纳",
+        "确认",
     )
     return any(marker in text for marker in markers)
 
@@ -160,6 +166,11 @@ def _should_pass_question_to_file_ingestion(latest_user: str) -> bool:
         "趋势",
         "对比",
         "字段",
+        "指标",
+        "看板",
+        "仪表盘",
+        "采纳",
+        "确认",
     )
     return any(marker in text for marker in markers)
 

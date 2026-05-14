@@ -1,5 +1,14 @@
 export interface SseEvent {
-  type: 'thinking' | 'text' | 'chart' | 'kpi_cards' | 'plan_summary' | 'error' | 'done';
+  type:
+    | 'thinking'
+    | 'text'
+    | 'chart'
+    | 'kpi_cards'
+    | 'plan_summary'
+    | 'analysis_proposal'
+    | 'dashboard_ready'
+    | 'error'
+    | 'done';
   content: unknown;
 }
 
@@ -21,8 +30,45 @@ export interface ChatMessage {
   chart?: Record<string, unknown>;
   kpiCards?: KpiCard[];
   planSummary?: PlanSummary;
+  analysisProposal?: AnalysisProposal;
+  dashboardReady?: DashboardReady;
   thinking?: string[];
   error?: string;
+}
+
+export interface AnalysisProposal {
+  markdown: string;
+  dataset: {
+    row_count: number;
+    domain_guess: string;
+    confidence: number;
+  };
+  proposed_metrics: ProposedMetric[];
+  actions: Array<{ id: string; label: string; kind: string }>;
+  question: string;
+}
+
+export interface ProposedMetric {
+  id: string;
+  name: string;
+  description: string;
+  formula_md: string;
+  matched_fields: Record<string, string>;
+  chart_hint: string;
+  confidence: number;
+  selected: boolean;
+}
+
+export interface DashboardReady {
+  markdown: string;
+  title: string;
+  dataset: {
+    row_count: number;
+    domain_guess: string;
+  };
+  widgets: Array<{ id: string; title: string; type: string; chart_index: number }>;
+  charts: Record<string, unknown>[];
+  metrics: Array<{ id: string; name: string; rows: Record<string, unknown>[] }>;
 }
 
 export interface KpiCard {

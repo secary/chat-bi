@@ -1,6 +1,6 @@
 ---
 name: chatbi-file-ingestion
-description: Use when Codex or another agent needs to read a user-uploaded CSV or Excel file for ChatBI, validate whether it matches the existing sales_order or customer_profile schema, directly analyze matched business tables, and fall back to pandas-based generic analysis when the uploaded structure does not fit the governed tables.
+description: Use when Codex or another agent needs to read a user-uploaded CSV or Excel file for ChatBI, validate whether it matches the existing sales_order or customer_profile schema, and return a compact table structure profile for downstream analysis.
 ---
 
 # ChatBI File Ingestion
@@ -12,9 +12,9 @@ Use this skill when the user wants ChatBI to read their own uploaded CSV or Exce
 1. Ask the application or caller for the local uploaded file path, then pass that path to `scripts/inspect_uploaded_table.py`.
 2. Let the script infer the target table from headers, or pass `--table sales_order` / `--table customer_profile` when the user specified the table.
 3. The script always validates headers and basic value types first.
-4. If the file fully matches `sales_order` or `customer_profile`, the skill returns `analysis_mode = schema_direct` and emits deterministic business analysis based on the governed table schema.
-5. If the file does not fully match those tables, the skill returns `analysis_mode = pandas_fallback` and emits a pandas-based generic profile: shape, dtypes, null counts, numeric summary, categorical top values, and preview rows.
-6. Use `--json` for agent or UI integration. If downstream analysis or charting needs full row data, rerun with `--include-rows`.
+4. If the file fully matches `sales_order` or `customer_profile`, the skill returns `analysis_mode = schema_validated` with normalized rows and a `table_profile`.
+5. If the file does not fully match those tables, the skill returns `analysis_mode = profile_only` with original rows and a `table_profile`.
+6. Use `--json` for agent or UI integration. If downstream analysis, metric inference, charting, or dashboard generation needs full row data, rerun with `--include-rows` and pass the rows to `chatbi-auto-analysis`.
 
 ## Commands
 
@@ -38,12 +38,12 @@ Headers may use database field names or the current Chinese business names, such
 
 ## Presentation Guidance
 
-This skill should first explain whether the upload matched a governed business table.
+This skill should explain whether the upload matched a governed business table, then stop at structural profiling.
 
-- `schema_direct`: summarize business metrics and highlights from the uploaded rows using the matched table semantics.
-- `pandas_fallback`: summarize the uploaded file as a general-purpose table without pretending it is one of the governed business tables.
+- `schema_validated`: report that headers and basic value types match a governed table, then return normalized rows and `table_profile`.
+- `profile_only`: report that the file is treated as a generic table, then return original rows and `table_profile`.
 
-Return a small preview table in both modes. Do not create business charts from unimported uploaded data unless the user explicitly asks for exploratory preview charts.
+Return a small preview table in both modes. Do not infer business metrics, calculate KPIs, create charts, or generate dashboards here; route those tasks to `chatbi-auto-analysis`.
 
 ## Safety
 

@@ -68,10 +68,11 @@ class FileIngestionSkillTest(unittest.TestCase):
         self.assertEqual(result["kind"], "file_ingestion")
         self.assertTrue(result["data"]["valid"])
         self.assertEqual(result["data"]["table"], "sales_order")
-        self.assertEqual(result["data"]["analysis_mode"], "schema_direct")
+        self.assertEqual(result["data"]["analysis_mode"], "schema_validated")
         self.assertEqual(result["data"]["row_count"], 1)
         self.assertEqual(result["data"]["rows"][0]["region"], "华东")
-        self.assertEqual(result["data"]["analysis"]["key_metrics"][0]["label"], "总销售额")
+        self.assertEqual(result["data"]["analysis"]["summary_title"], "表结构画像")
+        self.assertEqual(result["data"]["table_profile"]["row_count"], 1)
 
     def test_reads_customer_profile_xlsx(self):
         try:
@@ -112,11 +113,11 @@ class FileIngestionSkillTest(unittest.TestCase):
         result = json.loads(proc.stdout)
         self.assertEqual(result["data"]["table"], "customer_profile")
         self.assertTrue(result["data"]["valid"])
-        self.assertEqual(result["data"]["analysis_mode"], "schema_direct")
+        self.assertEqual(result["data"]["analysis_mode"], "schema_validated")
         self.assertEqual(result["data"]["preview_rows"][0]["region"], "华东")
         self.assertEqual(result["data"]["rows"], [])
 
-    def test_falls_back_to_pandas_analysis_for_non_governed_file(self):
+    def test_builds_table_profile_for_non_governed_file(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "generic.csv"
             with path.open("w", encoding="utf-8", newline="") as handle:
@@ -139,46 +140,12 @@ class FileIngestionSkillTest(unittest.TestCase):
         self.assertEqual(proc.returncode, 0, proc.stderr)
         result = json.loads(proc.stdout)
         self.assertFalse(result["data"]["valid"])
-        self.assertEqual(result["data"]["analysis_mode"], "pandas_fallback")
-        self.assertEqual(result["data"]["analysis"]["summary_title"], "Pandas 通用表格分析")
+        self.assertEqual(result["data"]["analysis_mode"], "profile_only")
+        self.assertEqual(result["data"]["analysis"]["summary_title"], "表结构画像")
         self.assertEqual(result["data"]["analysis"]["shape"]["rows"], 2)
         self.assertIn("评分", result["data"]["analysis"]["columns"])
-
-    def test_pandas_fallback_answers_question_with_distribution_stats(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            path = Path(tmpdir) / "deposit.csv"
-            with path.open("w", encoding="utf-8", newline="") as handle:
-                writer = csv.writer(handle)
-                writer.writerow(["账户状态", "账户类型", "余额"])
-                writer.writerow(["正常", "活期", "1000"])
-                writer.writerow(["正常", "定期", "2000"])
-                writer.writerow(["冻结", "活期", "300"])
-
-            proc = subprocess.run(
-                [
-                    sys.executable,
-                    str(SCRIPT),
-                    str(path),
-                    "--json",
-                    "--question",
-                    "请按账户状态做统计",
-                ],
-                cwd=ROOT,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                capture_output=True,
-                check=False,
-                env={**os.environ, "PYTHONIOENCODING": "utf-8"},
-            )
-
-        self.assertEqual(proc.returncode, 0, proc.stderr)
-        result = json.loads(proc.stdout)
-        self.assertEqual(result["data"]["analysis_mode"], "pandas_fallback")
-        self.assertEqual(result["data"]["analysis"]["focus_column"], "账户状态")
-        self.assertEqual(result["data"]["analysis"]["summary_title"], "账户状态分布分析")
-        self.assertIn("### 账户状态统计", result["text"])
-        self.assertEqual(result["data"]["analysis"]["distribution_rows"][0]["账户状态"], "正常")
+        self.assertEqual(result["data"]["table_profile"]["columns"][2]["name"], "评分")
+        self.assertIn("通用结构画像", result["text"])
 
 
 if __name__ == "__main__":

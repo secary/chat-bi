@@ -10,13 +10,14 @@ Use this skill to calculate month-over-month (环比) comparison for governed me
 ## Workflow
 
 1. Use `scripts/chatbi_comparison.py` when the user asks to compare metrics between two months.
-2. Pass the user's original natural-language question as the first argument.
+2. Pass the user's original natural-language question as the first argument. **`N月份` is treated like `N月`** when inferring months (e.g. `1月份和2月份` ≡ `1月和2月`).
 3. The script infers the current month and previous month from the question, defaulting to the latest two months in the data if not specified.
 4. Results include: current period value, previous period value, absolute change, and percentage change.
 
 ## Common Commands
 
 ```bash
+python3 scripts/chatbi_comparison.py "1月份和2月份销售额环比"
 python3 scripts/chatbi_comparison.py "4月和3月销售额环比"
 python3 scripts/chatbi_comparison.py "各区域销售额环比"
 python3 scripts/chatbi_comparison.py "上月和本月毛利率对比"

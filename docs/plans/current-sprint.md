@@ -59,8 +59,8 @@
 
 | 轮次 | 完成内容                                                                                                             | 验证                                                                                        |
 | ---- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| 127  | 新增上传表自动分析中间件，并将 Pandas/通用指标分析收敛到 `chatbi-auto-analysis`；`file-ingestion` 只保留结构校验画像 | `format_code.py`、foundation、skills、frontend lint/test/build                              |
 | 128  | 上传表自动分析增强为 LLM 语义推断 + 通用分析方法双轨；图表推荐扩展到 `horizontal_bar/grouped_bar/stacked_bar/area/scatter/heatmap/funnel/pie`；`dashboard_orchestration_core.py` 重构为通用看板聚合层，移除销售模板式写死逻辑 | `format_code.py`、`pytest tests/test_auto_analysis_skill.py tests/test_chart_recommendation_skill.py tests/test_chart_renderer.py tests/test_dashboard_orchestration_skill.py -q` |
 | 129  | 上传表自动分析补齐漏斗链路：planner 可识别阶段字段并生成“转化漏斗”，执行层支持阶段型 funnel DSL，图表推荐与 renderer 同时兼容“单行多阶段”和“阶段行 + 指标值”两种漏斗输入 | `format_code.py`、`pytest tests/test_auto_analysis_skill.py tests/test_chart_recommendation_skill.py tests/test_chart_renderer.py -q` |
 | 130  | 多专线改为 Manager 模式：删除路由 LLM；`multi_agent_manager` 单次规划子任务（含 depends_on 拓扑）；子 agent 收窄 ReAct/Legacy 提示词；`build_subtask_messages`；文档与 `test_multi_agent_manager` | `ruff check/format`、`pytest tests/test_multi_agent_manager.py tests/test_multi_agent_registry.py tests/test_react_runner.py -q` |
 | 131  | `skills/_agents/registry.yaml` 按技能域重划 6 条子专线（上传分析、演示库问数、环比对比、图表看板、语义别名、经营建议），`max_agents_per_round` 调至 4 | `pytest tests/test_multi_agent_manager.py tests/test_admin_multi_agents.py -q` |
+| 132  | `chatbi-comparison`：`detect_months` 前将「N月份」规范为「N月」，修复「1月份和2月份」无法双月解析而误走单月/跨年逻辑；新增 `test_chatbi_comparison_month_parse` | `ruff format`、`pytest tests/test_chatbi_comparison_month_parse.py -q` |

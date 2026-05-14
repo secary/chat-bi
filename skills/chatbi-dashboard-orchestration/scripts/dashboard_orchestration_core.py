@@ -9,7 +9,7 @@ CURRENT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(CURRENT_DIR.parents[1]))
 sys.path.insert(0, str(CURRENT_DIR.parents[2]))
 
-from _shared.output import kpi, skill_response
+from _shared.output import kpi, skill_response  # noqa: E402
 
 
 def orchestrate_from_input(raw: str) -> Dict[str, Any]:
@@ -48,6 +48,10 @@ def _extract_payload(text: str) -> Any:
 
 
 def build_dashboard_package(question: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    auto_analysis = payload.get("auto_analysis")
+    if isinstance(auto_analysis, dict):
+        return build_auto_analysis_dashboard(question, auto_analysis)
+
     overview = normalize_overview(payload)
     if not overview:
         return skill_response(
@@ -73,6 +77,65 @@ def build_dashboard_package(question: str, payload: Dict[str, Any]) -> Dict[str,
         data={"dashboard_spec": dashboard_spec, "overview": overview},
         charts=charts,
         kpis=kpis,
+    )
+
+
+def build_auto_analysis_dashboard(question: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    metrics = [item for item in payload.get("metrics", []) or [] if isinstance(item, dict)]
+    charts = [item for item in payload.get("charts", []) or [] if isinstance(item, dict)]
+    profile = payload.get("profile") if isinstance(payload.get("profile"), dict) else {}
+    dashboard = {
+        "markdown": f"## 上传文件看板已生成\n\n已基于 `{len(metrics)}` 个采纳指标生成图表和看板结构。",
+        "title": build_title(question or "上传文件自动分析"),
+        "dataset": {
+            "row_count": profile.get("row_count", 0),
+            "domain_guess": profile.get("domain_guess", "generic_table"),
+        },
+        "widgets": [
+            {
+                "id": str(item.get("id") or f"metric_{idx + 1}"),
+                "title": str(item.get("name") or f"指标 {idx + 1}"),
+                "type": "chart",
+                "chart_index": idx,
+            }
+            for idx, item in enumerate(metrics)
+        ],
+        "charts": charts,
+        "metrics": metrics,
+    }
+    dashboard_spec = {
+        "status": "ready",
+        "original_query": question,
+        "dashboard_intent": "uploaded_file_auto_analysis",
+        "dashboard_title": dashboard["title"],
+        "confidence": 0.82,
+        "layout": {"grid_columns": 12, "row_height": 80, "density": "comfortable"},
+        "sections": [
+            {"id": "summary", "title": "自动分析指标", "order": 1},
+            {"id": "charts", "title": "图表看板", "order": 2},
+        ],
+        "widgets": [
+            widget(
+                str(item.get("id") or f"metric_{idx + 1}"),
+                "chart",
+                str(item.get("name") or f"指标 {idx + 1}"),
+                "charts",
+                (idx % 2) * 6,
+                (idx // 2) * 4,
+                6,
+                4,
+                f"chart_{idx}",
+            )
+            for idx, item in enumerate(metrics)
+        ],
+        "warnings": [],
+        "missing_inputs": [],
+    }
+    return skill_response(
+        kind="dashboard_orchestration",
+        text=dashboard["markdown"],
+        data={"dashboard_spec": dashboard_spec, "dashboard_middleware": dashboard},
+        charts=charts,
     )
 
 
@@ -111,10 +174,32 @@ def build_dashboard_spec(question: str, overview: Dict[str, Any]) -> Dict[str, A
         "widgets": [
             widget("sales_kpi", "kpi", "销售总额", "summary", 0, 0, 3, 2, "kpi_total_sales"),
             widget("row_count_kpi", "kpi", "订单明细条数", "summary", 3, 0, 3, 2, "kpi_row_count"),
-            widget("region_count_kpi", "kpi", "覆盖区域数", "summary", 6, 0, 3, 2, "kpi_region_count"),
+            widget(
+                "region_count_kpi", "kpi", "覆盖区域数", "summary", 6, 0, 3, 2, "kpi_region_count"
+            ),
             widget("sales_trend", "chart", "销售额趋势", "trend", 0, 2, 7, 4, "chart_sales_trend"),
-            widget("region_share", "chart", "销售额占比（按区域）", "breakdown", 7, 2, 5, 4, "chart_region_share"),
-            widget("active_customer", "chart", "活跃客户（按区域）", "detail", 0, 6, 12, 4, "chart_active_customer"),
+            widget(
+                "region_share",
+                "chart",
+                "销售额占比（按区域）",
+                "breakdown",
+                7,
+                2,
+                5,
+                4,
+                "chart_region_share",
+            ),
+            widget(
+                "active_customer",
+                "chart",
+                "活跃客户（按区域）",
+                "detail",
+                0,
+                6,
+                12,
+                4,
+                "chart_active_customer",
+            ),
         ],
         "interactions": [
             {
@@ -142,13 +227,28 @@ def build_dashboard_charts(overview: Dict[str, Any]) -> List[Dict[str, Any]]:
     charts: List[Dict[str, Any]] = []
     month_rows = stringify_rows(overview.get("sales_by_month", []))
     if month_rows:
-        charts.append(plan_to_option({"chart_type": "line", "dimension": "month", "metrics": ["sales_amount"]}, month_rows))
+        charts.append(
+            plan_to_option(
+                {"chart_type": "line", "dimension": "month", "metrics": ["sales_amount"]},
+                month_rows,
+            )
+        )
     region_rows = stringify_rows(overview.get("sales_by_region", []))
     if region_rows:
-        charts.append(plan_to_option({"chart_type": "pie", "dimension": "region", "metrics": ["sales_amount"]}, region_rows))
+        charts.append(
+            plan_to_option(
+                {"chart_type": "pie", "dimension": "region", "metrics": ["sales_amount"]},
+                region_rows,
+            )
+        )
     customer_rows = stringify_rows(overview.get("customer_by_region", []))
     if customer_rows:
-        charts.append(plan_to_option({"chart_type": "bar", "dimension": "region", "metrics": ["active_customers"]}, customer_rows))
+        charts.append(
+            plan_to_option(
+                {"chart_type": "bar", "dimension": "region", "metrics": ["active_customers"]},
+                customer_rows,
+            )
+        )
     return charts
 
 
@@ -162,7 +262,17 @@ def build_dashboard_kpis(overview: Dict[str, Any]) -> List[Dict[str, str]]:
     ]
 
 
-def widget(widget_id: str, widget_type: str, title: str, section_id: str, x: int, y: int, w: int, h: int, data_ref: str) -> Dict[str, Any]:
+def widget(
+    widget_id: str,
+    widget_type: str,
+    title: str,
+    section_id: str,
+    x: int,
+    y: int,
+    w: int,
+    h: int,
+    data_ref: str,
+) -> Dict[str, Any]:
     return {
         "id": widget_id,
         "type": widget_type,
@@ -205,7 +315,11 @@ def decision_factors(overview: Dict[str, Any], kpis: Dict[str, Any]) -> List[str
 
 
 def stringify_rows(rows: Sequence[Dict[str, Any]]) -> List[Dict[str, str]]:
-    return [{key: str(value) if value is not None else "" for key, value in row.items()} for row in rows if isinstance(row, dict)]
+    return [
+        {key: str(value) if value is not None else "" for key, value in row.items()}
+        for row in rows
+        if isinstance(row, dict)
+    ]
 
 
 def fmt_num(value: Any) -> str:

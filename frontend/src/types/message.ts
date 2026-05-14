@@ -41,6 +41,7 @@ export interface AnalysisProposal {
   dataset: {
     row_count: number;
     domain_guess: string;
+    domain_label?: string;
     confidence: number;
   };
   proposed_metrics: ProposedMetric[];
@@ -65,10 +66,14 @@ export interface DashboardReady {
   dataset: {
     row_count: number;
     domain_guess: string;
+    domain_label?: string;
   };
   widgets: Array<{ id: string; title: string; type: string; chart_index: number }>;
   charts: Record<string, unknown>[];
   metrics: Array<{ id: string; name: string; rows: Record<string, unknown>[] }>;
+  kpi_values?: Array<{ label: string; value: string; unit: string; status: string }>;
+  table_rows?: Record<string, string>[];
+  table_columns?: string[];
 }
 
 export interface KpiCard {

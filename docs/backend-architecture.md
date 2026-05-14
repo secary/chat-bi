@@ -105,7 +105,7 @@ agent/
 用户请求
   │
   ├─ multi_agents=True  →  multi_agent_runner
-  │    ├─ Manager LLM（multi_agent_manager）产出子任务列表
+  │    ├─ Manager LLM（可多轮，见 max_manager_rounds）每轮一批子任务
   │    ├─ 各子任务顺序运行 ReAct/Legacy（stream_specialist + subagent 提示词）
   │    └─ Summarize LLM（Manager 口吻）汇总结果
   │
@@ -224,8 +224,8 @@ agent.runner.stream_chat()
     │
     ├─ multi_agents=True  →  multi_agent_runner.stream_chat_multi_agent
     │     │
-    │     ├─ multi_agent_manager.call_manager_plan_llm
-    │     │   │ Manager LLM 根据用户意图拆解子任务并指派专线
+    │     ├─ multi_agent_manager.call_manager_plan_llm（可循环至多 max_manager_rounds）
+    │     │   │ 每轮：Manager LLM 拆解子任务；可选下一轮再规划
     │     │     ▼
     │     ├─ stream_specialist(subtask_messages) × N 个子任务
     │     │   │ 每个 Agent 运行 ReAct 或 Legacy

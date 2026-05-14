@@ -42,10 +42,11 @@ def _registry_capability_block() -> str:
     )
 
 
-def _manager_system_prompt() -> str:
+def _manager_system_prompt(*, followup: bool) -> str:
     cap = max_agents_per_round()
     caps = _registry_capability_block()
-    return f"""你是 ChatBI 多专线的 **Manager**：根据用户对话，将需求拆解为 1～{cap} 个子任务，并指派给下方专线之一执行。
+    if not followup:
+        return f"""你是 ChatBI 多专线的 **Manager**（第 1 轮规划）：根据用户对话，将需求拆解为 1～{cap} 个子任务，并指派给下方专线之一执行。
 你只能指派 registry 中列出的专线 id；每个子任务必须对应一条仍有「可用技能」的专线。
 
 ## 专线与能力（仅能使用表中技能，勿指派无技能专线）
@@ -54,20 +55,49 @@ def _manager_system_prompt() -> str:
 ## 输出 JSON（仅此一个对象）
 {{
   "user_intent_summary": "一句话概括用户意图",
-  "decomposition_reason": "为何这样拆解或为何不拆解（单任务时说明）",
+  "decomposition_reason": "本轮为何如此拆解（单任务时说明）",
   "tasks": [
     {{
       "agent_id": "专线id",
       "handoff_instruction": "交给该专线的具体中文指令（可引用用户原话中的指标/时间范围）",
       "depends_on": null
     }}
-  ]
+  ],
+  "finalize_after_this_batch": true
 }}
 
 规则：
 - `tasks` 至少 1 条、至多 {cap} 条；`agent_id` 必须出现在上表专线 id 中。
-- `depends_on`：若该子任务依赖另一子任务的输出，填被依赖任务在 `tasks` 数组中的 **0-based 下标**；无依赖填 null。禁止自依赖；禁止环。
-- 简单问题可只输出 1 条 task；复杂问题可拆成多条并按依赖链排列（先查询后解读等）。
+- `depends_on`：若该子任务依赖另一子任务的输出，填被依赖任务在 **本批** `tasks` 数组中的 **0-based 下标**；无依赖填 null。禁止自依赖；禁止环。
+- `finalize_after_this_batch`：若本批子任务执行后**仍需**其它专线（例如先上传校验/分析，再图表编排），设为 **false**，系统会在执行后带 Observation 请你**再规划一轮**；若本批后即可汇总答复用户，设为 **true**（缺省按 true 处理）。
+- 若用户目标需多类专线**先后**配合，通常首轮应设 `finalize_after_this_batch` 为 false。
+- 不要输出 Markdown 围栏。"""
+    return f"""你是 ChatBI 多专线的 **Manager**（后续轮规划）。用户对话与「已完成子任务」摘要在用户消息中。
+请判断：是否还需派新的专线子任务；若 Observation 已足够达成用户目标，则不再派发。
+
+## 专线与能力
+{caps}
+
+## 输出 JSON（仅此一个对象）
+{{
+  "user_intent_summary": "一句话概括当前目标（可随进度微调）",
+  "decomposition_reason": "为何继续派发、或为何结束规划",
+  "tasks": [
+    {{
+      "agent_id": "专线id",
+      "handoff_instruction": "交给该专线的具体中文指令（可引用 Observation 中的事实）",
+      "depends_on": null
+    }}
+  ],
+  "ready_for_final_answer": false,
+  "finalize_after_this_batch": true
+}}
+
+规则：
+- `tasks` 可为空数组：当你认为**无需再调用任何专线**、可进入最终汇总答复用户时，设 `tasks` 为 `[]` 且 `ready_for_final_answer` 为 true（此时可省略 `finalize_after_this_batch` 或设为 true）。
+- 若仍需子任务：`tasks` 至多 {cap} 条，`ready_for_final_answer` 必须为 false；`depends_on` 规则同首轮（仅指向本批 tasks 下标）。
+- `tasks` 非空时 `ready_for_final_answer` 必须为 false。
+- `finalize_after_this_batch`：本批执行后若**不再**需要后续规划，设为 true；若执行后仍需下一轮 Manager，设为 false。
 - 不要输出 Markdown 围栏。"""
 
 
@@ -106,12 +136,17 @@ def topological_order(deps: List[Optional[int]]) -> Optional[List[int]]:
 def validate_and_order_tasks(
     raw_tasks: List[Any],
     cap: int,
+    *,
+    allow_empty: bool = False,
 ) -> Optional[List[Tuple[int, Dict[str, Any]]]]:
     """
     Validates task list and returns (original_index, task_dict) in execution order, or None.
+    When allow_empty is True, an empty list validates to [] (for follow-up rounds with no new tasks).
     """
-    if not isinstance(raw_tasks, list) or not raw_tasks:
+    if not isinstance(raw_tasks, list):
         return None
+    if not raw_tasks:
+        return [] if allow_empty else None
     if len(raw_tasks) > cap:
         return None
     reg = set(list_registry_agent_ids())
@@ -143,15 +178,40 @@ def validate_and_order_tasks(
     return [(idx, normalized[idx]) for idx in order]
 
 
+def _normalize_manager_ready_flag(plan: Dict[str, Any]) -> None:
+    """Empty tasks => ready for final answer; non-empty tasks => not ready."""
+    tasks = plan.get("tasks")
+    if not isinstance(tasks, list):
+        return
+    if len(tasks) == 0:
+        plan["ready_for_final_answer"] = True
+    else:
+        plan["ready_for_final_answer"] = False
+
+
 async def call_manager_plan_llm(
     messages: List[Dict[str, str]],
     trace_id: str = "",
+    *,
+    round_index: int = 1,
+    progress_digest: str = "",
 ) -> Optional[Dict[str, Any]]:
     """Returns parsed Manager JSON or None on failure."""
+    followup = round_index > 1
     body = _dialogue_tail_for_manager(messages)
+    if followup:
+        digest = (progress_digest or "").strip()
+        user_content = (
+            f"当前为第 {round_index} 轮 Manager 规划。\n"
+            "请阅读「用户对话」与「已完成子任务」摘要，输出 JSON。\n\n"
+            f"## 用户对话\n{body}\n\n"
+            f"## 已完成子任务\n{digest if digest else '（尚无）'}"
+        )
+    else:
+        user_content = f"请根据以下对话输出规划 JSON：\n{body}"
     llm_messages = [
-        {"role": "system", "content": _manager_system_prompt()},
-        {"role": "user", "content": f"请根据以下对话输出规划 JSON：\n{body}"},
+        {"role": "system", "content": _manager_system_prompt(followup=followup)},
+        {"role": "user", "content": user_content},
     ]
     try:
         resp = await chatbi_acompletion(
@@ -172,7 +232,10 @@ async def call_manager_plan_llm(
     if not content:
         return None
     try:
-        return parse_json_object(content)
+        plan = parse_json_object(content)
+        if isinstance(plan, dict):
+            _normalize_manager_ready_flag(plan)
+        return plan
     except (json.JSONDecodeError, ValueError):
         log_event(
             trace_id,

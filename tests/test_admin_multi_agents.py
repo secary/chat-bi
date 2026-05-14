@@ -45,7 +45,10 @@ def test_get_defaults_when_missing(admin_client):
     assert r.status_code == 200
     body = r.json()
     assert "max_agents_per_round" in body
+    assert "max_manager_rounds" in body
+    assert body["max_manager_rounds"] >= 1
     assert "agents" in body
+    assert isinstance(body["agents"], dict)
     assert isinstance(body["agents"], dict)
 
 
@@ -53,6 +56,7 @@ def test_put_roundtrip(admin_client):
     slug = _first_skill_slug()
     payload = {
         "max_agents_per_round": 3,
+        "max_manager_rounds": 5,
         "agents": {
             "risk": {
                 "label": "风控",
@@ -65,10 +69,12 @@ def test_put_roundtrip(admin_client):
     assert r.status_code == 200
     out = r.json()
     assert out["max_agents_per_round"] == 3
+    assert out["max_manager_rounds"] == 5
     assert out["agents"]["risk"]["skills"] == [slug]
 
     raw = load_registry_dict()
     assert raw["max_agents_per_round"] == 3
+    assert raw["max_manager_rounds"] == 5
     assert raw["agents"]["risk"]["skills"] == [slug]
 
 

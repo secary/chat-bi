@@ -66,6 +66,7 @@ class MultiAgentManagerTest(unittest.TestCase):
         payload = {
             "user_intent_summary": "问数",
             "decomposition_reason": "单任务",
+            "finalize_after_this_batch": True,
             "tasks": [
                 {
                     "agent_id": "demo_query",
@@ -113,6 +114,12 @@ class MultiAgentManagerTest(unittest.TestCase):
         self.assertTrue(out[-1]["content"].startswith("【Manager 交办】"))
         self.assertIn("original ask", out[-1]["content"])
         self.assertIn("prev summary", out[-1]["content"])
+
+    def test_validate_empty_when_allowed(self) -> None:
+        self.assertEqual(validate_and_order_tasks([], 4, allow_empty=True), [])
+
+    def test_validate_empty_when_not_allowed(self) -> None:
+        self.assertIsNone(validate_and_order_tasks([], 4, allow_empty=False))
 
 
 if __name__ == "__main__":

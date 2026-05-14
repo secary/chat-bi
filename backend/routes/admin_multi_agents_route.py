@@ -31,6 +31,7 @@ class AgentEntryPayload(BaseModel):
 
 class MultiAgentsPayload(BaseModel):
     max_agents_per_round: int = 2
+    max_manager_rounds: int = 4
     agents: Dict[str, AgentEntryPayload]
 
 
@@ -80,8 +81,13 @@ def _normalize_payload(body: MultiAgentsPayload) -> Dict[str, Any]:
     except (TypeError, ValueError):
         cap = 2
     cap = max(1, min(8, cap))
+    try:
+        mr = int(body.max_manager_rounds)
+    except (TypeError, ValueError):
+        mr = 4
+    mr = max(1, min(8, mr))
 
-    return {"max_agents_per_round": cap, "agents": agents_out}
+    return {"max_agents_per_round": cap, "max_manager_rounds": mr, "agents": agents_out}
 
 
 def _response_dict() -> Dict[str, Any]:
@@ -91,6 +97,12 @@ def _response_dict() -> Dict[str, Any]:
         cap_int = max(1, min(8, int(cap)))
     except (TypeError, ValueError):
         cap_int = clamp_max_agents()
+
+    mr = raw.get("max_manager_rounds", 4)
+    try:
+        mr_int = max(1, min(8, int(mr)))
+    except (TypeError, ValueError):
+        mr_int = 4
 
     agents_in = raw.get("agents") or {}
     agents_out: Dict[str, Any] = {}
@@ -113,7 +125,7 @@ def _response_dict() -> Dict[str, Any]:
                 "skills": skills_list,
             }
 
-    return {"max_agents_per_round": cap_int, "agents": agents_out}
+    return {"max_agents_per_round": cap_int, "max_manager_rounds": mr_int, "agents": agents_out}
 
 
 @router.get("/multi-agents")
@@ -126,6 +138,7 @@ def admin_get_multi_agents(request: Request) -> Dict[str, Any]:
         payload={
             "agent_count": len(out.get("agents") or {}),
             "max_agents_per_round": out.get("max_agents_per_round"),
+            "max_manager_rounds": out.get("max_manager_rounds"),
         },
     )
     return out
@@ -155,6 +168,7 @@ def admin_put_multi_agents(body: MultiAgentsPayload, request: Request) -> Dict[s
         payload={
             "agent_count": len(normalized.get("agents") or {}),
             "max_agents_per_round": normalized.get("max_agents_per_round"),
+            "max_manager_rounds": normalized.get("max_manager_rounds"),
         },
     )
     return out

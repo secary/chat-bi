@@ -33,11 +33,11 @@ def write_registry_dict(raw: Dict[str, Any]) -> None:
 def load_registry_dict() -> Dict[str, Any]:
     path = _registry_path()
     if not path.is_file():
-        return {"max_agents_per_round": 2, "agents": {}}
+        return {"max_agents_per_round": 2, "max_manager_rounds": 4, "agents": {}}
     with path.open(encoding="utf-8") as f:
         raw = yaml.safe_load(f) or {}
     if not isinstance(raw, dict):
-        return {"max_agents_per_round": 2, "agents": {}}
+        return {"max_agents_per_round": 2, "max_manager_rounds": 4, "agents": {}}
     return raw
 
 
@@ -48,6 +48,16 @@ def max_agents_per_round() -> int:
         return max(1, min(8, int(n)))
     except (TypeError, ValueError):
         return 2
+
+
+def max_manager_rounds() -> int:
+    """Manager LLM planning iterations (1 = legacy single-shot). Clamped 1–8."""
+    raw = load_registry_dict()
+    n = raw.get("max_manager_rounds", 4)
+    try:
+        return max(1, min(8, int(n)))
+    except (TypeError, ValueError):
+        return 4
 
 
 def enabled_slugs() -> Set[str]:

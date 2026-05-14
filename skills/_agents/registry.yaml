@@ -1,6 +1,8 @@
 # 多专线子 Agent：按 skills/*/SKILL.md 能力域划分；Manager 仅从中择线与拆解子任务。
 # 每条专线只挂载与其职责相关的技能（可多条搭配），勿在专线间重复挂载同一 skill。
+# max_manager_rounds：Manager 规划 LLM 最多调用轮数（每轮一批子任务）；上传后再出图等可设 >1。
 max_agents_per_round: 4
+max_manager_rounds: 5
 agents:
   upload_analyst:
     label: 上传与文件分析

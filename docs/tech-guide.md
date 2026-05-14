@@ -56,11 +56,10 @@ multi_agents == False 且 CHATBI_AGENT_REACT 非关闭
 
 ### 3.1 流程概览
 
-1. **Manager 规划**：[`call_manager_plan_llm`](../backend/agent/multi_agent_manager.py) 读取 registry 中各专线可用技能，根据对话输出 JSON：`user_intent_summary`、`decomposition_reason`、`tasks`（每项含 `agent_id`、`handoff_instruction`、可选 `depends_on` 为同数组内 0-based 下标）。`tasks` 长度受 [`max_agents_per_round`](../skills/_agents/registry.yaml) 上限约束；`depends_on` 必须无环，执行顺序为拓扑序。
-2. **子任务顺序执行**：对每个子任务，从 registry 读取 `label`、`role_prompt`、`skills` → [`skills_for_agent`](../backend/agent/multi_agent_registry.py) 得到 **启用且在该专线白名单内** 的 `SkillDoc` → 用 `build_subtask_messages` 组装 `messages` → `stream_specialist(..., subagent_mode=True)`。
-3. **Observation 收集**：每个子任务完成后写入 `blocks`（含 `handoff_instruction` 与 Observation 摘要），供汇总阶段使用。
-4. **汇总**：[`call_summarize_llm`](../backend/agent/multi_agent_summarize.py) 以 **Manager 口吻** 根据用户问题与各子任务 Observation 生成最终 **`plan`（含 text 等）**，再与 **最后一次工具结果** `last_result` 合并，走 `stream_result_events` 输出图表/KPI/文本。
-5. **回退**：若规划 JSON 无效、`tasks` 无法通过校验或为空，则 **降级** 为单次 Agent：递归调用 `stream_chat(..., multi_agents=False)`。
+1. **Manager 规划（可多轮）**：[`call_manager_plan_llm`](../backend/agent/multi_agent_manager.py) 读取 registry 专线与技能；每轮输出 JSON：`user_intent_summary`、`decomposition_reason`、`tasks`（结构同前）、`finalize_after_this_batch`（本批执行后是否仍需要下一轮 Manager；缺省视为 **true** 以节省调用）。首轮仅用户对话；第 2 轮起附带「已完成子任务」Observation  digest。最大轮数由 registry 的 `max_manager_rounds`（1–8，管理页可配）与 [`max_agents_per_round`](../skills/_agents/registry.yaml)（每轮子任务条数上限）共同约束。
+2. **子任务顺序执行**：每轮内对每个子任务（拓扑序）从 registry 取 `SkillDoc` → `build_subtask_messages` → `stream_specialist(..., subagent_mode=True)`。
+3. **跨轮汇总**：各轮子任务结果累积进 `blocks`（含 `round` 字段）后，要么在中间命中 `chatbi-auto-analysis` 结构化中间件时短路输出，要么最后由 [`call_summarize_llm`](../backend/agent/multi_agent_summarize.py) 统一生成答复。
+4. **回退**：若首轮规划无效或首轮 `tasks` 为空，则降级为单次 `stream_chat(..., multi_agents=False)`；若多轮执行后仍无任何 block，同样降级。
 
 ### 3.2 与「单 Agent」的差异（要点）
 
@@ -68,7 +67,7 @@ multi_agents == False 且 CHATBI_AGENT_REACT 非关闭
 |------|-----------|-------------|
 | Skill 可见范围 | 全局启用 Skill（目录扫描 − `skill_registry` 禁用项） | 每条专线 registry 中的 slug ∩ 启用 Skill |
 | System 前缀 | 可选 memory + 无专线 role | 每条专线注入各自的 `role_prompt` |
-| LLM 调用次数 | ReAct 多轮或 Legacy 一轮（+ 复合意图第二步） | Manager 规划 1 次 + 每子任务一轮完整子管线 + 汇总 1 次 |
+| LLM 调用次数 | ReAct 多轮或 Legacy 一轮（+ 复合意图第二步） | 至多 `max_manager_rounds` 次 Manager 规划 + 每轮子任务内 ReAct/Legacy + 汇总 1 次 |
 | 最终图表/KPI | 直接来自最后一次 Skill 结果 + 模型 plan | 汇总 LLM 的 plan 覆盖 text，结构化结果常继承 **最后一次子任务** 的 `last_result` |
 
 ---

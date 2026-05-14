@@ -95,6 +95,26 @@ class SkillProtocolTest(unittest.TestCase):
             "识别时间范围：`order_date` >= '2026-01-01' AND `order_date` < '2026-05-01'",
         )
 
+    def test_streams_auto_analysis_middleware_events(self):
+        result = {
+            "kind": "auto_analysis",
+            "text": "## 上传表分析建议",
+            "data": {
+                "analysis_proposal": {"markdown": "建议采纳", "proposed_metrics": []},
+                "dashboard_middleware": {"markdown": "看板已生成", "widgets": []},
+            },
+        }
+
+        async def collect():
+            return [
+                event async for event in stream_result_events("chatbi-auto-analysis", {}, result)
+            ]
+
+        events = asyncio.run(collect())
+        self.assertEqual(events[0]["type"], "text")
+        self.assertTrue(any(event["type"] == "analysis_proposal" for event in events))
+        self.assertTrue(any(event["type"] == "dashboard_ready" for event in events))
+
     def test_does_not_build_finish_kpis_for_multi_row_table(self):
         result = {
             "kind": "table",

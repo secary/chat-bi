@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import sys
 import types
 import unittest
@@ -17,7 +18,7 @@ cursors_stub = types.ModuleType("pymysql.cursors")
 cursors_stub.DictCursor = object
 sys.modules.setdefault("pymysql.cursors", cursors_stub)
 
-from backend.agent.react_runner import stream_chat_react
+from backend.agent.react_runner import _auto_analysis_args, stream_chat_react
 from backend.config import settings
 
 
@@ -449,7 +450,7 @@ class ReactRunnerTest(unittest.TestCase):
             "text": "文件读取完成",
             "data": {
                 "file": "/tmp/chatbi-uploads/sample.csv",
-                "analysis_mode": "pandas_fallback",
+                "analysis_mode": "profile_only",
                 "preview_rows": [{"门店": "南京东路店", "城市": "上海"}],
                 "rows": [{"门店": "南京东路店", "城市": "上海"}],
             },
@@ -501,6 +502,58 @@ class ReactRunnerTest(unittest.TestCase):
                             if event.get("type") == "thinking"
                         )
                         self.assertIn("文件已解析完成，正在整理结果", thinking)
+                        self.assertEqual(events[-1].get("type"), "done")
+
+        asyncio.run(run())
+
+    def test_auto_analysis_receives_rows_via_input_file(self):
+        rows = [{"门店": "南京东路店", "销售额": "100"}]
+        args = _auto_analysis_args("请推荐指标", [], {"data": {"rows": rows}})
+
+        self.assertEqual(args[0], "--input-file")
+        with open(args[1], encoding="utf-8") as handle:
+            payload = json.load(handle)
+        self.assertEqual(payload["rows"], rows)
+        self.assertEqual(payload["question"], "请推荐指标")
+
+    def test_auto_analysis_structured_result_stops_react_loop(self):
+        first = {
+            "action": "call_skill",
+            "skill": "chatbi-auto-analysis",
+            "skill_args": ["请推荐指标"],
+            "thought": "生成可确认的指标方案",
+        }
+        auto_result = {
+            "kind": "auto_analysis",
+            "text": "请确认是否采纳以下指标。",
+            "data": {
+                "status": "need_confirmation",
+                "analysis_proposal": {
+                    "markdown": "### 建议指标\n- 销售额趋势",
+                    "proposed_metrics": [],
+                },
+            },
+        }
+
+        async def run():
+            cfg = replace(settings, agent_react=True, agent_max_steps=6)
+            with patch("backend.agent.react_runner.settings", cfg):
+                with patch(
+                    "backend.agent.react_runner.call_llm_for_react_step",
+                    new_callable=AsyncMock,
+                ) as mock_llm:
+                    mock_llm.return_value = first
+                    with patch("backend.agent.react_runner.run_script") as mock_run:
+                        mock_run.return_value = auto_result
+                        events = await _collect(
+                            stream_chat_react(
+                                [{"role": "user", "content": "请分析上传文件适合哪些指标"}],
+                                trace_id="t9",
+                            )
+                        )
+                        mock_llm.assert_awaited_once()
+                        mock_run.assert_called_once()
+                        self.assertTrue([e for e in events if e.get("type") == "analysis_proposal"])
                         self.assertEqual(events[-1].get("type"), "done")
 
         asyncio.run(run())

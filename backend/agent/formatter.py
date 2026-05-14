@@ -51,6 +51,12 @@ async def stream_result_events(
     # if result has data.rows, use it to fill the chart and kpi graph.
     if plan_summary:
         yield {"type": "plan_summary", "content": plan_summary}
+    analysis_proposal = data.get("analysis_proposal") if isinstance(data, dict) else None
+    if isinstance(analysis_proposal, dict):
+        yield {"type": "analysis_proposal", "content": analysis_proposal}
+    dashboard_middleware = data.get("dashboard_middleware") if isinstance(data, dict) else None
+    if isinstance(dashboard_middleware, dict):
+        yield {"type": "dashboard_ready", "content": dashboard_middleware}
     rows = table_rows(result)
     chart_plan = result.get("chart_plan") or plan.get("chart_plan")
     if chart_plan and rows:

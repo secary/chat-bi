@@ -19,6 +19,8 @@ function mapRow(row: Record<string, unknown>): ChatMessage {
     chart: row.chart as Record<string, unknown> | undefined,
     kpiCards: row.kpiCards as ChatMessage['kpiCards'],
     planSummary: row.planSummary as ChatMessage['planSummary'],
+    analysisProposal: row.analysisProposal as ChatMessage['analysisProposal'],
+    dashboardReady: row.dashboardReady as ChatMessage['dashboardReady'],
     error: row.error as string | undefined,
   };
 }
@@ -184,6 +186,12 @@ export function useChat(
                 break;
               case 'plan_summary':
                 nextLast.planSummary = event.content as ChatMessage['planSummary'];
+                break;
+              case 'analysis_proposal':
+                nextLast.analysisProposal = event.content as ChatMessage['analysisProposal'];
+                break;
+              case 'dashboard_ready':
+                nextLast.dashboardReady = event.content as ChatMessage['dashboardReady'];
                 break;
               case 'error':
                 nextLast.error = String(event.content);

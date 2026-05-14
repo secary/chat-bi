@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import tempfile
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from backend.agent.executor import (
@@ -142,6 +143,47 @@ def _chart_recommendation_args(
     return [json.dumps(payload, ensure_ascii=False)]
 
 
+def _auto_analysis_args(
+    user_text: str,
+    plan_args: List[str],
+    last_result: Optional[Dict[str, Any]],
+    cached_rows: Optional[List[Dict[str, Any]]] = None,
+) -> List[str]:
+    rows = _rows_for_followup_chart(last_result) or (cached_rows or [])
+    if not rows:
+        return plan_args or [user_text]
+    payload: Dict[str, Any] = {"question": user_text, "rows": rows}
+    if _is_confirmation_request(user_text):
+        payload["mode"] = "execute"
+    return ["--input-file", _write_auto_analysis_payload(payload)]
+
+
+def _is_terminal_auto_analysis_result(skill_name: str, result: Optional[Dict[str, Any]]) -> bool:
+    if skill_name != "chatbi-auto-analysis" or not isinstance(result, dict):
+        return False
+    data = result.get("data")
+    if not isinstance(data, dict):
+        return False
+    if isinstance(data.get("analysis_proposal"), dict):
+        return True
+    if isinstance(data.get("dashboard_middleware"), dict):
+        return True
+    return str(data.get("status") or "") in {"need_confirmation", "ready"}
+
+
+def _write_auto_analysis_payload(payload: Dict[str, Any]) -> str:
+    handle = tempfile.NamedTemporaryFile(
+        "w",
+        encoding="utf-8",
+        prefix="chatbi-auto-analysis-",
+        suffix=".json",
+        delete=False,
+    )
+    with handle:
+        json.dump(payload, handle, ensure_ascii=False)
+    return handle.name
+
+
 def _has_upload_context(messages: List[Dict[str, str]]) -> bool:
     return bool(latest_user_upload_path(messages))
 
@@ -149,6 +191,29 @@ def _has_upload_context(messages: List[Dict[str, str]]) -> bool:
 def _is_visual_request(text: str) -> bool:
     markers = ("画图", "图表", "可视化", "展示")
     return bool(text) and any(marker in text for marker in markers)
+
+
+def _is_auto_analysis_request(text: str) -> bool:
+    markers = (
+        "分析",
+        "指标",
+        "看板",
+        "仪表盘",
+        "dashboard",
+        "采纳",
+        "确认",
+        "roi",
+        "ROI",
+        "留存",
+        "不良",
+        "逾期",
+        "趋势",
+    )
+    return bool(text) and any(marker in text for marker in markers)
+
+
+def _is_confirmation_request(text: str) -> bool:
+    return bool(text) and any(word in text for word in ["采纳", "确认", "开始", "生成看板"])
 
 
 def _enforce_upload_skill(
@@ -159,6 +224,10 @@ def _enforce_upload_skill(
 ) -> str:
     if not _has_upload_context(messages):
         return skill_name
+    if skill_name == "chatbi-file-ingestion":
+        return skill_name
+    if _rows_for_followup_chart(last_result) and _is_auto_analysis_request(user_text):
+        return "chatbi-auto-analysis"
     if skill_name != "chatbi-semantic-query":
         return skill_name
     if _rows_for_followup_chart(last_result) and _is_visual_request(user_text):
@@ -222,6 +291,7 @@ async def stream_chat_react(
     last_skill_name: Optional[str] = None
     last_result: Optional[Dict[str, Any]] = None
     called_skills: list[str] = []
+    last_ingestion_rows: List[Dict[str, Any]] = []
 
     yield {"type": "thinking", "content": "正在分析您的问题（ReAct 多步推理）..."}
 
@@ -314,6 +384,16 @@ async def stream_chat_react(
             return
         skill_name = _enforce_upload_skill(skill_name, user_text, messages, last_result)
 
+        # When auto-analysis is called without any row data but a file was uploaded,
+        # redirect to file-ingestion first so rows are available on the next step.
+        if (
+            skill_name == "chatbi-auto-analysis"
+            and _has_upload_context(messages)
+            and not _rows_for_followup_chart(last_result)
+            and not last_ingestion_rows
+        ):
+            skill_name = "chatbi-file-ingestion"
+
         skill_doc = find_skill(skills, skill_name)
         if not skill_doc:
             _sink_write(result_sink, last_result, last_skill_name)
@@ -334,6 +414,10 @@ async def stream_chat_react(
         """
         raw_args = plan.get("skill_args") or []
         args = skill_args_for_execution(skill_name, raw_args, messages)
+        if skill_name == "chatbi-auto-analysis":
+            args = _auto_analysis_args(
+                user_text, args, last_result, cached_rows=last_ingestion_rows or None
+            )
         if skill_name == "chatbi-chart-recommendation":
             args = _chart_recommendation_args(user_text, args, last_result)
         if _should_short_circuit_repeated_file_ingestion(
@@ -384,6 +468,26 @@ async def stream_chat_react(
             last_skill_name = skill_name
             last_result = result
             called_skills.append(skill_name)
+            if skill_name == "chatbi-file-ingestion":
+                ingested = _rows_for_followup_chart(result)
+                if ingested:
+                    last_ingestion_rows = ingested
+            if _is_terminal_auto_analysis_result(skill_name, result):
+                yield {
+                    "type": "thinking",
+                    "content": "自动分析已生成结构化结果，正在展示...",
+                }
+                async for event in stream_result_events(skill_name, plan, result):
+                    yield event
+                log_event(
+                    trace_id,
+                    "agent.runner",
+                    "completed",
+                    payload={"mode": "react", "short_circuit": "auto_analysis"},
+                )
+                _sink_write(result_sink, last_result, last_skill_name)
+                yield {"type": "done", "content": None}
+                return
             obs = summarize_observation(skill_name, result)
         except Exception as exc:
             log_event(

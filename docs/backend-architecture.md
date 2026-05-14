@@ -93,9 +93,10 @@ agent/
 ├── react_followup.py      # decision advisor followup
 │
 ├── multi_agent_registry.py # 多 Agent 注册表读写
-├── multi_agent_router.py   # Router LLM 选择 Agent
-├── multi_agent_summarize.py # 汇总 LLM 合并多 Agent 结果
-└── multi_agent_runner.py   # 多 Agent 并行执行编排
+├── multi_agent_manager.py   # Manager LLM 子任务规划（JSON）
+├── multi_agent_messages.py  # 子任务 user 消息拼装
+├── multi_agent_summarize.py # Manager 汇总 LLM
+└── multi_agent_runner.py   # Manager 编排：规划 → 专线 → 汇总
 ```
 
 #### Agent 三种运行模式
@@ -104,9 +105,9 @@ agent/
 用户请求
   │
   ├─ multi_agents=True  →  multi_agent_runner
-  │    ├─ Router LLM 决定激活哪些 Agent
-  │    ├─ 各 Agent 并行运行 ReAct/Legacy
-  │    └─ Summarize LLM 汇总结果
+  │    ├─ Manager LLM（multi_agent_manager）产出子任务列表
+  │    ├─ 各子任务顺序运行 ReAct/Legacy（stream_specialist + subagent 提示词）
+  │    └─ Summarize LLM（Manager 口吻）汇总结果
   │
   ├─ agent_react=True   →  react_runner (ReAct 多步循环)
   │    └─ 最多 N 步: LLM决策 → Skill执行 → 结果摘要 → 下一步
@@ -223,10 +224,10 @@ agent.runner.stream_chat()
     │
     ├─ multi_agents=True  →  multi_agent_runner.stream_chat_multi_agent
     │     │
-    │     ├─ multi_agent_router.call_route_llm
-    │     │   │ Router LLM 根据用户意图选择 Agent
+    │     ├─ multi_agent_manager.call_manager_plan_llm
+    │     │   │ Manager LLM 根据用户意图拆解子任务并指派专线
     │     │     ▼
-    │     ├─ stream_specialist(agent_id) × N 个 Agent
+    │     ├─ stream_specialist(subtask_messages) × N 个子任务
     │     │   │ 每个 Agent 运行 ReAct 或 Legacy
     │     │   │   ├─ prompt_builder.build_*_system_prompt
     │     │   │   ├─ planner.call_llm_for_react_step
@@ -239,7 +240,7 @@ agent.runner.stream_chat()
     │     │   │       │ {text / chart / kpi_cards} SSE 事件
     │     │     ▼
     │     └─ multi_agent_summarize.call_summarize_llm
-    │         │ 汇总 LLM 合并多 Agent 结果
+    │         │ Manager 汇总 LLM 合并各子任务结果
     │
     ├─ agent_react=True  →  react_runner.stream_chat_react
     │     │ 最多 agent_max_steps 轮循环

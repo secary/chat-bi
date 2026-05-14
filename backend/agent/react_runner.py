@@ -20,6 +20,7 @@ from backend.agent.prompt_builder import (
     build_react_system_prompt,
     scan_skills_enabled,
 )
+from backend.agent.prompt_subagent import build_react_system_prompt_for_subagent
 from backend.agent.query_decision import is_query_plus_decision_text
 from backend.agent.react_followup import run_decision_followup
 from backend.agent.upload_context import get_cached_file_data
@@ -252,6 +253,7 @@ async def stream_chat_react(
     skill_docs: Optional[List[SkillDoc]] = None,
     role_prompt: Optional[str] = None,
     result_sink: Optional[Dict[str, Any]] = None,
+    subagent_react: bool = False,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """
     ReAct multi-step agent loop.
@@ -264,7 +266,10 @@ async def stream_chat_react(
         trace_id,
         "agent.runner",
         "started",
-        payload={"message_count": len(messages), "mode": "react"},
+        payload={
+            "message_count": len(messages),
+            "mode": "react_subagent" if subagent_react else "react",
+        },
     )
     skills = skill_docs if skill_docs is not None else scan_skills_enabled(settings.skills_dir)
     user_text = next(
@@ -287,7 +292,11 @@ async def stream_chat_react(
     The skills are the skills that the agent can use.
     The system prompt is the prompt that the agent uses to make a decision.
     """
-    system_prompt = build_react_system_prompt(skills)
+    system_prompt = (
+        build_react_system_prompt_for_subagent(skills)
+        if subagent_react
+        else build_react_system_prompt(skills)
+    )
     if role_prompt and role_prompt.strip():
         system_prompt = role_prompt.strip() + "\n\n" + system_prompt
     if memory_block and memory_block.strip():

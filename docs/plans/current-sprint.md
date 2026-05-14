@@ -59,8 +59,8 @@
 
 | 轮次 | 完成内容                                                                                                             | 验证                                                                                        |
 | ---- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| 125  | 修复上传文件跟进分析：`chatbi-file-ingestion` 支持逾期统计与建议输出，避免二次追问只返回通用文案                     | `format_code.py`、`pytest tests/test_file_ingestion_skill.py tests/test_react_runner.py -q` |
 | 126  | `docker-compose.dev.yml` 调整为 dev 单 MySQL 实例双库模式：后端日志库改为直连 `demo-mysql/chatbi_local_logs`         | `git diff docker-compose.dev.yml`                                                           |
 | 127  | 新增上传表自动分析中间件，并将 Pandas/通用指标分析收敛到 `chatbi-auto-analysis`；`file-ingestion` 只保留结构校验画像 | `format_code.py`、foundation、skills、frontend lint/test/build                              |
 | 128  | 上传表自动分析增强为 LLM 语义推断 + 通用分析方法双轨；图表推荐扩展到 `horizontal_bar/grouped_bar/stacked_bar/area/scatter/heatmap/funnel/pie`；`dashboard_orchestration_core.py` 重构为通用看板聚合层，移除销售模板式写死逻辑 | `format_code.py`、`pytest tests/test_auto_analysis_skill.py tests/test_chart_recommendation_skill.py tests/test_chart_renderer.py tests/test_dashboard_orchestration_skill.py -q` |
 | 129  | 上传表自动分析补齐漏斗链路：planner 可识别阶段字段并生成“转化漏斗”，执行层支持阶段型 funnel DSL，图表推荐与 renderer 同时兼容“单行多阶段”和“阶段行 + 指标值”两种漏斗输入 | `format_code.py`、`pytest tests/test_auto_analysis_skill.py tests/test_chart_recommendation_skill.py tests/test_chart_renderer.py -q` |
+| 130  | 多专线改为 Manager 模式：删除路由 LLM；`multi_agent_manager` 单次规划子任务（含 depends_on 拓扑）；子 agent 收窄 ReAct/Legacy 提示词；`build_subtask_messages`；文档与 `test_multi_agent_manager` | `ruff check/format`、`pytest tests/test_multi_agent_manager.py tests/test_multi_agent_registry.py tests/test_react_runner.py -q` |

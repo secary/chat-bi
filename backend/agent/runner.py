@@ -17,6 +17,7 @@ from backend.agent.prompt_builder import (
     build_system_prompt,
     scan_skills_enabled,
 )
+from backend.agent.prompt_subagent import build_system_prompt_for_subagent
 from backend.agent.query_decision import is_query_plus_decision_text
 from backend.agent.react_runner import stream_chat_react
 from backend.config import settings
@@ -133,6 +134,7 @@ async def _stream_chat_legacy(
     skill_docs: Optional[List[SkillDoc]] = None,
     role_prompt: Optional[str] = None,
     result_sink: Optional[Dict[str, Any]] = None,
+    subagent_mode: bool = False,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """Single LLM JSON plan with optional two-step query and advice execution."""
     log_event(
@@ -150,7 +152,9 @@ async def _stream_chat_legacy(
         yield {"type": "text", "content": small_talk_reply(user_text)}
         yield {"type": "done", "content": None}
         return
-    system_prompt = build_system_prompt(skills)
+    system_prompt = (
+        build_system_prompt_for_subagent(skills) if subagent_mode else build_system_prompt(skills)
+    )
     if role_prompt and role_prompt.strip():
         system_prompt = role_prompt.strip() + "\n\n" + system_prompt
     if memory_block and memory_block.strip():
@@ -264,6 +268,7 @@ async def stream_specialist(
     skill_db_overrides: Optional[Dict[str, str]] = None,
     memory_block: Optional[str] = None,
     result_sink: Optional[Dict[str, Any]] = None,
+    subagent_mode: bool = False,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """One specialist pass: ReAct or Legacy with a filtered skill list."""
     if settings.agent_react:
@@ -275,6 +280,7 @@ async def stream_specialist(
             skill_docs=skill_docs,
             role_prompt=role_prompt,
             result_sink=result_sink,
+            subagent_react=subagent_mode,
         ):
             yield event
         return
@@ -286,5 +292,6 @@ async def stream_specialist(
         skill_docs=skill_docs,
         role_prompt=role_prompt,
         result_sink=result_sink,
+        subagent_mode=subagent_mode,
     ):
         yield event

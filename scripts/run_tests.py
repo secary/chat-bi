@@ -53,7 +53,7 @@ MODULE_SUITES: dict[str, list[str]] = {
         "tests/test_agent_workflow.py",
         "tests/test_chat_route_disconnect.py",
         "tests/test_multi_agent_registry.py",
-        "tests/test_multi_agent_router.py",
+        "tests/test_multi_agent_manager.py",
         "tests/test_observation.py",
         "tests/test_query_advice_dimension_flow.py",
         "tests/test_react_runner.py",

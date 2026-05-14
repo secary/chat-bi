@@ -46,7 +46,7 @@ multi_agents == False 且 CHATBI_AGENT_REACT 非关闭
 
 ### 2.3 Specialist（过滤 Skill 列表的同一条管线）
 
-[`stream_specialist`](../backend/agent/runner.py) 把 **Skill 文档列表** 限定为子集（仅传入的 `skill_docs`），然后根据配置走 **ReAct 或 Legacy**。多专线模式下每个专线调用一次 `stream_specialist`，互不共享中间的 `working` 对话状态（除共享最初的 `messages`）。
+[`stream_specialist`](../backend/agent/runner.py) 把 **Skill 文档列表** 限定为子集（仅传入的 `skill_docs`），然后根据配置走 **ReAct 或 Legacy**。多专线（Manager）模式下每个子任务调用一次 `stream_specialist`，使用 **子 agent 专用** ReAct/Legacy 系统提示（仅列出该专线技能）；`messages` 由 [`build_subtask_messages`](../backend/agent/multi_agent_messages.py) 按交办与用户原述构造。
 
 ---
 
@@ -56,11 +56,11 @@ multi_agents == False 且 CHATBI_AGENT_REACT 非关闭
 
 ### 3.1 流程概览
 
-1. **路由**：[`call_route_llm`](../backend/agent/multi_agent_router.py) 使用独立的 router System Prompt，只看「用户对话末尾最新输入」，输出 JSON：`agents`（专线 id 列表）、`user_intent_summary`、`routing_reason`。专线 id 必须来自 [`skills/_agents/registry.yaml`](../skills/_agents/registry.yaml)，且受 `max_agents_per_round` 截断。
-2. **专线顺序执行**：对每个选中的 `agent_id`，从 registry 读取 `label`、`role_prompt`、`skills` 列表 → [`scan_skills_for_slugs`](../backend/agent/prompt_builder.py) 得到 **启用且在该专线白名单内** 的 `SkillDoc` → 调用 `stream_specialist(..., skill_docs=..., role_prompt=...)`。
-3. **Observation 收集**：每条专线执行完后，用 `summarize_observation`（或文本兜底）写入 `blocks`，供汇总阶段使用。
-4. **汇总**：[`call_summarize_llm`](../backend/agent/multi_agent_summarize.py) 根据用户问题与各专线 Observation 生成最终 **`plan`（含 text 等）**，再与 **最后一次工具结果** `last_result` 合并，走 `stream_result_events` 输出图表/KPI/文本。
-5. **回退**：若路由结果为空或没有可选专线，则 **降级** 为单次 Agent：递归调用 `stream_chat(..., multi_agents=False)`。
+1. **Manager 规划**：[`call_manager_plan_llm`](../backend/agent/multi_agent_manager.py) 读取 registry 中各专线可用技能，根据对话输出 JSON：`user_intent_summary`、`decomposition_reason`、`tasks`（每项含 `agent_id`、`handoff_instruction`、可选 `depends_on` 为同数组内 0-based 下标）。`tasks` 长度受 [`max_agents_per_round`](../skills/_agents/registry.yaml) 上限约束；`depends_on` 必须无环，执行顺序为拓扑序。
+2. **子任务顺序执行**：对每个子任务，从 registry 读取 `label`、`role_prompt`、`skills` → [`skills_for_agent`](../backend/agent/multi_agent_registry.py) 得到 **启用且在该专线白名单内** 的 `SkillDoc` → 用 `build_subtask_messages` 组装 `messages` → `stream_specialist(..., subagent_mode=True)`。
+3. **Observation 收集**：每个子任务完成后写入 `blocks`（含 `handoff_instruction` 与 Observation 摘要），供汇总阶段使用。
+4. **汇总**：[`call_summarize_llm`](../backend/agent/multi_agent_summarize.py) 以 **Manager 口吻** 根据用户问题与各子任务 Observation 生成最终 **`plan`（含 text 等）**，再与 **最后一次工具结果** `last_result` 合并，走 `stream_result_events` 输出图表/KPI/文本。
+5. **回退**：若规划 JSON 无效、`tasks` 无法通过校验或为空，则 **降级** 为单次 Agent：递归调用 `stream_chat(..., multi_agents=False)`。
 
 ### 3.2 与「单 Agent」的差异（要点）
 
@@ -68,8 +68,8 @@ multi_agents == False 且 CHATBI_AGENT_REACT 非关闭
 |------|-----------|-------------|
 | Skill 可见范围 | 全局启用 Skill（目录扫描 − `skill_registry` 禁用项） | 每条专线 registry 中的 slug ∩ 启用 Skill |
 | System 前缀 | 可选 memory + 无专线 role | 每条专线注入各自的 `role_prompt` |
-| LLM 调用次数 | ReAct 多轮或 Legacy 一轮（+ 复合意图第二步） | 路由 1 次 + 每专线一轮完整子管线 + 汇总 1 次 |
-| 最终图表/KPI | 直接来自最后一次 Skill 结果 + 模型 plan | 汇总 LLM 的 plan 覆盖 text，结构化结果常继承 **最后一次专线** 的 `last_result` |
+| LLM 调用次数 | ReAct 多轮或 Legacy 一轮（+ 复合意图第二步） | Manager 规划 1 次 + 每子任务一轮完整子管线 + 汇总 1 次 |
+| 最终图表/KPI | 直接来自最后一次 Skill 结果 + 模型 plan | 汇总 LLM 的 plan 覆盖 text，结构化结果常继承 **最后一次子任务** 的 `last_result` |
 
 ---
 

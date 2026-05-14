@@ -57,6 +57,7 @@ async def stream_result_events(
     dashboard_middleware = data.get("dashboard_middleware") if isinstance(data, dict) else None
     if isinstance(dashboard_middleware, dict):
         yield {"type": "dashboard_ready", "content": dashboard_middleware}
+        return  # charts and kpis are bundled inside the dashboard card
     rows = table_rows(result)
     chart_plan = result.get("chart_plan") or plan.get("chart_plan")
     if chart_plan and rows:

@@ -291,6 +291,20 @@ async def stream_chat_react(
             yield {"type": "done", "content": None}
             return
 
+        if action == "ask":
+            ask_text = plan.get("text", "请问还有什么需要帮助的？")
+            yield {"type": "thinking", "content": "正在询问补充信息..."}
+            yield {"type": "text", "content": ask_text}
+            log_event(
+                trace_id,
+                "agent.runner",
+                "completed",
+                payload={"mode": "react", "action": "ask", "steps": step + 1},
+            )
+            _sink_write(result_sink, last_result, last_skill_name)
+            yield {"type": "done", "content": None}
+            return
+
         if action != "call_skill":
             _sink_write(result_sink, last_result, last_skill_name)
             yield {

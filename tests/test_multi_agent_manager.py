@@ -68,7 +68,7 @@ class MultiAgentManagerTest(unittest.TestCase):
             "decomposition_reason": "单任务",
             "tasks": [
                 {
-                    "agent_id": "analysis",
+                    "agent_id": "demo_query",
                     "handoff_instruction": "查询演示库销售额",
                     "depends_on": None,
                 }
@@ -86,7 +86,7 @@ class MultiAgentManagerTest(unittest.TestCase):
                 got = await call_manager_plan_llm(
                     [{"role": "user", "content": "1-4月销售额"}], trace_id="t1"
                 )
-                self.assertEqual(got.get("tasks", [{}])[0].get("agent_id"), "analysis")
+                self.assertEqual(got.get("tasks", [{}])[0].get("agent_id"), "demo_query")
 
         import asyncio
 

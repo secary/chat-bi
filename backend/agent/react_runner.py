@@ -104,15 +104,29 @@ def _is_file_ingestion_result(result: Optional[Dict[str, Any]]) -> bool:
     return isinstance(result, dict) and str(result.get("kind") or "") == "file_ingestion"
 
 
+def _file_ingestion_result_path(result: Optional[Dict[str, Any]]) -> str:
+    if not isinstance(result, dict):
+        return ""
+    data = result.get("data")
+    if not isinstance(data, dict):
+        return ""
+    return str(data.get("file") or "")
+
+
 def _should_short_circuit_repeated_file_ingestion(
     skill_name: str,
+    args: List[str],
     last_skill_name: Optional[str],
     last_result: Optional[Dict[str, Any]],
 ) -> bool:
+    current_path = str(args[0]) if args else ""
+    previous_path = _file_ingestion_result_path(last_result)
     return (
         skill_name == "chatbi-file-ingestion"
         and last_skill_name == "chatbi-file-ingestion"
         and _is_file_ingestion_result(last_result)
+        and bool(current_path)
+        and current_path == previous_path
     )
 
 
@@ -299,27 +313,6 @@ async def stream_chat_react(
             yield {"type": "done", "content": None}
             return
         skill_name = _enforce_upload_skill(skill_name, user_text, messages, last_result)
-        if _should_short_circuit_repeated_file_ingestion(
-            skill_name,
-            last_skill_name,
-            last_result,
-        ):
-            yield {
-                "type": "thinking",
-                "content": "上传文件已完成解析，避免重复读取，直接整理当前结果。",
-            }
-            merged = _merge_finish_result(plan, last_result, last_skill_name)
-            async for event in stream_result_events(last_skill_name or skill_name, plan, merged):
-                yield event
-            log_event(
-                trace_id,
-                "agent.runner",
-                "completed",
-                payload={"mode": "react", "short_circuit": "repeated_file_ingestion"},
-            )
-            _sink_write(result_sink, last_result, last_skill_name)
-            yield {"type": "done", "content": None}
-            return
 
         skill_doc = find_skill(skills, skill_name)
         if not skill_doc:
@@ -343,11 +336,32 @@ async def stream_chat_react(
         args = skill_args_for_execution(skill_name, raw_args, messages)
         if skill_name == "chatbi-chart-recommendation":
             args = _chart_recommendation_args(user_text, args, last_result)
+        if _should_short_circuit_repeated_file_ingestion(
+            skill_name,
+            args,
+            last_skill_name,
+            last_result,
+        ):
+            yield {
+                "type": "thinking",
+                "content": "文件已解析完成，正在整理结果...",
+            }
+            merged = _merge_finish_result(plan, last_result, last_skill_name)
+            async for event in stream_result_events(last_skill_name or skill_name, plan, merged):
+                yield event
+            log_event(
+                trace_id,
+                "agent.runner",
+                "completed",
+                payload={"mode": "react", "short_circuit": "repeated_file_ingestion"},
+            )
+            _sink_write(result_sink, last_result, last_skill_name)
+            yield {"type": "done", "content": None}
+            return
         assistant_note = json.dumps(
             {"action": "call_skill", "skill": skill_name, "skill_args": args},
             ensure_ascii=False,
         )
-
         try:
             log_event(
                 trace_id,

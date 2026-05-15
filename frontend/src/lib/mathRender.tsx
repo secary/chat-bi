@@ -1,17 +1,5 @@
 import { useMemo } from 'react';
-import katex from 'katex';
-
-export function renderKatexHtml(latex: string, displayMode: boolean): string | null {
-  try {
-    return katex.renderToString(latex.trim(), {
-      displayMode,
-      throwOnError: false,
-      strict: 'ignore',
-    });
-  } catch {
-    return null;
-  }
-}
+import { renderKatexHtml } from './katexHtml';
 
 export function KaTeXMath({ latex, display = false }: { latex: string; display?: boolean }) {
   const html = useMemo(() => renderKatexHtml(latex, display), [latex, display]);

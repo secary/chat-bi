@@ -1,6 +1,13 @@
 ---
 name: chatbi-metric-explainer
 description: Use when Codex or another agent needs to explain a governed metric's business meaning, formula, source table, default dimensions, related fields, or口径 in ChatBI. Trigger for requests such as 指标解释, 口径说明, 销售额怎么算, 毛利率是什么意思, 目标完成率定义, and 指标来源.
+trigger_conditions:
+  - 用户问指标含义、口径、公式、来源，不要数值结果
+when_not_to_use:
+  - 用户要实际查询指标值（用 chatbi-semantic-query）
+  - 用户要维护别名映射（用 chatbi-alias-manager）
+required_context:
+  - 问题中含指标名或业务别名
 ---
 
 # ChatBI Metric Explainer

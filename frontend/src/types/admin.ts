@@ -48,6 +48,7 @@ export interface MultiAgentLineEntry {
 
 export interface MultiAgentsRegistryPayload {
   max_agents_per_round: number;
+  max_manager_rounds: number;
   agents: Record<string, MultiAgentLineEntry>;
 }
 

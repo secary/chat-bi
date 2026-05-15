@@ -4,6 +4,7 @@ import json
 import re
 from typing import Any, Dict, List, Optional
 
+from backend.agent.abort_async import ChatAbortedError, await_with_abort
 from backend.llm_runtime import chatbi_acompletion
 
 """
@@ -12,7 +13,9 @@ Each ReAct round, tell LLM should return "action", such as skill/finish/answer/d
 
 
 async def call_llm_for_react_step(
-    system_prompt: str, messages: List[Dict[str, str]]
+    system_prompt: str,
+    messages: List[Dict[str, str]],
+    trace_id: str = "",
 ) -> Optional[Dict[str, Any]]:
     llm_messages = [
         {"role": "system", "content": system_prompt},
@@ -24,18 +27,26 @@ async def call_llm_for_react_step(
     ]
 
     try:
-        resp = await chatbi_acompletion(
-            messages=llm_messages,
-            response_format={"type": "json_object"},
-            temperature=0.1,
+        resp = await await_with_abort(
+            chatbi_acompletion(
+                messages=llm_messages,
+                response_format={"type": "json_object"},
+                temperature=0.1,
+            ),
+            trace_id,
         )
+    except ChatAbortedError:
+        raise
     except Exception as exc:
         raise RuntimeError(f"LLM 调用失败：{type(exc).__name__}: {exc}") from exc
 
     content = resp.choices[0].message.content
-    if not content:
+    if content is None or not str(content).strip():
         return None
-    return parse_json_object(content)
+    try:
+        return parse_json_object(content)
+    except (json.JSONDecodeError, ValueError):
+        return None
 
 
 """
@@ -44,7 +55,9 @@ async def call_llm_for_react_step(
 
 
 async def call_llm_for_plan(
-    system_prompt: str, messages: List[Dict[str, str]]
+    system_prompt: str,
+    messages: List[Dict[str, str]],
+    trace_id: str = "",
 ) -> Optional[Dict[str, Any]]:
     llm_messages = [
         {"role": "system", "content": system_prompt},
@@ -53,28 +66,37 @@ async def call_llm_for_plan(
     ]
 
     try:
-        resp = await chatbi_acompletion(
-            messages=llm_messages,
-            response_format={"type": "json_object"},
-            temperature=0.1,
+        resp = await await_with_abort(
+            chatbi_acompletion(
+                messages=llm_messages,
+                response_format={"type": "json_object"},
+                temperature=0.1,
+            ),
+            trace_id,
         )
+    except ChatAbortedError:
+        raise
     except Exception as exc:
         raise RuntimeError(f"LLM 调用失败：{type(exc).__name__}: {exc}") from exc
 
     content = resp.choices[0].message.content
-    if not content:
+    if content is None or not str(content).strip():
         return None
-    return parse_json_object(content)
-
-
-"""
-
-"""
+    try:
+        return parse_json_object(content)
+    except (json.JSONDecodeError, ValueError):
+        return None
 
 
 def parse_json_object(content: str) -> Dict[str, Any]:
     text = content.strip()
+    if not text:
+        raise ValueError("empty JSON content")
     fence_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
     if fence_match:
-        text = fence_match.group(1)
-    return json.loads(text)
+        text = fence_match.group(1).strip()
+    decoder = json.JSONDecoder()
+    obj, _end = decoder.raw_decode(text)
+    if not isinstance(obj, dict):
+        raise ValueError("JSON root must be an object")
+    return obj

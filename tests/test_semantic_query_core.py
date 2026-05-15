@@ -10,6 +10,7 @@ sys.path.insert(0, str(ROOT / "skills" / "chatbi-semantic-query" / "scripts"))
 from semantic_query.parsing import pick_metric
 from semantic_query.planner import make_plan
 from semantic_query.presenters import build_json_payload
+from semantic_query.sql_builder import merge_equality_filters
 
 
 class StubDb:
@@ -44,6 +45,32 @@ class StubDb:
         if "SELECT DISTINCT `region` AS value" in sql:
             return [{"value": "华东"}, {"value": "华南"}]
         raise AssertionError(f"Unexpected SQL: {sql}")
+
+
+def test_make_plan_merges_multi_region_filters_into_in_clause():
+    plan = make_plan("1-4月华东华南各区域收入排行", StubDb())
+
+    assert "`region` IN ('华东', '华南')" in plan.sql
+    assert "`region` = " not in plan.sql
+
+
+def test_merge_equality_filters_single_column_in():
+    filters = [
+        ("区域", "华东", "`region` = '华东'"),
+        ("区域", "华南", "`region` = '华南'"),
+    ]
+    merged = merge_equality_filters(filters)
+    assert merged == ["`region` IN ('华东', '华南')"]
+
+
+def test_merge_equality_filters_keeps_distinct_columns_separate():
+    filters = [
+        ("区域", "华东", "`region` = '华东'"),
+        ("渠道", "线上", "`channel` = '线上'"),
+    ]
+    merged = merge_equality_filters(filters)
+    assert "`region` = '华东'" in merged
+    assert "`channel` = '线上'" in merged
 
 
 def test_make_plan_builds_rank_sql_from_split_modules():

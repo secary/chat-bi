@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import subprocess
 import sys
 from typing import Any, Dict, List, Optional
 
@@ -14,6 +13,7 @@ from backend.config import settings
 _UPLOAD_PATH_RE = re.compile(r"/tmp/chatbi-uploads/[A-Za-z0-9._-]+", re.IGNORECASE)
 _FILE_INGESTION_VALUE_OPTIONS = {"--table", "--sample-size", "--question"}
 _FILE_INGESTION_FLAG_OPTIONS = {"--include-rows"}
+_USER_ORIGINAL_MARKER = "【用户原述】"
 
 
 def find_skill(skills: List[SkillDoc], name: str) -> Optional[SkillDoc]:
@@ -27,9 +27,11 @@ def find_skill(skills: List[SkillDoc], name: str) -> Optional[SkillDoc]:
 def skill_args_for_execution(
     skill_name: str, args: List[str], messages: List[Dict[str, str]]
 ) -> List[str]:
+    if skill_name in {"chatbi-semantic-query", "chatbi-decision-advisor"}:
+        latest_user = latest_user_prompt_for_demo_data_skills(messages)
+        if latest_user:
+            return [latest_user]
     if skill_name in {
-        "chatbi-semantic-query",
-        "chatbi-decision-advisor",
         "chatbi-semantic-processing",
         "chatbi-auto-analysis",
         "chatbi-chart-recommendation",
@@ -40,6 +42,11 @@ def skill_args_for_execution(
             return [latest_user]
     if skill_name == "chatbi-file-ingestion":
         return file_ingestion_args(args, messages)
+    if skill_name == "chatbi-database-overview":
+        latest_user = latest_user_prompt_for_demo_data_skills(messages)
+        if latest_user:
+            return [latest_user]
+        return args
     return args
 
 
@@ -48,6 +55,16 @@ def latest_user_content(messages: List[Dict[str, str]]) -> str:
         if message.get("role") == "user" and message.get("content"):
             return message["content"]
     return ""
+
+
+def latest_user_prompt_for_demo_data_skills(messages: List[Dict[str, str]]) -> str:
+    """Prefer 【用户原述】 so Manager handoff does not pollute DB substring filters."""
+    content = latest_user_content(messages)
+    if not content or _USER_ORIGINAL_MARKER not in content:
+        return content
+    idx = content.rfind(_USER_ORIGINAL_MARKER)
+    tail = content[idx + len(_USER_ORIGINAL_MARKER) :].strip()
+    return tail or content
 
 
 def file_ingestion_args(args: List[str], messages: List[Dict[str, str]]) -> List[str]:
@@ -125,13 +142,23 @@ def _should_include_rows_for_file_followup(messages: List[Dict[str, str]], args:
         "可视化",
         "展示",
         "分析",
+        "统计",
         "汇总",
         "排行",
+        "排名",
         "趋势",
         "对比",
+        "分布",
+        "占比",
+        "比例",
+        "百分比",
         "柱状图",
         "折线图",
         "饼图",
+        "计算",
+        "总计",
+        "求和",
+        "平均",
         "指标",
         "看板",
         "仪表盘",
@@ -171,6 +198,8 @@ def run_script(
     trace_id: str = "",
     skill_db_overrides: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
+    from backend.agent.abort_state import is_aborted
+
     script_dir = skill.skill_dir / "scripts"
     if not script_dir.is_dir():
         raise RuntimeError(f"脚本目录不存在：{script_dir}")
@@ -187,19 +216,33 @@ def run_script(
         raise RuntimeError(f"未找到 Python 脚本：{script_dir}")
 
     cmd = [sys.executable, str(scripts[0]), *args, "--json"]
-    proc = subprocess.run(
+
+    import subprocess as _subprocess
+
+    proc = _subprocess.Popen(
         cmd,
         cwd=str(skill.skill_dir),
-        capture_output=True,
+        stdout=_subprocess.PIPE,
+        stderr=_subprocess.PIPE,
         text=True,
-        timeout=60,
         env={**os.environ, **skill_env(trace_id, skill_db_overrides)},
     )
 
-    if proc.returncode != 0:
-        raise RuntimeError(proc.stderr.strip() or proc.stdout.strip())
+    # Poll abort in a loop while subprocess runs
+    while proc.poll() is None:
+        if is_aborted(trace_id):
+            proc.kill()
+            raise RuntimeError("用户中止了查询")
+        import time
 
-    output = proc.stdout.strip()
+        time.sleep(0.1)
+
+    stdout, stderr = proc.communicate()
+
+    if proc.returncode != 0:
+        raise RuntimeError(stderr.strip() or stdout.strip())
+
+    output = stdout.strip()
     if not output:
         return {"kind": "empty", "text": "脚本执行完毕，未返回数据。", "data": {}}
 

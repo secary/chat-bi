@@ -5,15 +5,16 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, List, Optional
 
+from backend.agent.abort_async import ChatAbortedError, await_with_abort
 from backend.agent.planner import parse_json_object
 from backend.llm_runtime import chatbi_acompletion
 from backend.trace import log_event
 
-SUMMARY_SYSTEM = """你是 ChatBI「汇总专线」：综合多条专线工具返回的 Observation 摘要，生成一份连贯、可执行的 Markdown 回答。
+SUMMARY_SYSTEM = """你是 ChatBI 多专线的 **Manager**：综合各子任务专线返回的 Observation 摘要，向用户输出一份连贯、可执行的 Markdown 最终答复。
 
 规则：
-- 仅基于提供的 Observation 与用户问题组织语言，禁止编造未出现的数字
-- 结构清晰：可先总述，再分专线要点；必要时用列表
+- 仅基于各子任务的「交办说明 handoff_instruction」与 Observation、以及用户问题组织语言；禁止编造未出现的数字
+- 结构清晰：可先总述，再按子任务或专线分点；必要时用列表
 - 输出 JSON（仅此一个对象）：
 {
   "text": "给用户的完整 Markdown 正文",
@@ -28,7 +29,7 @@ async def call_summarize_llm(
     blocks: List[Dict[str, str]],
     trace_id: str = "",
 ) -> Optional[Dict[str, Any]]:
-    """blocks: items with keys agent, label, observation."""
+    """blocks: items with keys agent, label, observation, handoff_instruction (optional)."""
     body = json.dumps(
         {
             "user_question": user_question,
@@ -41,11 +42,16 @@ async def call_summarize_llm(
         {"role": "user", "content": body},
     ]
     try:
-        resp = await chatbi_acompletion(
-            messages=llm_messages,
-            response_format={"type": "json_object"},
-            temperature=0.2,
+        resp = await await_with_abort(
+            chatbi_acompletion(
+                messages=llm_messages,
+                response_format={"type": "json_object"},
+                temperature=0.2,
+            ),
+            trace_id,
         )
+    except ChatAbortedError:
+        raise
     except Exception as exc:
         log_event(
             trace_id,

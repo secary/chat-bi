@@ -38,6 +38,7 @@ MODULE_SUITES: dict[str, list[str]] = {
     "skills": [
         "tests/test_auto_analysis_skill.py",
         "tests/test_chart_recommendation_skill.py",
+        "tests/test_chatbi_comparison_month_parse.py",
         "tests/test_dashboard_orchestration_skill.py",
         "tests/test_database_overview_skill.py",
         "tests/test_decision_advisor_focus.py",
@@ -49,14 +50,18 @@ MODULE_SUITES: dict[str, list[str]] = {
     ],
     "agent": [
         "tests/test_agent_runner_contract.py",
+        "tests/test_abort_async.py",
         "tests/test_agent_skill_protocol.py",
         "tests/test_agent_workflow.py",
         "tests/test_chat_route_disconnect.py",
         "tests/test_multi_agent_registry.py",
-        "tests/test_multi_agent_router.py",
+        "tests/test_multi_agent_manager.py",
         "tests/test_observation.py",
+        "tests/test_planner_parse_json.py",
         "tests/test_query_advice_dimension_flow.py",
         "tests/test_react_runner.py",
+        "tests/test_skill_metadata_parse.py",
+        "tests/test_session_repo_payload.py",
         "tests/test_upload_context.py",
     ],
     "admin": [

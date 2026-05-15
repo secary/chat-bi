@@ -86,7 +86,8 @@ open http://localhost:5174
 
 - 修改 `backend/` 或 `skills/`：后端自动 reload，无需重建镜像。
 - 修改 `frontend/`：Vite 自动热更新，无需重建镜像。
-- 修改依赖文件、Dockerfile 或系统依赖：需要重新 `--build`。
+- 修改 `frontend/package.json` 或 `package-lock.json`：重启 frontend 容器即可（入口脚本会对比 lock 并自动 `npm ci`）；若仍缺包可执行 `docker compose --env-file .env.dev -f docker-compose.dev.yml down -v` 后重新 `up --build` 清空 `frontend-node-modules` 卷。
+- 修改 Dockerfile 或系统依赖：需要重新 `--build`。
 - 修改 `database/init.sql`：已有 `database/mysql-data-dev/` 不会自动重放，需重置开发数据目录后再启动。
 - 容器名前缀为 `chatbi-dev-*`，可以和生产式本地运行并存。
 

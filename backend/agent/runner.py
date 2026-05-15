@@ -11,12 +11,14 @@ from backend.agent.executor import (
 )
 from backend.agent.formatter import stream_result_events
 from backend.agent.intent_guard import small_talk_reply, should_skip_skill_for_message
+from backend.agent.abort_async import ChatAbortedError
 from backend.agent.planner import call_llm_for_plan
 from backend.agent.prompt_builder import (
     SkillDoc,
     build_system_prompt,
     scan_skills_enabled,
 )
+from backend.agent.prompt_subagent import build_system_prompt_for_subagent
 from backend.agent.query_decision import is_query_plus_decision_text
 from backend.agent.react_runner import stream_chat_react
 from backend.config import settings
@@ -92,6 +94,7 @@ async def stream_chat(
     skill_db_overrides: Optional[Dict[str, str]] = None,
     memory_block: Optional[str] = None,
     multi_agents: bool = False,
+    session_id: Optional[int] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """Agent loop: ReAct multi-step or legacy single-plan Skill execution."""
     if multi_agents:
@@ -102,6 +105,7 @@ async def stream_chat(
             trace_id=trace_id,
             skill_db_overrides=skill_db_overrides,
             memory_block=memory_block,
+            session_id=session_id,
         ):
             yield event
         return
@@ -112,6 +116,7 @@ async def stream_chat(
             trace_id=trace_id,
             skill_db_overrides=skill_db_overrides,
             memory_block=memory_block,
+            session_id=session_id,
         ):
             yield event
         return
@@ -133,6 +138,8 @@ async def _stream_chat_legacy(
     skill_docs: Optional[List[SkillDoc]] = None,
     role_prompt: Optional[str] = None,
     result_sink: Optional[Dict[str, Any]] = None,
+    subagent_mode: bool = False,
+    specialist_agent_id: Optional[str] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """Single LLM JSON plan with optional two-step query and advice execution."""
     log_event(
@@ -150,7 +157,9 @@ async def _stream_chat_legacy(
         yield {"type": "text", "content": small_talk_reply(user_text)}
         yield {"type": "done", "content": None}
         return
-    system_prompt = build_system_prompt(skills)
+    system_prompt = (
+        build_system_prompt_for_subagent(skills) if subagent_mode else build_system_prompt(skills)
+    )
     if role_prompt and role_prompt.strip():
         system_prompt = role_prompt.strip() + "\n\n" + system_prompt
     if memory_block and memory_block.strip():
@@ -158,7 +167,14 @@ async def _stream_chat_legacy(
 
     yield {"type": "thinking", "content": "正在分析您的问题，理解业务语义..."}
     log_event(trace_id, "agent.planner", "started", payload={"skill_count": len(skills)})
-    plan = await call_llm_for_plan(system_prompt, messages)
+    try:
+        plan = await call_llm_for_plan(system_prompt, messages, trace_id=trace_id)
+    except ChatAbortedError:
+        log_event(trace_id, "agent.runner", "aborted", level="INFO")
+        _legacy_sink_write(result_sink, None, None)
+        yield {"type": "thinking", "content": "用户中止了查询。"}
+        yield {"type": "done", "content": None}
+        return
     log_event(
         trace_id,
         "agent.planner",
@@ -216,7 +232,11 @@ async def _stream_chat_legacy(
                 trace_id,
                 "agent.skill",
                 "started",
-                payload={"skill": skill_name, "args": args},
+                payload={
+                    "skill": skill_name,
+                    "args": args,
+                    "agent_id": specialist_agent_id or "single",
+                },
             )
             result = run_script(
                 skill_doc,
@@ -264,6 +284,8 @@ async def stream_specialist(
     skill_db_overrides: Optional[Dict[str, str]] = None,
     memory_block: Optional[str] = None,
     result_sink: Optional[Dict[str, Any]] = None,
+    subagent_mode: bool = False,
+    specialist_agent_id: Optional[str] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """One specialist pass: ReAct or Legacy with a filtered skill list."""
     if settings.agent_react:
@@ -275,6 +297,8 @@ async def stream_specialist(
             skill_docs=skill_docs,
             role_prompt=role_prompt,
             result_sink=result_sink,
+            subagent_react=subagent_mode,
+            specialist_agent_id=specialist_agent_id,
         ):
             yield event
         return
@@ -286,5 +310,7 @@ async def stream_specialist(
         skill_docs=skill_docs,
         role_prompt=role_prompt,
         result_sink=result_sink,
+        subagent_mode=subagent_mode,
+        specialist_agent_id=specialist_agent_id,
     ):
         yield event

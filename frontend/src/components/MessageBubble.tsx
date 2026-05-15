@@ -3,8 +3,7 @@ import type { ChatMessage } from '../types/message';
 import { ThinkingBubble } from './ThinkingBubble';
 import { ChartRenderer } from './ChartRenderer';
 import { KPICards } from './KPICards';
-import { tokenizeInlineMarkdown } from '../lib/inlineMarkdown';
-import { parseMarkdownBlocks } from '../lib/markdownBlocks';
+import { FormattedMarkdown } from '../lib/formattedMarkdown';
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -56,20 +55,30 @@ function withDashboardTheme(option: Record<string, unknown>): Record<string, unk
   };
 
   const legend = (next.legend ?? {}) as Record<string, unknown>;
+  const legendText = (legend.textStyle ?? {}) as Record<string, unknown>;
   next.legend = {
     ...legend,
-    textStyle: { color: '#64748b' },
+    textStyle: { color: '#64748b', ...legendText },
     itemWidth: 12,
     itemHeight: 8,
+    padding: Array.isArray(legend.padding) ? legend.padding : [10, 12, 14, 12],
   };
 
   const grid = (next.grid ?? {}) as Record<string, unknown>;
+  const rawBottom = grid.bottom;
+  let bottomOut: number | string = 56;
+  if (typeof rawBottom === 'number' && !Number.isNaN(rawBottom)) {
+    bottomOut = Math.max(56, rawBottom);
+  } else if (rawBottom !== undefined && rawBottom !== null && rawBottom !== '') {
+    bottomOut = rawBottom as string | number;
+  }
   next.grid = {
     ...grid,
     left: 48,
     right: 24,
     top: 36,
-    bottom: 40,
+    bottom: bottomOut,
+    containLabel: grid.containLabel !== undefined ? grid.containLabel : true,
   };
 
   const xAxisRaw = next.xAxis;
@@ -80,7 +89,7 @@ function withDashboardTheme(option: Record<string, unknown>): Record<string, unk
     axisTick: { show: false },
     axisLabel: {
       color: '#64748b',
-      margin: 10,
+      margin: 14,
       rotate: 0,
       interval: 0,
       formatter: wrapCategoryLabel,
@@ -159,11 +168,26 @@ function withDashboardTheme(option: Record<string, unknown>): Record<string, unk
       };
     }
     if (series.type === 'pie') {
+      const lbl = (series.label ?? {}) as Record<string, unknown>;
+      const lblLine = (series.labelLine ?? {}) as Record<string, unknown>;
       return {
         ...series,
-        radius: ['42%', '72%'],
-        label: { color: '#334155', ...(series.label as Record<string, unknown> | undefined) },
-        labelLine: { lineStyle: { color: 'rgba(148, 163, 184, 0.4)' } },
+        center: Array.isArray(series.center) ? series.center : ['50%', '44%'],
+        radius: ['26%', '42%'],
+        avoidLabelOverlap: true,
+        label: {
+          color: '#334155',
+          fontSize: 11,
+          lineHeight: 15,
+          ...lbl,
+        },
+        labelLine: {
+          length: 6,
+          length2: 4,
+          smooth: 0.15,
+          lineStyle: { color: 'rgba(148, 163, 184, 0.45)', width: 1 },
+          ...lblLine,
+        },
         itemStyle: { borderColor: '#ffffff', borderWidth: 2, ...(series.itemStyle as Record<string, unknown> | undefined) },
       };
     }
@@ -173,97 +197,6 @@ function withDashboardTheme(option: Record<string, unknown>): Record<string, unk
   return next;
 }
 
-function renderInline(content: string) {
-  return tokenizeInlineMarkdown(content).map((token, idx) =>
-    token.type === 'bold' ? (
-      <strong key={idx} className="font-semibold text-gray-900">
-        {token.value}
-      </strong>
-    ) : (
-      <span key={idx}>{token.value}</span>
-    ),
-  );
-}
-
-function FormattedContent({ content }: { content: string }) {
-  const blocks = parseMarkdownBlocks(content);
-  return (
-    <div className="space-y-1">
-      {blocks.map((block, index) => {
-        if (block.type === 'table') {
-          return (
-            <div key={index} className="my-2 overflow-x-auto rounded-lg border border-gray-200">
-              <table className="min-w-full border-collapse text-sm">
-                <thead className="bg-gray-50">
-                  <tr>
-                    {block.header.map((cell, hIdx) => (
-                      <th
-                        key={hIdx}
-                        className="border-b border-gray-200 px-3 py-2 text-left font-semibold text-gray-800"
-                      >
-                        {renderInline(cell)}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {block.rows.map((row, rIdx) => (
-                    <tr key={rIdx} className="border-b border-gray-100 last:border-b-0">
-                      {row.map((cell, cIdx) => (
-                        <td key={cIdx} className="px-3 py-2 align-top text-gray-700">
-                          {renderInline(cell)}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          );
-        }
-
-        const trimmed = block.content.trim();
-        if (!trimmed) {
-          return <div key={index} className="h-2" />;
-        }
-        if (trimmed.startsWith('## ')) {
-          return (
-            <h2 key={index} className="pt-1 text-base font-semibold tracking-tight text-gray-950">
-              {renderInline(trimmed.slice(3))}
-            </h2>
-          );
-        }
-        if (trimmed.startsWith('### ')) {
-          return (
-            <h3 key={index} className="pt-3 text-sm font-semibold text-gray-900">
-              {renderInline(trimmed.slice(4))}
-            </h3>
-          );
-        }
-        if (/^\d+\.\s/.test(trimmed)) {
-          return (
-            <p key={index} className="pt-2 text-sm font-semibold text-gray-900">
-              {renderInline(trimmed)}
-            </p>
-          );
-        }
-        if (/^[-•]\s+/.test(trimmed)) {
-          return (
-            <div key={index} className="flex gap-2 text-sm text-gray-700">
-              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-gray-400/60" />
-              <span>{renderInline(trimmed.slice(2))}</span>
-            </div>
-          );
-        }
-        return (
-          <p key={index} className="text-sm text-gray-700">
-            {renderInline(trimmed)}
-          </p>
-        );
-      })}
-    </div>
-  );
-}
 
 function AnalysisProposalCard({
   proposal,
@@ -272,7 +205,7 @@ function AnalysisProposalCard({
 }) {
   return (
     <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-3">
-      <FormattedContent content={proposal.markdown} />
+      <FormattedMarkdown content={proposal.markdown} />
       <div className="mt-3 grid gap-2 md:grid-cols-2">
         {proposal.proposed_metrics.map((metric) => (
           <div key={metric.id} className="rounded-lg border border-emerald-200 bg-white px-3 py-2">
@@ -285,7 +218,9 @@ function AnalysisProposalCard({
                 {Math.round(metric.confidence * 100)}%
               </span>
             </div>
-            <div className="mt-2 text-xs text-gray-600">{metric.formula_md}</div>
+            <div className="mt-2 text-xs text-gray-600">
+              <FormattedMarkdown content={metric.formula_md} />
+            </div>
             <div className="mt-2 text-xs text-gray-500">
               ID: <span className="font-mono">{metric.id}</span>
             </div>
@@ -294,6 +229,29 @@ function AnalysisProposalCard({
       </div>
     </div>
   );
+}
+
+function kpiGridClassName(count: number): string {
+  const shell =
+    'grid gap-3 border-b border-slate-200/90 px-4 py-4 sm:px-5 md:px-6';
+  if (count <= 1) {
+    return `${shell} grid-cols-1`;
+  }
+  if (count === 2) {
+    return `${shell} grid-cols-1 min-[480px]:grid-cols-2`;
+  }
+  if (count === 3) {
+    return `${shell} grid-cols-1 min-[480px]:grid-cols-2 xl:grid-cols-3`;
+  }
+  return `${shell} grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4`;
+}
+
+function chartGridClassName(count: number): string {
+  const shell = 'grid gap-4 border-b border-slate-200/90 px-4 py-5 sm:px-5 md:px-6';
+  if (count <= 1) {
+    return `${shell} grid-cols-1`;
+  }
+  return `${shell} grid-cols-1 min-[720px]:grid-cols-2`;
 }
 
 function DashboardMiddlewareCard({
@@ -305,30 +263,31 @@ function DashboardMiddlewareCard({
   const charts = dashboard.charts ?? [];
   const tableRows = dashboard.table_rows ?? [];
   const tableCols = dashboard.table_columns ?? [];
-  const chartCols = charts.length <= 1 ? 'grid-cols-1' : 'grid-cols-2';
+  const kpiCount = kpis.length;
+  const singleKpiHero = kpiCount === 1;
   const domainLabel = dashboard.dataset.domain_label || dashboard.dataset.domain_guess;
 
   return (
-    <div className="mt-3 overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.08),_transparent_28%),linear-gradient(180deg,_#ffffff_0%,_#f8fafc_100%)] shadow-[0_18px_50px_rgba(148,163,184,0.18)]">
-      <div className="border-b border-slate-200/90 px-5 py-4 md:px-6">
-        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div>
+    <div className="mt-3 min-w-0 overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.08),_transparent_28%),linear-gradient(180deg,_#ffffff_0%,_#f8fafc_100%)] shadow-[0_18px_50px_rgba(148,163,184,0.18)]">
+      <div className="border-b border-slate-200/90 px-4 py-4 sm:px-5 md:px-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <span className="inline-flex h-2.5 w-2.5 rounded-full bg-sky-500 shadow-[0_0_12px_rgba(14,165,233,0.35)]" />
+              <span className="inline-flex h-2.5 w-2.5 shrink-0 rounded-full bg-sky-500 shadow-[0_0_12px_rgba(14,165,233,0.35)]" />
               <span className="text-[11px] font-medium uppercase tracking-[0.32em] text-slate-500">
                 Auto Analysis Board
               </span>
             </div>
-            <div className="mt-2 text-lg font-semibold tracking-wide text-slate-900 md:text-xl">
+            <div className="mt-2 break-words text-lg font-semibold tracking-wide text-slate-900 md:text-xl">
               {dashboard.title}
             </div>
-            <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
               {dashboard.dataset.row_count > 0 && <span>{dashboard.dataset.row_count} 行数据</span>}
               <span>{domainLabel}</span>
               <span>已采纳 {dashboard.widgets.length} 个指标</span>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
             <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[11px] font-medium text-sky-700">
               自动生成看板
             </span>
@@ -340,27 +299,37 @@ function DashboardMiddlewareCard({
       </div>
 
       {kpis.length > 0 && (
-        <div className="grid gap-3 border-b border-slate-200/90 px-5 py-4 md:grid-cols-2 md:px-6 xl:grid-cols-4">
+        <div className={kpiGridClassName(kpiCount)}>
           {kpis.map((k, i) => (
             <div
               key={i}
-              className="relative overflow-hidden rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,_rgba(255,255,255,0.96),_rgba(248,250,252,0.96))] px-4 py-4 shadow-[0_8px_30px_rgba(148,163,184,0.12)]"
+              className={
+                'relative flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,_rgba(255,255,255,0.96),_rgba(248,250,252,0.96))] shadow-[0_8px_30px_rgba(148,163,184,0.12)] ' +
+                (singleKpiHero ? 'p-5 sm:p-6' : 'p-4 sm:p-5')
+              }
             >
-              <div className="absolute right-0 top-0 h-20 w-20 rounded-full bg-sky-100 blur-2xl" />
-              <div className="relative text-[11px] font-medium uppercase tracking-[0.24em] text-slate-500">
-                {k.label}
-              </div>
-              <div className="relative mt-3 text-3xl font-semibold tracking-tight text-slate-900">
-                {k.value}
-                {k.unit && (
-                  <span className="ml-1 text-sm font-normal text-slate-500">{k.unit}</span>
-                )}
-              </div>
-              <div className="relative mt-3 h-1.5 w-24 rounded-full bg-slate-200">
+              <div className="pointer-events-none absolute right-0 top-0 h-24 w-24 rounded-full bg-sky-100 blur-2xl sm:h-28 sm:w-28" />
+              <div className="relative z-[1] min-w-0">
+                <div className="text-[11px] font-medium uppercase tracking-[0.24em] text-slate-500">
+                  {k.label}
+                </div>
                 <div
-                  className="h-full rounded-full bg-[linear-gradient(90deg,_#0ea5e9,_#22c55e)] shadow-[0_0_10px_rgba(14,165,233,0.2)]"
-                  style={{ width: `${Math.min(90, 42 + i * 12)}%` }}
-                />
+                  className={
+                    'mt-2 font-semibold tracking-tight text-slate-900 ' +
+                    (singleKpiHero ? 'text-3xl sm:text-4xl' : 'text-2xl sm:text-3xl')
+                  }
+                >
+                  {k.value}
+                  {k.unit && (
+                    <span className="ml-1 text-sm font-normal text-slate-500 sm:text-base">{k.unit}</span>
+                  )}
+                </div>
+                <div className="mt-4 h-2 w-full rounded-full bg-slate-200">
+                  <div
+                    className="h-full rounded-full bg-[linear-gradient(90deg,_#0ea5e9,_#22c55e)] shadow-[0_0_10px_rgba(14,165,233,0.2)]"
+                    style={{ width: `${Math.min(90, 42 + i * 12)}%` }}
+                  />
+                </div>
               </div>
             </div>
           ))}
@@ -368,7 +337,7 @@ function DashboardMiddlewareCard({
       )}
 
       {charts.length > 0 && (
-        <div className={`grid gap-4 border-b border-slate-200/90 px-5 py-5 md:px-6 ${chartCols}`}>
+        <div className={chartGridClassName(charts.length)}>
           {charts.map((chart, i) => {
             const opt = withDashboardTheme(chart as Record<string, unknown>);
             const w = dashboard.widgets[i];
@@ -376,7 +345,7 @@ function DashboardMiddlewareCard({
             return (
               <div
                 key={i}
-                className="overflow-hidden rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,_#ffffff,_#f8fafc)] shadow-[0_10px_32px_rgba(148,163,184,0.14)]"
+                className="min-w-0 rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,_#ffffff,_#f8fafc)] shadow-[0_10px_32px_rgba(148,163,184,0.14)]"
               >
                 <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
                   <div>
@@ -391,13 +360,14 @@ function DashboardMiddlewareCard({
                     {Array.isArray(opt.series) ? `${opt.series.length} series` : '1 series'}
                   </span>
                 </div>
-                <ReactECharts
-                  option={opt}
-                  style={{ height: 360, width: '100%' }}
-                  notMerge
-                  opts={{ renderer: 'canvas' }}
-                  className="px-2 py-2"
-                />
+                <div className="px-4 pb-8 pt-2 sm:px-5">
+                  <ReactECharts
+                    option={opt}
+                    style={{ height: 360, width: '100%' }}
+                    notMerge
+                    opts={{ renderer: 'canvas' }}
+                  />
+                </div>
               </div>
             );
           })}
@@ -405,7 +375,7 @@ function DashboardMiddlewareCard({
       )}
 
       {tableRows.length > 0 && tableCols.length > 0 && (
-        <div className="px-5 py-5 md:px-6">
+        <div className="px-4 py-5 sm:px-5 md:px-6">
           <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,_#ffffff,_#f8fafc)] shadow-[0_10px_32px_rgba(148,163,184,0.14)]">
             <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
               <div>
@@ -483,7 +453,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
       <div
         className={
           isWideDashboard
-            ? 'relative left-1/2 w-[min(88vw,1400px)] max-w-none -translate-x-1/2'
+            ? 'w-full min-w-0 max-w-none'
             : 'max-w-[90%]'
         }
       >
@@ -498,7 +468,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
 
         {message.content && (
           <div className="prose prose-sm max-w-none rounded-2xl rounded-tl-sm bg-surface px-5 py-3.5 text-sm leading-relaxed text-gray-800 shadow-card">
-            <FormattedContent content={message.content} />
+            <FormattedMarkdown content={message.content} />
           </div>
         )}
 

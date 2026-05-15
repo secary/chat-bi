@@ -21,4 +21,13 @@ describe('tokenizeInlineMarkdown', () => {
       { type: 'text', value: '：直营' },
     ]);
   });
+
+  it('parses inline and display math', () => {
+    expect(tokenizeInlineMarkdown('率 $a/b$ 与 $$x=1$$')).toEqual([
+      { type: 'text', value: '率 ' },
+      { type: 'math', value: 'a/b', display: false },
+      { type: 'text', value: ' 与 ' },
+      { type: 'math', value: 'x=1', display: true },
+    ]);
+  });
 });

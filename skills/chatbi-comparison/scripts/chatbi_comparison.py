@@ -7,6 +7,7 @@ Supports three modes:
 - all_months  : show all months with consecutive MoM changes (全量/全年/按月)
 - quarterly   : group by quarter with QoQ changes (季度/按季)
 """
+
 from __future__ import annotations
 
 import argparse
@@ -80,15 +81,33 @@ DIMENSIONS: Dict[str, Dict[str, str]] = {
     "部门": {"aliases": "部门,团队,事业部", "field": "department"},
 }
 
-QUARTER_MAP = {1: "Q1", 2: "Q1", 3: "Q1", 4: "Q2", 5: "Q2", 6: "Q2",
-               7: "Q3", 8: "Q3", 9: "Q3", 10: "Q4", 11: "Q4", 12: "Q4"}
+QUARTER_MAP = {
+    1: "Q1",
+    2: "Q1",
+    3: "Q1",
+    4: "Q2",
+    5: "Q2",
+    6: "Q2",
+    7: "Q3",
+    8: "Q3",
+    9: "Q3",
+    10: "Q4",
+    11: "Q4",
+    12: "Q4",
+}
 
 # ---------------------------------------------------------------------------
 # Parsing helpers
 # ---------------------------------------------------------------------------
 
+
 def _q(text: str) -> str:
     return re.sub(r"\s+", "", text).lower()
+
+
+def _normalize_month_placeholders(q: str) -> str:
+    """「1月份」与「1月」等价，便于月份正则匹配（不影响「三个月」等非数字+月份结构）。"""
+    return re.sub(r"(\d{1,2})月份", r"\1月", q)
 
 
 def detect_metric(question: str) -> Tuple[str, Dict]:
@@ -112,35 +131,69 @@ def detect_mode(question: str) -> str:
     q = _q(question)
     if any(kw in q for kw in ["全量", "全年", "所有月", "每月", "各月", "月度趋势", "全部月"]):
         return "all_months"
-    if any(kw in q for kw in ["季度", "按季", "季环比", "q1", "q2", "q3", "q4",
-                                "第一季", "第二季", "第三季", "第四季"]):
+    if any(
+        kw in q
+        for kw in [
+            "季度",
+            "按季",
+            "季环比",
+            "q1",
+            "q2",
+            "q3",
+            "q4",
+            "第一季",
+            "第二季",
+            "第三季",
+            "第四季",
+        ]
+    ):
         return "quarterly"
     return "month_pair"
 
 
-def detect_months(question: str, db: MysqlCli) -> Tuple[int, int, int]:
-    """Return (year, current_month, prev_month) for month_pair mode."""
-    q = _q(question)
-    pair = re.search(r"(\d{1,2})月[和与对比vsvs]+(\d{1,2})月", q)
-    if pair:
-        m1, m2 = int(pair.group(1)), int(pair.group(2))
-        return 2026, max(m1, m2), min(m1, m2)
-    single = re.search(r"(\d{1,2})月", q)
-    if single:
-        cur = int(single.group(1))
-        return 2026, cur, (cur - 1) if cur > 1 else 12
-    rows = db.query("SELECT MAX(MONTH(order_date)) AS m FROM sales_order WHERE YEAR(order_date)=2026")
-    cur = int(rows[0]["m"]) if rows else 4
-    return 2026, cur, (cur - 1) if cur > 1 else 12
+_MONTH_CONNECTOR = r"(?:和|与|对比|较|对|vs|相对|相较于|相比|对照)+"
+
+
+def _pair_from_two_months(m1: int, m2: int) -> Tuple[int, int]:
+    return max(m1, m2), min(m1, m2)
 
 
 def detect_year(question: str) -> int:
     m = re.search(r"(202\d)年", question)
     return int(m.group(1)) if m else 2026
 
+
+def detect_months(question: str, db: MysqlCli) -> Tuple[int, int, int]:
+    """Return (year, current_month, prev_month) for month_pair mode."""
+    year = detect_year(question)
+    q = _normalize_month_placeholders(_q(question))
+    pair = re.search(rf"(\d{{1,2}})月{_MONTH_CONNECTOR}(\d{{1,2}})月", q)
+    if pair:
+        m1, m2 = int(pair.group(1)), int(pair.group(2))
+        cur, prev = _pair_from_two_months(m1, m2)
+        return year, cur, prev
+    found = [int(m) for m in re.findall(r"(\d{1,2})月", q)]
+    distinct: List[int] = []
+    for m in found:
+        if m not in distinct:
+            distinct.append(m)
+    if len(distinct) >= 2:
+        cur, prev = _pair_from_two_months(distinct[0], distinct[1])
+        return year, cur, prev
+    if len(distinct) == 1:
+        cur = distinct[0]
+        return year, cur, (cur - 1) if cur > 1 else 12
+    rows = db.query(
+        f"SELECT MAX(MONTH(order_date)) AS m FROM sales_order WHERE YEAR(order_date)={year}"
+    )
+    cur = int(rows[0]["m"]) if rows else 4
+    return year, cur, (cur - 1) if cur > 1 else 12
+
+
 # ---------------------------------------------------------------------------
 # SQL helpers
 # ---------------------------------------------------------------------------
+
 
 def _month_expr(col: str, month: int) -> str:
     return f"SUM(CASE WHEN MONTH(order_date)={month} THEN `{col}` ELSE 0 END)"
@@ -149,8 +202,7 @@ def _month_expr(col: str, month: int) -> str:
 def _metric_expr_for_month(meta: Dict, month: int) -> str:
     num, den = meta["num_col"], meta["den_col"]
     if den:
-        return (f"{_month_expr(num, month)} "
-                f"/ NULLIF({_month_expr(den, month)}, 0) * 100")
+        return f"{_month_expr(num, month)} / NULLIF({_month_expr(den, month)}, 0) * 100"
     return _month_expr(num, month)
 
 
@@ -160,13 +212,21 @@ def _metric_expr_simple(meta: Dict) -> str:
         return f"SUM(`{num}`) / NULLIF(SUM(`{den}`), 0) * 100"
     return f"SUM(`{num}`)"
 
+
 # ---------------------------------------------------------------------------
 # Mode: month_pair
 # ---------------------------------------------------------------------------
 
+
 def run_month_pair(
-    db: MysqlCli, meta: Dict, dim_field: str, dim_name: str,
-    metric_name: str, year: int, cur: int, prev: int,
+    db: MysqlCli,
+    meta: Dict,
+    dim_field: str,
+    dim_name: str,
+    metric_name: str,
+    year: int,
+    cur: int,
+    prev: int,
 ) -> Dict[str, Any]:
     cur_label = f"{cur}月{metric_name}"
     prev_label = f"{prev}月{metric_name}"
@@ -183,11 +243,14 @@ def run_month_pair(
     if not rows:
         return skill_response("text", "未查询到数据。")
 
-    raw_rows = [{
-        "dimension": r["dimension"],
-        cur_label: round(float(r["cur_val"] or 0), 2),
-        prev_label: round(float(r["prev_val"] or 0), 2),
-    } for r in rows]
+    raw_rows = [
+        {
+            "dimension": r["dimension"],
+            cur_label: round(float(r["cur_val"] or 0), 2),
+            prev_label: round(float(r["prev_val"] or 0), 2),
+        }
+        for r in rows
+    ]
 
     chart_plan = {
         "chart_type": "bar",
@@ -204,8 +267,7 @@ def run_month_pair(
     text = (
         f"{year}年{cur}月 vs {prev}月 · **{metric_name}环比**（按{dim_name}）\n\n"
         f"**{top['dimension']}** 环比{rate_str}，"
-        f"{_fmt(pv0, meta)} → {_fmt(cv0, meta)}。\n\n"
-        + _md_table_pair(rows, meta, cur, prev)
+        f"{_fmt(pv0, meta)} → {_fmt(cv0, meta)}。\n\n" + _md_table_pair(rows, meta, cur, prev)
     )
 
     cur_total = sum(float(r["cur_val"] or 0) for r in rows)
@@ -213,16 +275,28 @@ def run_month_pair(
     kpis = _pair_kpis(cur_total, prev_total, meta, cur, prev)
 
     return {
-        "kind": "table", "text": text, "chart_plan": chart_plan,
-        "data": {"rows": raw_rows}, "charts": [], "kpis": kpis,
+        "kind": "table",
+        "text": text,
+        "chart_plan": chart_plan,
+        "data": {
+            "rows": raw_rows,
+            "comparison_meta": {"year": year, "cur_month": cur, "prev_month": prev},
+        },
+        "charts": [],
+        "kpis": kpis,
     }
+
 
 # ---------------------------------------------------------------------------
 # Mode: all_months
 # ---------------------------------------------------------------------------
 
+
 def run_all_months(
-    db: MysqlCli, meta: Dict, metric_name: str, year: int,
+    db: MysqlCli,
+    meta: Dict,
+    metric_name: str,
+    year: int,
 ) -> Dict[str, Any]:
     sql = (
         f"SELECT MONTH(order_date) AS month, "
@@ -238,17 +312,17 @@ def run_all_months(
 
     # Build raw rows for chart: month label + value + MoM change
     raw_rows = []
-    md_lines = [f"| 月份 | {metric_name} | 环比变化 | 环比增长率 |",
-                "|------|------|--------|------|"]
+    md_lines = [
+        f"| 月份 | {metric_name} | 环比变化 | 环比增长率 |",
+        "|------|------|--------|------|",
+    ]
     for i, (m, v) in enumerate(month_vals):
         prev_v = month_vals[i - 1][1] if i > 0 else None
         change = v - prev_v if prev_v is not None else 0.0
         rate = (change / prev_v * 100) if prev_v else None
         rate_str = f"{rate:+.1f}%" if rate is not None else "—"
         raw_rows.append({"月份": f"{m}月", metric_name: round(v, 2)})
-        md_lines.append(
-            f"| {m}月 | {_fmt(v, meta)} | {_fmt_change(change, meta)} | {rate_str} |"
-        )
+        md_lines.append(f"| {m}月 | {_fmt(v, meta)} | {_fmt_change(change, meta)} | {rate_str} |")
 
     chart_plan = {
         "chart_type": "line",
@@ -267,16 +341,25 @@ def run_all_months(
     ]
 
     return {
-        "kind": "table", "text": text, "chart_plan": chart_plan,
-        "data": {"rows": raw_rows}, "charts": [], "kpis": kpis,
+        "kind": "table",
+        "text": text,
+        "chart_plan": chart_plan,
+        "data": {"rows": raw_rows},
+        "charts": [],
+        "kpis": kpis,
     }
+
 
 # ---------------------------------------------------------------------------
 # Mode: quarterly
 # ---------------------------------------------------------------------------
 
+
 def run_quarterly(
-    db: MysqlCli, meta: Dict, metric_name: str, year: int,
+    db: MysqlCli,
+    meta: Dict,
+    metric_name: str,
+    year: int,
 ) -> Dict[str, Any]:
     sql = (
         f"SELECT MONTH(order_date) AS month, "
@@ -298,21 +381,22 @@ def run_quarterly(
     quarters = sorted(q_data.keys())
     # For ratio metrics, average; for sum metrics, sum
     is_ratio = meta["den_col"] is not None
-    q_vals = [(q, (sum(q_data[q]) / len(q_data[q])) if is_ratio else sum(q_data[q]))
-              for q in quarters]
+    q_vals = [
+        (q, (sum(q_data[q]) / len(q_data[q])) if is_ratio else sum(q_data[q])) for q in quarters
+    ]
 
     raw_rows = [{"季度": q, metric_name: round(v, 2)} for q, v in q_vals]
 
-    md_lines = [f"| 季度 | {metric_name} | 环比变化 | 环比增长率 |",
-                "|------|------|--------|------|"]
+    md_lines = [
+        f"| 季度 | {metric_name} | 环比变化 | 环比增长率 |",
+        "|------|------|--------|------|",
+    ]
     for i, (q, v) in enumerate(q_vals):
         prev_v = q_vals[i - 1][1] if i > 0 else None
         change = v - prev_v if prev_v is not None else 0.0
         rate = (change / prev_v * 100) if prev_v else None
         rate_str = f"{rate:+.1f}%" if rate is not None else "—"
-        md_lines.append(
-            f"| {q} | {_fmt(v, meta)} | {_fmt_change(change, meta)} | {rate_str} |"
-        )
+        md_lines.append(f"| {q} | {_fmt(v, meta)} | {_fmt_change(change, meta)} | {rate_str} |")
 
     chart_plan = {
         "chart_type": "bar",
@@ -330,13 +414,19 @@ def run_quarterly(
     ]
 
     return {
-        "kind": "table", "text": text, "chart_plan": chart_plan,
-        "data": {"rows": raw_rows}, "charts": [], "kpis": kpis,
+        "kind": "table",
+        "text": text,
+        "chart_plan": chart_plan,
+        "data": {"rows": raw_rows},
+        "charts": [],
+        "kpis": kpis,
     }
+
 
 # ---------------------------------------------------------------------------
 # Shared formatters
 # ---------------------------------------------------------------------------
+
 
 def _fmt(val: float, meta: Dict) -> str:
     unit, fmt = meta["unit"], meta["fmt"]
@@ -358,8 +448,10 @@ def _fmt_change(change: float, meta: Dict) -> str:
 
 
 def _md_table_pair(rows: List[Dict], meta: Dict, cur: int, prev: int) -> str:
-    lines = [f"| 维度 | {cur}月 | {prev}月 | 环比变化 | 增长率 |",
-             "|------|------|------|--------|------|"]
+    lines = [
+        f"| 维度 | {cur}月 | {prev}月 | 环比变化 | 增长率 |",
+        "|------|------|------|--------|------|",
+    ]
     for r in rows:
         cv, pv = float(r["cur_val"] or 0), float(r["prev_val"] or 0)
         change = cv - pv
@@ -378,15 +470,21 @@ def _pair_kpis(cur_total: float, prev_total: float, meta: Dict, cur: int, prev: 
     return [
         kpi(f"{cur}月{meta['unit'] and '合计' or ''}", _fmt(cur_total, meta)),
         kpi(f"{prev}月", _fmt(prev_total, meta)),
-        kpi("环比变化", _fmt_change(change, meta),
-            status="positive" if change >= 0 else "negative"),
-        kpi("环比增长率", f"{rate:+.1f}%" if rate is not None else "—",
-            status="positive" if (rate or 0) >= 0 else "negative"),
+        kpi(
+            "环比变化", _fmt_change(change, meta), status="positive" if change >= 0 else "negative"
+        ),
+        kpi(
+            "环比增长率",
+            f"{rate:+.1f}%" if rate is not None else "—",
+            status="positive" if (rate or 0) >= 0 else "negative",
+        ),
     ]
+
 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     parser = argparse.ArgumentParser()
@@ -409,8 +507,9 @@ def main() -> None:
             out = run_quarterly(db, metric_meta, metric_name, year)
         else:
             _, cur_month, prev_month = detect_months(question, db)
-            out = run_month_pair(db, metric_meta, dim_field, dim_name,
-                                 metric_name, year, cur_month, prev_month)
+            out = run_month_pair(
+                db, metric_meta, dim_field, dim_name, metric_name, year, cur_month, prev_month
+            )
     except RuntimeError as exc:
         out = skill_response("error", f"查询失败：{exc}")
 

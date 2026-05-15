@@ -59,8 +59,10 @@
 
 | 轮次 | 完成内容                                                                                                             | 验证                                                                                        |
 | ---- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| 125  | 修复上传文件跟进分析：`chatbi-file-ingestion` 支持逾期统计与建议输出，避免二次追问只返回通用文案                     | `format_code.py`、`pytest tests/test_file_ingestion_skill.py tests/test_react_runner.py -q` |
-| 126  | `docker-compose.dev.yml` 调整为 dev 单 MySQL 实例双库模式：后端日志库改为直连 `demo-mysql/chatbi_local_logs`         | `git diff docker-compose.dev.yml`                                                           |
-| 127  | 新增上传表自动分析中间件，并将 Pandas/通用指标分析收敛到 `chatbi-auto-analysis`；`file-ingestion` 只保留结构校验画像 | `format_code.py`、foundation、skills、frontend lint/test/build                              |
-| 128  | 上传表自动分析增强为 LLM 语义推断 + 通用分析方法双轨；图表推荐扩展到 `horizontal_bar/grouped_bar/stacked_bar/area/scatter/heatmap/funnel/pie`；`dashboard_orchestration_core.py` 重构为通用看板聚合层，移除销售模板式写死逻辑 | `format_code.py`、`pytest tests/test_auto_analysis_skill.py tests/test_chart_recommendation_skill.py tests/test_chart_renderer.py tests/test_dashboard_orchestration_skill.py -q` |
-| 129  | 上传表自动分析补齐漏斗链路：planner 可识别阶段字段并生成“转化漏斗”，执行层支持阶段型 funnel DSL，图表推荐与 renderer 同时兼容“单行多阶段”和“阶段行 + 指标值”两种漏斗输入 | `format_code.py`、`pytest tests/test_auto_analysis_skill.py tests/test_chart_recommendation_skill.py tests/test_chart_renderer.py -q` |
+| 142  | 移除 Agent 执行前技能校验（`skill_call_validator`）；各 SKILL 去掉 `validator_requires`；由 LLM 提示与专线边界选技能 | `pytest tests/test_react_runner.py tests/test_skill_metadata_parse.py -q`、`ruff check/format` |
+| 141  | 环比月份解析：`chatbi-comparison` 支持「相对/相较于」与双月 findall 回退；`comparison_meta` + Observation `comparison_period`；`period_compare` 子专线重试提示 | `pytest tests/test_chatbi_comparison_month_parse.py -q`、`ruff check/format` |
+| 140  | Skill YAML 元数据（选用/禁用/必备上下文）注入单/多 Agent 提示；`skill_call_validator` 执行前校验 + `validation_rejected` trace 延迟反馈；11 个 SKILL.md 补全 | `ruff check/format`、`pytest tests/test_skill_metadata_parse.py tests/test_skill_call_validator.py tests/test_react_runner.py tests/test_multi_agent_manager.py -q` |
+| 139  | 对话「中止」：LLM 调用可响应 `/abort`；多专线子任务流式循环内轮询中止；SSE 在断连或中止时停止拉流；前端 `fetch` 同步 `AbortSignal` | `ruff`、`pytest tests/test_abort_async.py tests/test_react_runner.py tests/test_multi_agent_manager.py -q`；`frontend` ESLint |
+| 136  | 多 Agent 上传采纳看板：宽度随主栏自适应；KPI/图表按数量与断点网格排布（单指标全宽+大屏双列），表头与卡片 `min-w-0` 防溢出 | `frontend` ESLint |
+| 137  | Manager：`上传路径/采纳/上传提案` 会话线索注入规划；system 增加路由硬约束与专线技能边界；`test_multi_agent_manager` 覆盖线索与 LLM 入参 | `ruff check/format`、`pytest tests/test_multi_agent_manager.py -q` |
+| 138  | `load_messages_ui` 恢复 `dashboardReady`/`analysisProposal`/`planSummary`，离开聊天页再返回可看板；`test_session_repo_payload` | `pytest tests/test_session_repo_payload.py -q`、`ruff` |

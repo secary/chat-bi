@@ -59,13 +59,9 @@ def load_field_dictionary(db: MysqlCli, available: set[str]) -> Dict[str, Dict[s
     if "field_dictionary" not in available:
         return {}
     rows = db.query(
-        "SELECT table_name, field_name, business_name, business_meaning "
-        "FROM field_dictionary"
+        "SELECT table_name, field_name, business_name, business_meaning FROM field_dictionary"
     )
-    return {
-        f"{row['table_name']}.{row['field_name']}": row
-        for row in rows
-    }
+    return {f"{row['table_name']}.{row['field_name']}": row for row in rows}
 
 
 def load_metrics(db: MysqlCli, available: set[str]) -> List[Dict[str, str]]:
@@ -81,8 +77,7 @@ def load_dimensions(db: MysqlCli, available: set[str]) -> List[Dict[str, str]]:
     if "dimension_definition" not in available:
         return []
     return db.query(
-        "SELECT dimension_name, field_name, source_table "
-        "FROM dimension_definition ORDER BY id"
+        "SELECT dimension_name, field_name, source_table FROM dimension_definition ORDER BY id"
     )
 
 
@@ -173,9 +168,7 @@ def render_text(summary: Dict[str, object]) -> str:
     for asset in business:
         cols = asset["columns"]
         assert isinstance(cols, list)
-        col_names = "、".join(
-            f"{c['business_name'] or c['name']}({c['name']})" for c in cols[:6]
-        )
+        col_names = "、".join(f"{c['business_name'] or c['name']}({c['name']})" for c in cols[:6])
         suffix = "..." if int(asset["column_count"]) > len(cols[:6]) else ""
         row_count = "未知" if asset["row_count"] is None else str(asset["row_count"])
         lines.append(
@@ -200,7 +193,9 @@ def render_text(summary: Dict[str, object]) -> str:
     return "\n".join(lines)
 
 
-def database_overview(db: MysqlCli, database: str, column_limit: int = 8) -> Dict[str, object]:
+def database_overview(
+    db: MysqlCli, database: str, column_limit: int = 8, question: str = ""
+) -> Dict[str, object]:
     summary = summarize_database(db, database, column_limit)
     return skill_response(
         kind="database_overview",
@@ -218,6 +213,12 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--user", default=DEFAULT_DB["user"])
     parser.add_argument("--password", default=DEFAULT_DB["password"])
     parser.add_argument("--database", default=DEFAULT_DB["database"])
+    parser.add_argument(
+        "question",
+        nargs="*",
+        default=[],
+        help="用户的问题（可选，用于传递自然语言查询意图）",
+    )
     return parser.parse_args(argv)
 
 
@@ -232,8 +233,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "database": args.database,
         }
     )
+    question = " ".join(args.question) if args.question else ""
     try:
-        result = database_overview(db, args.database, max(1, args.include_columns))
+        result = database_overview(db, args.database, max(1, args.include_columns), question)
     except Exception as exc:
         if args.json:
             print(json.dumps(skill_response("error", str(exc)), ensure_ascii=False))

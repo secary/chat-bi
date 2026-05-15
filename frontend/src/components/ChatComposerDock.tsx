@@ -3,6 +3,7 @@ import { ChatInput } from './ChatInput';
 interface ChatComposerDockProps {
   suggestedPrompts: string[];
   onSend: (text: string, traceId?: string) => void;
+  onAbort?: () => void;
   inputBusy: boolean;
   booting: boolean;
   sessionId: number | null;
@@ -11,6 +12,7 @@ interface ChatComposerDockProps {
 export function ChatComposerDock({
   suggestedPrompts,
   onSend,
+  onAbort,
   inputBusy,
   booting,
   sessionId,
@@ -34,7 +36,7 @@ export function ChatComposerDock({
           ))}
         </div>
       ) : null}
-      <ChatInput onSend={onSend} loading={inputBusy} disabled={booting || sessionId == null} />
+      <ChatInput onSend={onSend} onAbort={onAbort} loading={inputBusy} disabled={booting || sessionId == null} />
     </>
   );
 }

@@ -33,7 +33,11 @@ export function MultiAgentsAdminPage() {
           listAdminSkills(),
         ]);
         if (!cancelled) {
-          setDraft(reg);
+          setDraft({
+            ...reg,
+            max_manager_rounds:
+              typeof reg.max_manager_rounds === 'number' ? reg.max_manager_rounds : 4,
+          });
           setSkills(sk);
         }
       } catch (e) {
@@ -151,9 +155,9 @@ export function MultiAgentsAdminPage() {
         <p className="text-sm text-gray-400">加载中…</p>
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-gray-200 bg-surface p-4 shadow-card">
+          <div className="flex flex-wrap items-center gap-4 rounded-xl border border-gray-200 bg-surface p-4 shadow-card">
             <label className="flex items-center gap-2 text-sm text-gray-700">
-              每轮最多专线数
+              每轮最多子任务数
               <input
                 type="number"
                 min={1}
@@ -168,6 +172,23 @@ export function MultiAgentsAdminPage() {
                 }}
               />
               <span className="text-xs text-gray-400">（1–8）</span>
+            </label>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              Manager 最多规划轮数
+              <input
+                type="number"
+                min={1}
+                max={8}
+                className="w-20 rounded-lg border border-gray-200 px-3 py-1.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
+                value={draft.max_manager_rounds}
+                onChange={(e) => {
+                  const n = Number(e.target.value);
+                  setDraft((p) =>
+                    p ? { ...p, max_manager_rounds: clampMaxAgentsRound(n) } : p,
+                  );
+                }}
+              />
+              <span className="text-xs text-gray-400">（1–8，&gt;1 时多轮规划）</span>
             </label>
           </div>
 

@@ -15,6 +15,7 @@ import { authEnabled } from '../lib/authFlags';
 export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 const CHAT_URL = `${API_BASE_URL}/chat`;
 const UPLOAD_URL = `${API_BASE_URL}/upload`;
+const ABORT_URL = `${API_BASE_URL}/abort`;
 const TOKEN_KEY = 'chatbi_token';
 
 export function getStoredToken(): string | null {
@@ -86,6 +87,7 @@ export function newTraceId(): string {
 export async function* streamChat(
   req: ChatRequest,
   traceId = newTraceId(),
+  options?: { signal?: AbortSignal },
 ): AsyncGenerator<SseEvent> {
   const response = await fetch(CHAT_URL, {
     method: 'POST',
@@ -94,6 +96,7 @@ export async function* streamChat(
       'X-Trace-Id': traceId,
     }),
     body: JSON.stringify(req),
+    signal: options?.signal,
   });
 
   if (response.status === 401) {
@@ -174,6 +177,16 @@ export async function uploadFile(file: File, traceId = newTraceId()): Promise<Up
   }
 
   return (await response.json()) as UploadedFile;
+}
+
+export async function abortChat(traceId: string): Promise<void> {
+  const response = await fetch(ABORT_URL, {
+    method: 'POST',
+    headers: authHeaders({ 'X-Trace-Id': traceId }),
+  });
+  if (!response.ok) {
+    throw new Error(`中止请求失败: ${response.status}`);
+  }
 }
 
 export async function getDashboardOverview(): Promise<DashboardOverview> {

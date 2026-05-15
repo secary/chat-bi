@@ -126,7 +126,7 @@ uv pip --python .venv/bin/python install -r requirements.txt
 - `test_agent_workflow.py::*`：复合“查询 + 建议”拆成 semantic-query → decision-advisor；普通查询保持单步；prompt 包含数据库概览触发规则。
 - `test_chat_route_disconnect.py::*`：前端断连状态一旦出现保持生效。
 - `test_multi_agent_registry.py::*`：按 slug 顺序过滤已启用 Skill。
-- `test_multi_agent_router.py::*`：路由 LLM JSON 调用和专线数量上限。
+- `test_multi_agent_manager.py::*`：Manager 规划 JSON 调用、子任务 cap、依赖拓扑与环检测、子 agent 提示词不包含未授予技能。
 - `test_query_advice_dimension_flow.py::*`：从查询结果首列推断建议关注维度。
 - `test_react_runner.py::*`：ReAct 两轮调用、无 skill finish、寒暄短路、可视化优先 Skill 保图表、查询+建议自动补跑 decision-advisor、模型收尾 JSON 异常时回退最后一次 Skill 结果。
 - `test_upload_context.py::*`：历史上传文件路径注入上下文，纯数据库问题不注入。

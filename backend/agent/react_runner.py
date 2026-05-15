@@ -4,6 +4,7 @@ import json
 import tempfile
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
+from backend.agent.context_window import build_react_context
 from backend.agent.executor import (
     find_skill,
     latest_user_upload_path,
@@ -14,14 +15,17 @@ from backend.agent.executor import (
 from backend.agent.formatter import stream_result_events
 from backend.agent.intent_guard import small_talk_reply, should_skip_skill_for_message
 from backend.agent.observation import summarize_observation
+from backend.agent.abort_async import ChatAbortedError
 from backend.agent.planner import call_llm_for_react_step
 from backend.agent.prompt_builder import (
     SkillDoc,
     build_react_system_prompt,
     scan_skills_enabled,
 )
+from backend.agent.prompt_subagent import build_react_system_prompt_for_subagent
 from backend.agent.query_decision import is_query_plus_decision_text
 from backend.agent.react_followup import run_decision_followup
+from backend.agent.upload_context import get_cached_file_data
 from backend.config import settings
 from backend.trace import log_event
 
@@ -119,16 +123,21 @@ def _should_short_circuit_repeated_file_ingestion(
     args: List[str],
     last_skill_name: Optional[str],
     last_result: Optional[Dict[str, Any]],
+    messages: Optional[List[Dict[str, str]]] = None,
 ) -> bool:
+    if skill_name != "chatbi-file-ingestion" or last_skill_name != "chatbi-file-ingestion":
+        return False
+    if not _is_file_ingestion_result(last_result):
+        return False
     current_path = str(args[0]) if args else ""
     previous_path = _file_ingestion_result_path(last_result)
-    return (
-        skill_name == "chatbi-file-ingestion"
-        and last_skill_name == "chatbi-file-ingestion"
-        and _is_file_ingestion_result(last_result)
-        and bool(current_path)
-        and current_path == previous_path
-    )
+    if bool(current_path) and current_path == previous_path:
+        return True
+    if messages:
+        upload_path = latest_user_upload_path(messages)
+        if upload_path and get_cached_file_data(upload_path):
+            return True
+    return False
 
 
 def _chart_recommendation_args(
@@ -238,6 +247,22 @@ def _enforce_upload_skill(
     return "chatbi-file-ingestion"
 
 
+def _skill_log_payload(
+    skill_name: str,
+    skill_doc: SkillDoc,
+    *,
+    agent_id: Optional[str],
+    extra: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    payload: Dict[str, Any] = {
+        "skill": skill_name,
+        "agent_id": agent_id or "single",
+    }
+    if extra:
+        payload.update(extra)
+    return payload
+
+
 async def stream_chat_react(
     messages: List[Dict[str, str]],
     trace_id: str = "",
@@ -246,6 +271,9 @@ async def stream_chat_react(
     skill_docs: Optional[List[SkillDoc]] = None,
     role_prompt: Optional[str] = None,
     result_sink: Optional[Dict[str, Any]] = None,
+    subagent_react: bool = False,
+    specialist_agent_id: Optional[str] = None,
+    session_id: Optional[int] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """
     ReAct multi-step agent loop.
@@ -258,9 +286,13 @@ async def stream_chat_react(
         trace_id,
         "agent.runner",
         "started",
-        payload={"message_count": len(messages), "mode": "react"},
+        payload={
+            "message_count": len(messages),
+            "mode": "react_subagent" if subagent_react else "react",
+        },
     )
     skills = skill_docs if skill_docs is not None else scan_skills_enabled(settings.skills_dir)
+    allowed_slugs = {d.skill_dir.name for d in skills}
     user_text = next(
         (str(m.get("content", "")) for m in reversed(messages) if m.get("role") == "user"),
         "",
@@ -281,11 +313,21 @@ async def stream_chat_react(
     The skills are the skills that the agent can use.
     The system prompt is the prompt that the agent uses to make a decision.
     """
-    system_prompt = build_react_system_prompt(skills)
+    system_prompt = (
+        build_react_system_prompt_for_subagent(skills)
+        if subagent_react
+        else build_react_system_prompt(skills)
+    )
     if role_prompt and role_prompt.strip():
         system_prompt = role_prompt.strip() + "\n\n" + system_prompt
     if memory_block and memory_block.strip():
         system_prompt = memory_block.strip() + "\n\n" + system_prompt
+
+    # Inject sliding window context for long conversation management
+    if session_id:
+        conversation_context = build_react_context(session_id, user_text, messages)
+        if conversation_context.strip():
+            system_prompt = system_prompt + "\n\n" + conversation_context
 
     """
     working: 一个消息列表，用于存储对话历史和obs(observation的内容)
@@ -304,7 +346,16 @@ async def stream_chat_react(
     LLM decides next action {"thought", "action", "skill", "skill_args"} → executes a skill → summarizes observation → repeats.
     The agent_max_steps is 8 by default. If the agent_max_steps is reached, the agent will return the last result.
     """
+    from backend.agent.abort_state import is_aborted as _is_aborted
+
     for step in range(settings.agent_max_steps):
+        if _is_aborted(trace_id):
+            log_event(trace_id, "agent.runner", "aborted", level="INFO")
+            yield {"type": "thinking", "content": "用户中止了查询。"}
+            _sink_write(result_sink, last_result, last_skill_name)
+            yield {"type": "done", "content": None}
+            return
+
         log_event(
             trace_id,
             "agent.planner",
@@ -317,7 +368,13 @@ async def stream_chat_react(
             将system prompt + 对话的上下文 + skill所执行的结果obs，一起传给LLM，得到下一步的决策。
             LLM 返回 {"thought", "action", "skill", "skill_args"}
             """
-            plan = await call_llm_for_react_step(system_prompt, working)
+            plan = await call_llm_for_react_step(system_prompt, working, trace_id=trace_id)
+        except ChatAbortedError:
+            log_event(trace_id, "agent.runner", "aborted", level="INFO")
+            yield {"type": "thinking", "content": "用户中止了查询。"}
+            _sink_write(result_sink, last_result, last_skill_name)
+            yield {"type": "done", "content": None}
+            return
         except Exception as exc:
             if last_result:
                 yield {
@@ -368,6 +425,20 @@ async def stream_chat_react(
             yield {"type": "done", "content": None}
             return
 
+        if action == "ask":
+            ask_text = plan.get("text", "请问还有什么需要帮助的？")
+            yield {"type": "thinking", "content": "正在询问补充信息..."}
+            yield {"type": "text", "content": ask_text}
+            log_event(
+                trace_id,
+                "agent.runner",
+                "completed",
+                payload={"mode": "react", "action": "ask", "steps": step + 1},
+            )
+            _sink_write(result_sink, last_result, last_skill_name)
+            yield {"type": "done", "content": None}
+            return
+
         if action != "call_skill":
             _sink_write(result_sink, last_result, last_skill_name)
             yield {
@@ -387,7 +458,6 @@ async def stream_chat_react(
             yield {"type": "done", "content": None}
             return
         skill_name = _enforce_upload_skill(skill_name, user_text, messages, last_result)
-
         # When auto-analysis is called without any row data but a file was uploaded,
         # redirect to file-ingestion first so rows are available on the next step.
         if (
@@ -400,8 +470,12 @@ async def stream_chat_react(
 
         skill_doc = find_skill(skills, skill_name)
         if not skill_doc:
+            available = ", ".join(sorted(allowed_slugs)) if allowed_slugs else "（无）"
             _sink_write(result_sink, last_result, last_skill_name)
-            yield {"type": "error", "content": f"未找到技能：{skill_name}"}
+            yield {
+                "type": "error",
+                "content": f"未找到技能：{skill_name}。本专线可用技能：{available}",
+            }
             yield {"type": "done", "content": None}
             return
 
@@ -433,6 +507,7 @@ async def stream_chat_react(
             args,
             last_skill_name,
             last_result,
+            messages,
         ):
             yield {
                 "type": "thinking",
@@ -459,7 +534,12 @@ async def stream_chat_react(
                 trace_id,
                 "agent.skill",
                 "started",
-                payload={"skill": skill_name, "args": args},
+                payload=_skill_log_payload(
+                    skill_name,
+                    skill_doc,
+                    agent_id=specialist_agent_id,
+                    extra={"args": args},
+                ),
             )
             result = run_script(
                 skill_doc,
@@ -471,7 +551,12 @@ async def stream_chat_react(
                 trace_id,
                 "agent.skill",
                 "completed",
-                payload={"skill": skill_name, **skill_result_log_payload(result)},
+                payload=_skill_log_payload(
+                    skill_name,
+                    skill_doc,
+                    agent_id=specialist_agent_id,
+                    extra=skill_result_log_payload(result),
+                ),
             )
             last_skill_name = skill_name
             last_result = result

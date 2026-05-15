@@ -59,7 +59,7 @@ flowchart LR
 **数据模型**（建议扩展 `database/init.sql`：增加 `chat_session`、`chat_message`；亦可单独库，Demo 阶段可与业务库同实例）
 
 - `chat_session`：`id`、`title`（可由首条用户消息自动生成）、`created_at`、`updated_at`。
-- `chat_message`：`id`、`session_id`、`role`、`content`（TEXT）、`payload_json`（可选，存 thinking/chart/kpi 等前端回放结构，JSON）。
+- `chat_message`：`id`、`session_id`、`role`、`content`（TEXT）、`payload_json`（可选，存 thinking/chart/kpi、planSummary、analysisProposal、dashboardReady 等前端回放结构，JSON）。
 
 **API**（新建路由模块如 `backend/routes/sessions.py`，由 `backend/main.py` `include_router`，单文件 &lt;300 行）
 

@@ -1,6 +1,14 @@
 ---
 name: chatbi-alias-manager
 description: Use when Codex or another agent needs to add missing Chinese synonyms, aliases, or business phrasing to the local ChatBI semantic layer, especially when a natural-language query uses a new word that should map to an existing metric or dimension in alias_mapping. Supports safely inserting aliases for governed metrics and dimensions such as 销售额, 毛利, 目标完成率, 客户留存率, 区域, 时间, 部门, 产品类别, 产品名称, 渠道, and 客户类型.
+trigger_conditions:
+  - 用户要用新词/别名映射到既有标准指标或维度
+  - 问数因缺别名失败，需写入 alias_mapping
+when_not_to_use:
+  - 普通问数（直接 chatbi-semantic-query）
+  - 用户只问指标口径解释（用 chatbi-metric-explainer）
+required_context:
+  - 明确 alias 与 standard 名称及类型（指标/维度）
 ---
 
 # ChatBI Alias Manager

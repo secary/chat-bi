@@ -58,18 +58,33 @@ def build_dashboard_package(question: str, payload: Dict[str, Any]) -> Dict[str,
 
     overview = normalize_overview(payload)
     if not overview:
+        chart_assets: List[Dict[str, Any]] = []
+        kpis = build_dashboard_kpis({}, chart_assets)
+        tables = build_overview_tables([], chart_assets)
+        dashboard_spec = build_dashboard_spec(question, {}, kpis, chart_assets, tables)
+        # 无数据时仍返回完整布局框架，并给出结构化的下一步指引
         return skill_response(
             kind="dashboard_orchestration",
-            text="看板编排需要先提供概览数据、图表结果或 KPI 输入。",
+            text=f"已基于「{question}」生成看板布局框架。缺少数据，暂时展示空白卡片布局，数据就绪后可自动填充。",
             data={
                 "dashboard_spec": {
+                    **dashboard_spec,
                     "status": "need_clarification",
                     "dashboard_intent": "overview",
                     "dashboard_title": build_title(question),
-                    "warnings": [],
-                    "missing_inputs": ["dashboard_source_data"],
+                    "confidence": 0.5,
+                    "missing_inputs": [
+                        "kpis",
+                        "sales_by_region",
+                        "sales_by_month",
+                        "customer_by_region",
+                    ],
+                    "suggested_skill": "chatbi-semantic-query",
+                    "suggested_action": "获取数据后重新调用编排，或直接查询数据后由系统自动生成看板",
                 }
             },
+            charts=[],
+            kpis=[],
         )
 
     chart_assets = build_overview_chart_assets(question, overview["datasets"])

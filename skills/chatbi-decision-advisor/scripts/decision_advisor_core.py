@@ -4,6 +4,7 @@ from dataclasses import asdict, dataclass
 from decimal import Decimal
 import json
 import re
+from collections import OrderedDict
 from typing import Dict, Iterable, List, Sequence, Tuple
 
 from _shared.db import MysqlCli, quote_ident, quote_literal
@@ -91,7 +92,23 @@ def parse_time_conditions(question: str) -> Tuple[List[str], List[str], List[str
     sales_conditions: List[str] = []
     customer_conditions: List[str] = []
     labels: List[str] = []
-    match = re.search(r"(20\d{2})\s*年\s*(\d{1,2})\s*月?\s*(?:-|到|至|~)\s*(\d{1,2})\s*月", question)
+
+    match = re.search(r"(20\d{2})\s*年?\s*的?\s*前\s*四\s*个?\s*月", question)
+    if match:
+        year = int(match.group(1))
+        start, end = month_bounds(year, 1, 4)
+        labels.append(f"{year}年前四个月")
+        sales_conditions.append(
+            f"`order_date` >= {quote_literal(start)} AND `order_date` < {quote_literal(end)}"
+        )
+        customer_conditions.append(
+            f"`stat_month` >= {quote_literal(start)} AND `stat_month` < {quote_literal(end)}"
+        )
+        return sales_conditions, customer_conditions, labels
+
+    match = re.search(
+        r"(20\d{2})\s*年\s*(\d{1,2})\s*月?\s*(?:-|到|至|~)\s*(\d{1,2})\s*月", question
+    )
     if match:
         year, start_month, end_month = map(int, match.groups())
         start, end = month_bounds(year, start_month, end_month)
@@ -109,8 +126,12 @@ def parse_time_conditions(question: str) -> Tuple[List[str], List[str], List[str
             year = int(match.group(1))
             start, end = f"{year}-01-01", f"{year + 1}-01-01"
             labels.append(f"{year}年")
-    sales_conditions.append(f"`order_date` >= {quote_literal(start)} AND `order_date` < {quote_literal(end)}")
-    customer_conditions.append(f"`stat_month` >= {quote_literal(start)} AND `stat_month` < {quote_literal(end)}")
+    sales_conditions.append(
+        f"`order_date` >= {quote_literal(start)} AND `order_date` < {quote_literal(end)}"
+    )
+    customer_conditions.append(
+        f"`stat_month` >= {quote_literal(start)} AND `stat_month` < {quote_literal(end)}"
+    )
     return sales_conditions, customer_conditions, labels
 
 
@@ -126,11 +147,17 @@ def load_distinct_values(db: MysqlCli, table: str, fields: Iterable[str]) -> Dic
 
 
 def parse_focus_dimensions(question: str) -> List[str]:
-    return [name for name, words in DIMENSION_PATTERNS.items() if any(word in question for word in words)]
+    return [
+        name
+        for name, words in DIMENSION_PATTERNS.items()
+        if any(word in question for word in words)
+    ]
 
 
 def parse_focus_metrics(question: str) -> List[str]:
-    return [name for name, words in METRIC_PATTERNS.items() if any(word in question for word in words)]
+    return [
+        name for name, words in METRIC_PATTERNS.items() if any(word in question for word in words)
+    ]
 
 
 def build_scope(db: MysqlCli, question: str) -> Scope:
@@ -175,15 +202,52 @@ def build_scope(db: MysqlCli, question: str) -> Scope:
     )
 
 
+_EQ_WHERE_PATTERN = re.compile(r"^`([^`]+)`\s*=\s*(.+)$", re.DOTALL)
+
+
+def merge_equality_where_fragments(conditions: List[str]) -> List[str]:
+    """Merge multiple ``col = v`` on the same column into ``col IN (...)`` for WHERE fragments."""
+    by_field: OrderedDict[str, List[Tuple[str, str]]] = OrderedDict()
+    passthrough: List[str] = []
+
+    for cond in conditions:
+        stripped = cond.strip()
+        m = _EQ_WHERE_PATTERN.match(stripped)
+        if not m:
+            passthrough.append(cond)
+            continue
+        field = m.group(1)
+        rhs = m.group(2).strip()
+        by_field.setdefault(field, []).append((rhs, cond))
+
+    parts: List[str] = []
+    for field, items in by_field.items():
+        seen: set[str] = set()
+        ordered_rhs: List[str] = []
+        for rhs, _ in items:
+            if rhs not in seen:
+                seen.add(rhs)
+                ordered_rhs.append(rhs)
+        if len(ordered_rhs) == 1:
+            parts.append(items[0][1])
+        else:
+            parts.append(f"{quote_ident(field)} IN ({', '.join(ordered_rhs)})")
+    return parts + passthrough
+
+
 def where_clause(conditions: Sequence[str]) -> str:
-    return "" if not conditions else " WHERE " + " AND ".join(conditions)
+    merged = merge_equality_where_fragments(list(conditions))
+    return "" if not merged else " WHERE " + " AND ".join(merged)
 
 
 def load_facts(db: MysqlCli, scope: Scope) -> Dict[str, object]:
     sales_where = where_clause(scope.sales_conditions)
     customer_where = where_clause(scope.customer_conditions)
-    retention = [] if scope.has_sales_only_filter else db.query(
-        f"""
+    retention = (
+        []
+        if scope.has_sales_only_filter
+        else db.query(
+            f"""
         SELECT DATE_FORMAT(stat_month, '%Y-%m') AS month, SUM(new_customers) AS new_customers,
                SUM(active_customers) AS active_customers,
                SUM(retained_customers) / SUM(active_customers) AS retention_rate,
@@ -191,6 +255,7 @@ def load_facts(db: MysqlCli, scope: Scope) -> Dict[str, object]:
         FROM customer_profile{customer_where}
         GROUP BY DATE_FORMAT(stat_month, '%Y-%m') ORDER BY month
         """
+        )
     )
     return {
         "overview": db.query(
@@ -244,7 +309,11 @@ def load_facts(db: MysqlCli, scope: Scope) -> Dict[str, object]:
 def _theme_enabled(scope: Dict[str, object], theme: str) -> bool:
     focus_dimensions = set(scope.get("focus_dimensions", [])) if isinstance(scope, dict) else set()
     focus_metrics = set(scope.get("focus_metrics", [])) if isinstance(scope, dict) else set()
-    if focus_dimensions and theme == "客户运营" and not ({"客户类型", "区域", "月份"} & focus_dimensions):
+    if (
+        focus_dimensions
+        and theme == "客户运营"
+        and not ({"客户类型", "区域", "月份"} & focus_dimensions)
+    ):
         return False
     dimension = THEME_DIMENSION_MAP.get(theme)
     if focus_dimensions and dimension and dimension not in focus_dimensions:
@@ -264,32 +333,128 @@ def build_advices(facts: Dict[str, object]) -> List[Advice]:
     advices: List[Advice] = []
 
     if _theme_enabled(scope, "增长目标") and achievement >= Decimal("1.05"):
-        advices.append(Advice("高", "增长目标", "适度上调下一周期销售目标，并优先复制高完成区域的打法。", f"整体目标完成率为{pct(achievement)}，已经超过105%的积极阈值。", ["将高完成区域的渠道、产品和客户打法整理为标准销售动作。", "下一周期目标可以分区域差异化上调，避免一刀切加压。", "同步监控毛利率，防止单纯追求规模导致盈利质量下滑。"]))
+        advices.append(
+            Advice(
+                "高",
+                "增长目标",
+                "适度上调下一周期销售目标，并优先复制高完成区域的打法。",
+                f"整体目标完成率为{pct(achievement)}，已经超过105%的积极阈值。",
+                [
+                    "将高完成区域的渠道、产品和客户打法整理为标准销售动作。",
+                    "下一周期目标可以分区域差异化上调，避免一刀切加压。",
+                    "同步监控毛利率，防止单纯追求规模导致盈利质量下滑。",
+                ],
+            )
+        )
     if _theme_enabled(scope, "目标补差") and achievement < Decimal("0.95"):
-        advices.append(Advice("高", "目标补差", "启动目标补差机制，优先处理未达标区域和部门。", f"整体目标完成率为{pct(achievement)}，低于95%的预警阈值。", ["拆解未达标区域的客户、渠道和产品缺口。", "对低完成团队设置周度跟进节奏。", "优先推进转化周期短、毛利稳定的机会。"]))
+        advices.append(
+            Advice(
+                "高",
+                "目标补差",
+                "启动目标补差机制，优先处理未达标区域和部门。",
+                f"整体目标完成率为{pct(achievement)}，低于95%的预警阈值。",
+                [
+                    "拆解未达标区域的客户、渠道和产品缺口。",
+                    "对低完成团队设置周度跟进节奏。",
+                    "优先推进转化周期短、毛利稳定的机会。",
+                ],
+            )
+        )
     if _theme_enabled(scope, "销售趋势") and len(months) >= 2:
         first, last = decimal_value(months[0], "sales"), decimal_value(months[-1], "sales")
         if first and last > first:
             growth = (last - first) / first
-            advices.append(Advice("中", "销售趋势", "保持当前增长节奏，重点把月度增长沉淀为稳定获客能力。", f"销售额从{months[0]['month']}的{money(first)}增长到{months[-1]['month']}的{money(last)}，增幅为{pct(growth)}。", ["识别最近两个月贡献增长的主要渠道和产品。", "将新增线索、转化率、客单价拆成过程指标持续跟踪。", "对增长较快业务设置交付和服务容量预警。"]))
+            advices.append(
+                Advice(
+                    "中",
+                    "销售趋势",
+                    "保持当前增长节奏，重点把月度增长沉淀为稳定获客能力。",
+                    f"销售额从{months[0]['month']}的{money(first)}增长到{months[-1]['month']}的{money(last)}，增幅为{pct(growth)}。",
+                    [
+                        "识别最近两个月贡献增长的主要渠道和产品。",
+                        "将新增线索、转化率、客单价拆成过程指标持续跟踪。",
+                        "对增长较快业务设置交付和服务容量预警。",
+                    ],
+                )
+            )
     if _theme_enabled(scope, "区域经营") and regions:
         top_region = regions[0]
         bottom_region = min(regions, key=lambda row: decimal_value(row, "target_achievement_rate"))
-        advices.append(Advice("高", "区域经营", f"优先复盘{top_region['region']}区域打法，并关注{bottom_region['region']}区域目标完成质量。", f"{top_region['region']}销售额最高，为{money(decimal_value(top_region, 'sales'))}；{bottom_region['region']}目标完成率相对最低，为{pct(decimal_value(bottom_region, 'target_achievement_rate'))}。", [f"提炼{top_region['region']}在客户、渠道和产品组合上的成功因素。", f"检查{bottom_region['region']}的目标设定、机会储备和转化效率。", "将区域目标完成率和毛利率一起看，避免只看规模排名。"]))
+        advices.append(
+            Advice(
+                "高",
+                "区域经营",
+                f"优先复盘{top_region['region']}区域打法，并关注{bottom_region['region']}区域目标完成质量。",
+                f"{top_region['region']}销售额最高，为{money(decimal_value(top_region, 'sales'))}；{bottom_region['region']}目标完成率相对最低，为{pct(decimal_value(bottom_region, 'target_achievement_rate'))}。",
+                [
+                    f"提炼{top_region['region']}在客户、渠道和产品组合上的成功因素。",
+                    f"检查{bottom_region['region']}的目标设定、机会储备和转化效率。",
+                    "将区域目标完成率和毛利率一起看，避免只看规模排名。",
+                ],
+            )
+        )
     if _theme_enabled(scope, "渠道策略") and channels:
         top_channel = channels[0]
         low_margin_channel = min(channels, key=lambda row: decimal_value(row, "gross_margin_rate"))
-        advices.append(Advice("中", "渠道策略", f"继续加大{top_channel['channel']}渠道投入，同时优化{low_margin_channel['channel']}渠道的利润结构。", f"{top_channel['channel']}渠道销售额最高，为{money(decimal_value(top_channel, 'sales'))}；{low_margin_channel['channel']}渠道毛利率相对最低，为{pct(decimal_value(low_margin_channel, 'gross_margin_rate'))}。", [f"分析{top_channel['channel']}渠道的线索来源和转化动作，评估可复制性。", f"复核{low_margin_channel['channel']}渠道折扣、交付成本和产品结构。", "按渠道建立销售额、毛利率、客户数的组合看板。"]))
+        advices.append(
+            Advice(
+                "中",
+                "渠道策略",
+                f"继续加大{top_channel['channel']}渠道投入，同时优化{low_margin_channel['channel']}渠道的利润结构。",
+                f"{top_channel['channel']}渠道销售额最高，为{money(decimal_value(top_channel, 'sales'))}；{low_margin_channel['channel']}渠道毛利率相对最低，为{pct(decimal_value(low_margin_channel, 'gross_margin_rate'))}。",
+                [
+                    f"分析{top_channel['channel']}渠道的线索来源和转化动作，评估可复制性。",
+                    f"复核{low_margin_channel['channel']}渠道折扣、交付成本和产品结构。",
+                    "按渠道建立销售额、毛利率、客户数的组合看板。",
+                ],
+            )
+        )
     if _theme_enabled(scope, "产品组合") and products:
         top_product = products[0]
         low_margin_product = min(products, key=lambda row: decimal_value(row, "gross_margin_rate"))
-        advices.append(Advice("中", "产品组合", f"围绕{top_product['product_category']}巩固收入基本盘，并改善{low_margin_product['product_category']}的盈利表现。", f"{top_product['product_category']}销售额最高，为{money(decimal_value(top_product, 'sales'))}；{low_margin_product['product_category']}毛利率相对最低，为{pct(decimal_value(low_margin_product, 'gross_margin_rate'))}。", [f"将{top_product['product_category']}作为重点交叉销售入口。", f"检查{low_margin_product['product_category']}的定价、交付投入和客户结构。", "对产品类别设置收入贡献和毛利贡献双维度排序。"]))
+        advices.append(
+            Advice(
+                "中",
+                "产品组合",
+                f"围绕{top_product['product_category']}巩固收入基本盘，并改善{low_margin_product['product_category']}的盈利表现。",
+                f"{top_product['product_category']}销售额最高，为{money(decimal_value(top_product, 'sales'))}；{low_margin_product['product_category']}毛利率相对最低，为{pct(decimal_value(low_margin_product, 'gross_margin_rate'))}。",
+                [
+                    f"将{top_product['product_category']}作为重点交叉销售入口。",
+                    f"检查{low_margin_product['product_category']}的定价、交付投入和客户结构。",
+                    "对产品类别设置收入贡献和毛利贡献双维度排序。",
+                ],
+            )
+        )
     if _theme_enabled(scope, "客户运营") and retention:
         latest = retention[-1]
         retention_rate = decimal_value(latest, "retention_rate")
-        advices.append(Advice("高" if retention_rate < Decimal("0.83") else "中", "客户运营", "持续提升客户留存，并对流失客户建立召回和预警机制。", f"{latest['month']}客户留存率为{pct(retention_rate)}，流失客户数为{decimal_value(latest, 'churned_customers')}。", ["对流失客户按区域和客户类型拆解，定位流失集中点。", "对高价值活跃客户设置续约、复购或增购触达计划。", "将客户留存率纳入月度经营复盘，不只看新增客户数。"]))
+        advices.append(
+            Advice(
+                "高" if retention_rate < Decimal("0.83") else "中",
+                "客户运营",
+                "持续提升客户留存，并对流失客户建立召回和预警机制。",
+                f"{latest['month']}客户留存率为{pct(retention_rate)}，流失客户数为{decimal_value(latest, 'churned_customers')}。",
+                [
+                    "对流失客户按区域和客户类型拆解，定位流失集中点。",
+                    "对高价值活跃客户设置续约、复购或增购触达计划。",
+                    "将客户留存率纳入月度经营复盘，不只看新增客户数。",
+                ],
+            )
+        )
     if _theme_enabled(scope, "盈利质量") and margin < Decimal("0.32"):
-        advices.append(Advice("高", "盈利质量", "暂停低毛利扩张动作，优先修复毛利率。", f"整体毛利率为{pct(margin)}，低于32%的风险阈值。", ["排查低毛利产品和渠道组合。", "对高折扣订单设置审批规则。", "提高标准化交付比例，降低定制成本。"]))
+        advices.append(
+            Advice(
+                "高",
+                "盈利质量",
+                "暂停低毛利扩张动作，优先修复毛利率。",
+                f"整体毛利率为{pct(margin)}，低于32%的风险阈值。",
+                [
+                    "排查低毛利产品和渠道组合。",
+                    "对高折扣订单设置审批规则。",
+                    "提高标准化交付比例，降低定制成本。",
+                ],
+            )
+        )
     return sorted(advices, key=lambda item: {"高": 0, "中": 1, "低": 2}.get(item.priority, 9))
 
 
@@ -298,11 +463,38 @@ def render_markdown(facts: Dict[str, object], advices: List[Advice]) -> str:
     scope = facts.get("scope", {})
     labels = scope.get("labels", []) if isinstance(scope, dict) else []
     scope_text = "、".join(labels) if labels else "全量数据"
-    lines = ["# 决策意见", "", f"- 分析范围：{scope_text}", "", "## 指标概览", "", f"- 销售额：{money(decimal_value(overview, 'sales'))}", f"- 目标完成率：{pct(decimal_value(overview, 'target_achievement_rate'))}", f"- 毛利率：{pct(decimal_value(overview, 'gross_margin_rate'))}", f"- 订单数：{decimal_value(overview, 'order_count')}", f"- 客户数：{decimal_value(overview, 'customer_count')}", "", "## 建议", ""]
+    lines = [
+        "# 决策意见",
+        "",
+        f"- 分析范围：{scope_text}",
+        "",
+        "## 指标概览",
+        "",
+        f"- 销售额：{money(decimal_value(overview, 'sales'))}",
+        f"- 目标完成率：{pct(decimal_value(overview, 'target_achievement_rate'))}",
+        f"- 毛利率：{pct(decimal_value(overview, 'gross_margin_rate'))}",
+        f"- 订单数：{decimal_value(overview, 'order_count')}",
+        f"- 客户数：{decimal_value(overview, 'customer_count')}",
+        "",
+        "## 建议",
+        "",
+    ]
     if not advices:
-        lines.extend(["- 当前问题范围内未触发专门规则，建议先补充关注指标或维度后再生成经营建议。", ""])
+        lines.extend(
+            ["- 当前问题范围内未触发专门规则，建议先补充关注指标或维度后再生成经营建议。", ""]
+        )
     for index, advice in enumerate(advices, start=1):
-        lines.extend([f"### {index}. [{advice.priority}] {advice.theme}", "", f"**决策建议**：{advice.decision}", "", f"**依据**：{advice.reason}", "", "**行动项**："])
+        lines.extend(
+            [
+                f"### {index}. [{advice.priority}] {advice.theme}",
+                "",
+                f"**决策建议**：{advice.decision}",
+                "",
+                f"**依据**：{advice.reason}",
+                "",
+                "**行动项**：",
+            ]
+        )
         lines.extend([f"- {action}" for action in advice.actions])
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
@@ -312,11 +504,26 @@ def build_kpis(facts: Dict[str, object]) -> List[Dict[str, str]]:
     overview = facts["overview"]
     achievement = decimal_value(overview, "target_achievement_rate")
     margin = decimal_value(overview, "gross_margin_rate")
-    return [kpi("销售额", money(decimal_value(overview, "sales")), status="neutral"), kpi("目标完成率", pct(achievement), status="success" if achievement >= Decimal("1.0") else "warning"), kpi("毛利率", pct(margin), status="success" if margin >= Decimal("0.35") else "warning"), kpi("订单数", str(decimal_value(overview, "order_count")), status="neutral"), kpi("客户数", str(decimal_value(overview, "customer_count")), status="neutral")]
+    return [
+        kpi("销售额", money(decimal_value(overview, "sales")), status="neutral"),
+        kpi(
+            "目标完成率",
+            pct(achievement),
+            status="success" if achievement >= Decimal("1.0") else "warning",
+        ),
+        kpi("毛利率", pct(margin), status="success" if margin >= Decimal("0.35") else "warning"),
+        kpi("订单数", str(decimal_value(overview, "order_count")), status="neutral"),
+        kpi("客户数", str(decimal_value(overview, "customer_count")), status="neutral"),
+    ]
 
 
 def build_payload(facts: Dict[str, object], advices: List[Advice]) -> Dict[str, object]:
-    return skill_response(kind="decision", text=render_markdown(facts, advices), data={"facts": facts, "advices": [asdict(item) for item in advices]}, kpis=build_kpis(facts))
+    return skill_response(
+        kind="decision",
+        text=render_markdown(facts, advices),
+        data={"facts": facts, "advices": [asdict(item) for item in advices]},
+        kpis=build_kpis(facts),
+    )
 
 
 def dump_payload(payload: Dict[str, object]) -> str:

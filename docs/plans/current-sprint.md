@@ -59,9 +59,9 @@
 
 | 轮次 | 完成内容                                                                                                             | 验证                                                                                        |
 | ---- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| 129  | 上传表自动分析补齐漏斗链路：planner 可识别阶段字段并生成“转化漏斗”，执行层支持阶段型 funnel DSL，图表推荐与 renderer 同时兼容“单行多阶段”和“阶段行 + 指标值”两种漏斗输入 | `format_code.py`、`pytest tests/test_auto_analysis_skill.py tests/test_chart_recommendation_skill.py tests/test_chart_renderer.py -q` |
 | 130  | 多专线改为 Manager 模式：删除路由 LLM；`multi_agent_manager` 单次规划子任务（含 depends_on 拓扑）；子 agent 收窄 ReAct/Legacy 提示词；`build_subtask_messages`；文档与 `test_multi_agent_manager` | `ruff check/format`、`pytest tests/test_multi_agent_manager.py tests/test_multi_agent_registry.py tests/test_react_runner.py -q` |
 | 131  | `skills/_agents/registry.yaml` 按技能域重划 6 条子专线（上传分析、演示库问数、环比对比、图表看板、语义别名、经营建议），`max_agents_per_round` 调至 4 | `pytest tests/test_multi_agent_manager.py tests/test_admin_multi_agents.py -q` |
 | 132  | `chatbi-comparison`：`detect_months` 前将「N月份」规范为「N月」，修复「1月份和2月份」无法双月解析而误走单月/跨年逻辑；新增 `test_chatbi_comparison_month_parse` | `ruff format`、`pytest tests/test_chatbi_comparison_month_parse.py -q` |
 | 133  | Manager 多轮规划：`max_manager_rounds` + `finalize_after_this_batch`；首轮/后续轮不同 system prompt；`stream_chat_multi_agent` 循环累积 blocks；admin/前端可配轮数 | `pytest tests/test_admin_multi_agents.py tests/test_multi_agent_manager.py -q`、`ruff` |
 | 134  | 多 Agent 问数：同一列多枚举过滤合并为 `IN`；`chatbi-semantic-query` 入参优先取「用户原述」；ReAct/单次规划 JSON 解析失败不再抛裸异常；空结果 Observation 附 SQL 与互斥条件提示 | `ruff check/format`、`pytest tests/test_semantic_query_core.py tests/test_executor_file_ingestion_args.py tests/test_observation.py tests/test_planner_parse_json.py -q` |
+| 135  | 经营建议 KPI 全 0：`chatbi-decision-advisor` 与问数共用「用户原述」入参；解析「2026 年前四个月」时间窗；决策 SQL WHERE 同列多 `=` 合并为 `IN` | `ruff check/format`、`pytest tests/test_decision_advisor_focus.py tests/test_executor_file_ingestion_args.py -q` |

@@ -27,12 +27,11 @@ def find_skill(skills: List[SkillDoc], name: str) -> Optional[SkillDoc]:
 def skill_args_for_execution(
     skill_name: str, args: List[str], messages: List[Dict[str, str]]
 ) -> List[str]:
-    if skill_name == "chatbi-semantic-query":
-        latest_user = latest_user_question_for_semantic_query(messages)
+    if skill_name in {"chatbi-semantic-query", "chatbi-decision-advisor"}:
+        latest_user = latest_user_prompt_for_demo_data_skills(messages)
         if latest_user:
             return [latest_user]
     if skill_name in {
-        "chatbi-decision-advisor",
         "chatbi-semantic-processing",
         "chatbi-auto-analysis",
         "chatbi-chart-recommendation",
@@ -53,8 +52,8 @@ def latest_user_content(messages: List[Dict[str, str]]) -> str:
     return ""
 
 
-def latest_user_question_for_semantic_query(messages: List[Dict[str, str]]) -> str:
-    """Prefer the user-original block from multi-agent composed messages."""
+def latest_user_prompt_for_demo_data_skills(messages: List[Dict[str, str]]) -> str:
+    """Prefer 【用户原述】 so Manager handoff does not pollute DB substring filters."""
     content = latest_user_content(messages)
     if not content or _USER_ORIGINAL_MARKER not in content:
         return content

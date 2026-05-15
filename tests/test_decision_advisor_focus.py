@@ -13,8 +13,30 @@ assert SPEC and SPEC.loader
 sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
 
+sys.path.insert(0, str(ROOT / "skills/chatbi-decision-advisor/scripts"))
+import decision_advisor_core as decision_core  # noqa: E402
+
 
 class DecisionAdvisorFocusTest(unittest.TestCase):
+    def test_parse_time_first_four_months_without_year_character(self):
+        sales, customer, labels = decision_core.parse_time_conditions(
+            "基于 2026 年前四个月的数据，从经营角度给建议"
+        )
+        self.assertIn("2026年前四个月", labels[0])
+        self.assertTrue(any("2026-01-01" in cond for cond in sales))
+        self.assertTrue(any("2026-05-01" in cond for cond in sales))
+
+    def test_where_clause_merges_duplicate_region_equalities(self):
+        sql_where = decision_core.where_clause(
+            [
+                "`order_date` >= '2026-01-01' AND `order_date` < '2026-05-01'",
+                "`region` = '华东'",
+                "`region` = '华南'",
+            ]
+        )
+        self.assertIn("`region` IN ('华东', '华南')", sql_where)
+        self.assertNotIn("`region` = '华东' AND `region` = '华南'", sql_where)
+
     def test_parses_focus_dimension_from_question(self):
         dimensions = MODULE.parse_focus_dimensions(
             "1-4月销售额排行，重点分析维度：区域，并给出决策建议"

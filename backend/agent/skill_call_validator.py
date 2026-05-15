@@ -2,11 +2,23 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Set
 
 from backend.agent.prompt_builder import SkillDoc
 from backend.agent.upload_path_detect import has_upload_file_reference
+
+_METRIC_QUERY_RE = re.compile(
+    r"(销售额|毛利|利润|营收|收入|排行|排名|趋势|汇总|指标|kpi|客户|订单|区域|渠道|产品)",
+    re.IGNORECASE,
+)
+
+
+def _has_metric_query_keywords(text: str) -> bool:
+    if not text:
+        return False
+    return bool(_METRIC_QUERY_RE.search(text))
 
 
 def dialogue_text_from_messages(messages: List[Dict[str, str]]) -> str:
@@ -104,6 +116,16 @@ def validate_skill_call(
                         "请先 chatbi-file-ingestion。"
                     ),
                     rule="upload_path_or_rows",
+                )
+        elif req == "no_metric_query_in_thread":
+            if _has_metric_query_keywords(blob):
+                return ValidationResult(
+                    ok=False,
+                    reason=(
+                        f"技能「{slug}」仅用于库表/Schema概览查询；"
+                        "用户问数涉及业务指标、排行、趋势时应用 chatbi-semantic-query。"
+                    ),
+                    rule="no_metric_query_in_thread",
                 )
 
     return ValidationResult(ok=True)

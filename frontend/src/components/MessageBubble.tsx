@@ -56,20 +56,30 @@ function withDashboardTheme(option: Record<string, unknown>): Record<string, unk
   };
 
   const legend = (next.legend ?? {}) as Record<string, unknown>;
+  const legendText = (legend.textStyle ?? {}) as Record<string, unknown>;
   next.legend = {
     ...legend,
-    textStyle: { color: '#64748b' },
+    textStyle: { color: '#64748b', ...legendText },
     itemWidth: 12,
     itemHeight: 8,
+    padding: Array.isArray(legend.padding) ? legend.padding : [10, 12, 14, 12],
   };
 
   const grid = (next.grid ?? {}) as Record<string, unknown>;
+  const rawBottom = grid.bottom;
+  let bottomOut: number | string = 56;
+  if (typeof rawBottom === 'number' && !Number.isNaN(rawBottom)) {
+    bottomOut = Math.max(56, rawBottom);
+  } else if (rawBottom !== undefined && rawBottom !== null && rawBottom !== '') {
+    bottomOut = rawBottom as string | number;
+  }
   next.grid = {
     ...grid,
     left: 48,
     right: 24,
     top: 36,
-    bottom: 40,
+    bottom: bottomOut,
+    containLabel: grid.containLabel !== undefined ? grid.containLabel : true,
   };
 
   const xAxisRaw = next.xAxis;
@@ -80,7 +90,7 @@ function withDashboardTheme(option: Record<string, unknown>): Record<string, unk
     axisTick: { show: false },
     axisLabel: {
       color: '#64748b',
-      margin: 10,
+      margin: 14,
       rotate: 0,
       interval: 0,
       formatter: wrapCategoryLabel,
@@ -425,13 +435,14 @@ function DashboardMiddlewareCard({
                     {Array.isArray(opt.series) ? `${opt.series.length} series` : '1 series'}
                   </span>
                 </div>
-                <ReactECharts
-                  option={opt}
-                  style={{ height: 360, width: '100%' }}
-                  notMerge
-                  opts={{ renderer: 'canvas' }}
-                  className="px-2 py-2"
-                />
+                <div className="px-3 pb-8 pt-2">
+                  <ReactECharts
+                    option={opt}
+                    style={{ height: 360, width: '100%' }}
+                    notMerge
+                    opts={{ renderer: 'canvas' }}
+                  />
+                </div>
               </div>
             );
           })}

@@ -296,6 +296,29 @@ function AnalysisProposalCard({
   );
 }
 
+function kpiGridClassName(count: number): string {
+  const shell =
+    'grid gap-3 border-b border-slate-200/90 px-4 py-4 sm:px-5 md:px-6';
+  if (count <= 1) {
+    return `${shell} grid-cols-1`;
+  }
+  if (count === 2) {
+    return `${shell} grid-cols-1 min-[480px]:grid-cols-2`;
+  }
+  if (count === 3) {
+    return `${shell} grid-cols-1 min-[480px]:grid-cols-2 xl:grid-cols-3`;
+  }
+  return `${shell} grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4`;
+}
+
+function chartGridClassName(count: number): string {
+  const shell = 'grid gap-4 border-b border-slate-200/90 px-4 py-5 sm:px-5 md:px-6';
+  if (count <= 1) {
+    return `${shell} grid-cols-1`;
+  }
+  return `${shell} grid-cols-1 min-[720px]:grid-cols-2`;
+}
+
 function DashboardMiddlewareCard({
   dashboard,
 }: {
@@ -305,30 +328,31 @@ function DashboardMiddlewareCard({
   const charts = dashboard.charts ?? [];
   const tableRows = dashboard.table_rows ?? [];
   const tableCols = dashboard.table_columns ?? [];
-  const chartCols = charts.length <= 1 ? 'grid-cols-1' : 'grid-cols-2';
+  const kpiCount = kpis.length;
+  const singleKpiHero = kpiCount === 1;
   const domainLabel = dashboard.dataset.domain_label || dashboard.dataset.domain_guess;
 
   return (
-    <div className="mt-3 overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.08),_transparent_28%),linear-gradient(180deg,_#ffffff_0%,_#f8fafc_100%)] shadow-[0_18px_50px_rgba(148,163,184,0.18)]">
-      <div className="border-b border-slate-200/90 px-5 py-4 md:px-6">
-        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div>
+    <div className="mt-3 min-w-0 overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.08),_transparent_28%),linear-gradient(180deg,_#ffffff_0%,_#f8fafc_100%)] shadow-[0_18px_50px_rgba(148,163,184,0.18)]">
+      <div className="border-b border-slate-200/90 px-4 py-4 sm:px-5 md:px-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <span className="inline-flex h-2.5 w-2.5 rounded-full bg-sky-500 shadow-[0_0_12px_rgba(14,165,233,0.35)]" />
+              <span className="inline-flex h-2.5 w-2.5 shrink-0 rounded-full bg-sky-500 shadow-[0_0_12px_rgba(14,165,233,0.35)]" />
               <span className="text-[11px] font-medium uppercase tracking-[0.32em] text-slate-500">
                 Auto Analysis Board
               </span>
             </div>
-            <div className="mt-2 text-lg font-semibold tracking-wide text-slate-900 md:text-xl">
+            <div className="mt-2 break-words text-lg font-semibold tracking-wide text-slate-900 md:text-xl">
               {dashboard.title}
             </div>
-            <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
               {dashboard.dataset.row_count > 0 && <span>{dashboard.dataset.row_count} 行数据</span>}
               <span>{domainLabel}</span>
               <span>已采纳 {dashboard.widgets.length} 个指标</span>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
             <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[11px] font-medium text-sky-700">
               自动生成看板
             </span>
@@ -340,27 +364,37 @@ function DashboardMiddlewareCard({
       </div>
 
       {kpis.length > 0 && (
-        <div className="grid gap-3 border-b border-slate-200/90 px-5 py-4 md:grid-cols-2 md:px-6 xl:grid-cols-4">
+        <div className={kpiGridClassName(kpiCount)}>
           {kpis.map((k, i) => (
             <div
               key={i}
-              className="relative overflow-hidden rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,_rgba(255,255,255,0.96),_rgba(248,250,252,0.96))] px-4 py-4 shadow-[0_8px_30px_rgba(148,163,184,0.12)]"
+              className={
+                'relative flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,_rgba(255,255,255,0.96),_rgba(248,250,252,0.96))] shadow-[0_8px_30px_rgba(148,163,184,0.12)] ' +
+                (singleKpiHero ? 'p-5 sm:p-6' : 'p-4 sm:p-5')
+              }
             >
-              <div className="absolute right-0 top-0 h-20 w-20 rounded-full bg-sky-100 blur-2xl" />
-              <div className="relative text-[11px] font-medium uppercase tracking-[0.24em] text-slate-500">
-                {k.label}
-              </div>
-              <div className="relative mt-3 text-3xl font-semibold tracking-tight text-slate-900">
-                {k.value}
-                {k.unit && (
-                  <span className="ml-1 text-sm font-normal text-slate-500">{k.unit}</span>
-                )}
-              </div>
-              <div className="relative mt-3 h-1.5 w-24 rounded-full bg-slate-200">
+              <div className="pointer-events-none absolute right-0 top-0 h-24 w-24 rounded-full bg-sky-100 blur-2xl sm:h-28 sm:w-28" />
+              <div className="relative z-[1] min-w-0">
+                <div className="text-[11px] font-medium uppercase tracking-[0.24em] text-slate-500">
+                  {k.label}
+                </div>
                 <div
-                  className="h-full rounded-full bg-[linear-gradient(90deg,_#0ea5e9,_#22c55e)] shadow-[0_0_10px_rgba(14,165,233,0.2)]"
-                  style={{ width: `${Math.min(90, 42 + i * 12)}%` }}
-                />
+                  className={
+                    'mt-2 font-semibold tracking-tight text-slate-900 ' +
+                    (singleKpiHero ? 'text-3xl sm:text-4xl' : 'text-2xl sm:text-3xl')
+                  }
+                >
+                  {k.value}
+                  {k.unit && (
+                    <span className="ml-1 text-sm font-normal text-slate-500 sm:text-base">{k.unit}</span>
+                  )}
+                </div>
+                <div className="mt-4 h-2 w-full rounded-full bg-slate-200">
+                  <div
+                    className="h-full rounded-full bg-[linear-gradient(90deg,_#0ea5e9,_#22c55e)] shadow-[0_0_10px_rgba(14,165,233,0.2)]"
+                    style={{ width: `${Math.min(90, 42 + i * 12)}%` }}
+                  />
+                </div>
               </div>
             </div>
           ))}
@@ -368,7 +402,7 @@ function DashboardMiddlewareCard({
       )}
 
       {charts.length > 0 && (
-        <div className={`grid gap-4 border-b border-slate-200/90 px-5 py-5 md:px-6 ${chartCols}`}>
+        <div className={chartGridClassName(charts.length)}>
           {charts.map((chart, i) => {
             const opt = withDashboardTheme(chart as Record<string, unknown>);
             const w = dashboard.widgets[i];
@@ -376,7 +410,7 @@ function DashboardMiddlewareCard({
             return (
               <div
                 key={i}
-                className="overflow-hidden rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,_#ffffff,_#f8fafc)] shadow-[0_10px_32px_rgba(148,163,184,0.14)]"
+                className="min-w-0 overflow-hidden rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,_#ffffff,_#f8fafc)] shadow-[0_10px_32px_rgba(148,163,184,0.14)]"
               >
                 <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
                   <div>
@@ -405,7 +439,7 @@ function DashboardMiddlewareCard({
       )}
 
       {tableRows.length > 0 && tableCols.length > 0 && (
-        <div className="px-5 py-5 md:px-6">
+        <div className="px-4 py-5 sm:px-5 md:px-6">
           <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,_#ffffff,_#f8fafc)] shadow-[0_10px_32px_rgba(148,163,184,0.14)]">
             <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
               <div>
@@ -483,7 +517,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
       <div
         className={
           isWideDashboard
-            ? 'relative left-1/2 w-[min(88vw,1400px)] max-w-none -translate-x-1/2'
+            ? 'w-full min-w-0 max-w-none'
             : 'max-w-[90%]'
         }
       >

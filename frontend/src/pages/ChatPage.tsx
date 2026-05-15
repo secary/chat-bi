@@ -209,8 +209,8 @@ export function ChatPage() {
           </div>
         ) : (
           <>
-            <div className="flex-1 overflow-y-auto px-6 py-6">
-              <div className="mx-auto max-w-3xl">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-6 py-6">
+              <div className="mx-auto min-w-0 w-full max-w-3xl">
                 {messages.map((msg) => (
                   <MessageBubble key={msg.id} message={msg} />
                 ))}
@@ -218,7 +218,7 @@ export function ChatPage() {
                 <div ref={bottomRef} />
               </div>
             </div>
-            <div className="mx-auto w-full max-w-3xl px-4 pb-4">
+            <div className="mx-auto min-w-0 w-full max-w-3xl px-4 pb-4">
               <ChatComposerDock
                 suggestedPrompts={suggestedPrompts}
                 onSend={sendMessage}

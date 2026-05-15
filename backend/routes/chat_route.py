@@ -188,6 +188,7 @@ async def chat(
                 skill_db_overrides=skill_db,
                 memory_block=memory_block or None,
                 multi_agents=req.multi_agents,
+                session_id=persist_sid,
             ):
                 next_disconnected = _next_disconnect_state(
                     disconnected, await request.is_disconnected()

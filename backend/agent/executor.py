@@ -42,6 +42,11 @@ def skill_args_for_execution(
             return [latest_user]
     if skill_name == "chatbi-file-ingestion":
         return file_ingestion_args(args, messages)
+    if skill_name == "chatbi-database-overview":
+        latest_user = latest_user_prompt_for_demo_data_skills(messages)
+        if latest_user:
+            return [latest_user]
+        return args
     return args
 
 

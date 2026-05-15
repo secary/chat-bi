@@ -6,6 +6,7 @@ import json
 from collections import deque
 from typing import Any, Dict, List, Optional, Tuple
 
+from backend.agent.context_window import build_manager_context
 from backend.agent.multi_agent_registry import (
     agent_label,
     list_registry_agent_ids,
@@ -46,6 +47,16 @@ def _latest_user_content(messages: List[Dict[str, str]]) -> str:
         if m.get("role") == "user":
             return str(m.get("content") or "").strip()
     return ""
+
+
+def _get_session_id_from_messages(messages: List[Dict[str, str]]) -> Optional[int]:
+    """Extract session_id from messages if available."""
+    for m in messages:
+        if isinstance(m, dict):
+            sid = m.get("session_id")
+            if isinstance(sid, int) and sid > 0:
+                return sid
+    return None
 
 
 def _has_upload_analysis_proposal_cue(text: str) -> bool:
@@ -271,10 +282,15 @@ async def call_manager_plan_llm(
     *,
     round_index: int = 1,
     progress_digest: str = "",
+    session_id: Optional[int] = None,
 ) -> Optional[Dict[str, Any]]:
     """Returns parsed Manager JSON or None on failure."""
     followup = round_index > 1
-    body = _dialogue_tail_for_manager(messages)
+    latest_user = _latest_user_content(messages)
+    if session_id:
+        body = build_manager_context(session_id, latest_user, messages)
+    else:
+        body = _dialogue_tail_for_manager(messages)
     hints = _manager_context_hints(messages)
     hints_block = f"\n\n## 系统自动检测的会话线索（供路由，请采信）\n{hints}\n" if hints else ""
     if followup:

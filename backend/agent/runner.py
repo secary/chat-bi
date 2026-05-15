@@ -98,6 +98,7 @@ async def stream_chat(
     skill_db_overrides: Optional[Dict[str, str]] = None,
     memory_block: Optional[str] = None,
     multi_agents: bool = False,
+    session_id: Optional[int] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """Agent loop: ReAct multi-step or legacy single-plan Skill execution."""
     if multi_agents:
@@ -108,6 +109,7 @@ async def stream_chat(
             trace_id=trace_id,
             skill_db_overrides=skill_db_overrides,
             memory_block=memory_block,
+            session_id=session_id,
         ):
             yield event
         return
@@ -118,6 +120,7 @@ async def stream_chat(
             trace_id=trace_id,
             skill_db_overrides=skill_db_overrides,
             memory_block=memory_block,
+            session_id=session_id,
         ):
             yield event
         return

@@ -4,6 +4,7 @@ import json
 import tempfile
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
+from backend.agent.context_window import build_react_context
 from backend.agent.executor import (
     find_skill,
     latest_user_upload_path,
@@ -278,6 +279,7 @@ async def stream_chat_react(
     result_sink: Optional[Dict[str, Any]] = None,
     subagent_react: bool = False,
     specialist_agent_id: Optional[str] = None,
+    session_id: Optional[int] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """
     ReAct multi-step agent loop.
@@ -326,6 +328,12 @@ async def stream_chat_react(
         system_prompt = role_prompt.strip() + "\n\n" + system_prompt
     if memory_block and memory_block.strip():
         system_prompt = memory_block.strip() + "\n\n" + system_prompt
+
+    # Inject sliding window context for long conversation management
+    if session_id:
+        conversation_context = build_react_context(session_id, user_text, messages)
+        if conversation_context.strip():
+            system_prompt = system_prompt + "\n\n" + conversation_context
 
     """
     working: 一个消息列表，用于存储对话历史和obs(observation的内容)

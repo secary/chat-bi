@@ -43,6 +43,7 @@ async def stream_chat_multi_agent(
     trace_id: str = "",
     skill_db_overrides: Optional[Dict[str, str]] = None,
     memory_block: Optional[str] = None,
+    session_id: Optional[int] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """
     Manager pattern (multi-round):
@@ -79,6 +80,7 @@ async def stream_chat_multi_agent(
                 trace_id=trace_id,
                 round_index=rnd,
                 progress_digest=digest,
+                session_id=session_id,
             )
         except ChatAbortedError:
             log_event(trace_id, "agent.multi", "aborted", level="INFO")

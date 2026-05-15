@@ -59,8 +59,8 @@
 
 | 轮次 | 完成内容                                                                                                             | 验证                                                                                        |
 | ---- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| 132  | `chatbi-comparison`：`detect_months` 前将「N月份」规范为「N月」，修复「1月份和2月份」无法双月解析而误走单月/跨年逻辑；新增 `test_chatbi_comparison_month_parse` | `ruff format`、`pytest tests/test_chatbi_comparison_month_parse.py -q` |
 | 133  | Manager 多轮规划：`max_manager_rounds` + `finalize_after_this_batch`；首轮/后续轮不同 system prompt；`stream_chat_multi_agent` 循环累积 blocks；admin/前端可配轮数 | `pytest tests/test_admin_multi_agents.py tests/test_multi_agent_manager.py -q`、`ruff` |
 | 134  | 多 Agent 问数：同一列多枚举过滤合并为 `IN`；`chatbi-semantic-query` 入参优先取「用户原述」；ReAct/单次规划 JSON 解析失败不再抛裸异常；空结果 Observation 附 SQL 与互斥条件提示 | `ruff check/format`、`pytest tests/test_semantic_query_core.py tests/test_executor_file_ingestion_args.py tests/test_observation.py tests/test_planner_parse_json.py -q` |
 | 135  | 经营建议 KPI 全 0：`chatbi-decision-advisor` 与问数共用「用户原述」入参；解析「2026 年前四个月」时间窗；决策 SQL WHERE 同列多 `=` 合并为 `IN` | `ruff check/format`、`pytest tests/test_decision_advisor_focus.py tests/test_executor_file_ingestion_args.py -q` |
 | 136  | 多 Agent 上传采纳看板：宽度随主栏自适应；KPI/图表按数量与断点网格排布（单指标全宽+大屏双列），表头与卡片 `min-w-0` 防溢出 | `frontend` ESLint |
+| 137  | Manager：`上传路径/采纳/上传提案` 会话线索注入规划；system 增加路由硬约束与专线技能边界；`test_multi_agent_manager` 覆盖线索与 LLM 入参 | `ruff check/format`、`pytest tests/test_multi_agent_manager.py -q` |

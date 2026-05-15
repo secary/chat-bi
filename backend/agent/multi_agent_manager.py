@@ -28,6 +28,78 @@ def _dialogue_tail_for_manager(messages: List[Dict[str, str]], max_msgs: int = 1
     return "\n".join(lines) if lines else ""
 
 
+def _dialogue_text_for_scan(messages: List[Dict[str, str]], max_msgs: int = 28) -> str:
+    """Longer window than the Manager tail: upload path / 采纳 often appear earlier."""
+    tail = messages[-max_msgs:] if len(messages) > max_msgs else messages
+    parts: List[str] = []
+    for m in tail:
+        c = str(m.get("content") or "").strip()
+        if c:
+            parts.append(c)
+    return "\n".join(parts)
+
+
+def _latest_user_content(messages: List[Dict[str, str]]) -> str:
+    for m in reversed(messages):
+        if m.get("role") == "user":
+            return str(m.get("content") or "").strip()
+    return ""
+
+
+def _has_upload_file_reference(text: str) -> bool:
+    if not text:
+        return False
+    low = text.lower()
+    if "chatbi-uploads" in low:
+        return True
+    if "/tmp/" in text and any(ext in low for ext in (".csv", ".xlsx", ".xls")):
+        return True
+    return False
+
+
+def _has_upload_analysis_proposal_cue(text: str) -> bool:
+    if not text:
+        return False
+    return "上传表分析建议" in text or "上传文件分析建议" in text
+
+
+def _user_message_suggests_metric_adopt(user_text: str) -> bool:
+    if not user_text:
+        return False
+    if "采纳" in user_text:
+        return True
+    low = user_text.lower()
+    return "adopt" in low and ("metric" in low or "指标" in user_text)
+
+
+def _manager_context_hints(messages: List[Dict[str, str]]) -> str:
+    """
+    Deterministic cues appended to the Manager user message so routing does not
+    ignore earlier turns (e.g. 采纳 after upload + proposal).
+    """
+    blob = _dialogue_text_for_scan(messages, 32)
+    latest_user = _latest_user_content(messages)
+    lines: List[str] = []
+    if _has_upload_file_reference(blob):
+        lines.append(
+            "- 对话中曾出现**本地上传/临时文件路径**（如含 `chatbi-uploads`、`/tmp/` 与 csv/xlsx）。"
+            "凡需在该数据上**计算指标、执行「采纳」、按提案出图/看板**，必须派 **upload_analyst**"
+            "（`chatbi-file-ingestion`、`chatbi-auto-analysis`）。"
+            "**禁止**派 **demo_query** 处理上传文件上的指标（该专线无 `chatbi-file-ingestion`，会报未找到技能）。"
+        )
+    if _has_upload_analysis_proposal_cue(blob):
+        lines.append(
+            "- 对话中曾出现**上传表/文件分析提案**类回复；用户后续的「采纳某指标」应在 **upload_analyst** 上执行，"
+            "而非 **demo_query**。"
+        )
+    if _user_message_suggests_metric_adopt(latest_user):
+        lines.append(
+            "- 末条用户消息含**采纳**意图：若上文存在上传路径或上传分析提案，则指标计算与看板中间件一律走 **upload_analyst**；"
+            "仅当全程明确是**演示库问数**、且未依赖上传文件时，才用 **demo_query**。"
+        )
+    return "\n".join(lines) if lines else ""
+
+
 def _registry_capability_block() -> str:
     lines_out: List[str] = []
     for aid in list_registry_agent_ids():
@@ -42,15 +114,25 @@ def _registry_capability_block() -> str:
     )
 
 
+def _manager_routing_rules_block() -> str:
+    return """## 路由硬约束（违反将导致子专线报错或无法出数）
+- **upload_analyst**：用户本地上传文件（路径常含 `chatbi-uploads`、`/tmp/…csv|xlsx`）、上传表分析提案、以及用户**采纳**某上传表指标后的计算与看板，**必须**派此专线；依赖 `chatbi-file-ingestion` 与 `chatbi-auto-analysis`。
+- **demo_query**：仅用于对**演示业务库**的自然语言问数、库表概览、指标口径解释等；**不得**用于在**上传文件数据**上执行采纳或指标计算（该专线**没有** `chatbi-file-ingestion`）。
+- **viz_board**：出图/看板编排；若数据来自上传表，须依赖 **upload_analyst** 先产出表格或 Observation（`depends_on` 指向其下标），不可让 demo_query 代算上传指标。"""
+
+
 def _manager_system_prompt(*, followup: bool) -> str:
     cap = max_agents_per_round()
     caps = _registry_capability_block()
     if not followup:
         return f"""你是 ChatBI 多专线的 **Manager**（第 1 轮规划）：根据用户对话，将需求拆解为 1～{cap} 个子任务，并指派给下方专线之一执行。
 你只能指派 registry 中列出的专线 id；每个子任务必须对应一条仍有「可用技能」的专线。
+规划前请对照下表各专线的**技能名称**，勿将任务派给不具备所需技能的专线。
 
 ## 专线与能力（仅能使用表中技能，勿指派无技能专线）
 {caps}
+
+{_manager_routing_rules_block()}
 
 ## 输出 JSON（仅此一个对象）
 {{
@@ -74,9 +156,12 @@ def _manager_system_prompt(*, followup: bool) -> str:
 - 不要输出 Markdown 围栏。"""
     return f"""你是 ChatBI 多专线的 **Manager**（后续轮规划）。用户对话与「已完成子任务」摘要在用户消息中。
 请判断：是否还需派新的专线子任务；若 Observation 已足够达成用户目标，则不再派发。
+派发前请核对各专线**可用技能**，避免重复派发错误专线（例如上传采纳却派 demo_query）。
 
 ## 专线与能力
 {caps}
+
+{_manager_routing_rules_block()}
 
 ## 输出 JSON（仅此一个对象）
 {{
@@ -199,6 +284,8 @@ async def call_manager_plan_llm(
     """Returns parsed Manager JSON or None on failure."""
     followup = round_index > 1
     body = _dialogue_tail_for_manager(messages)
+    hints = _manager_context_hints(messages)
+    hints_block = f"\n\n## 系统自动检测的会话线索（供路由，请采信）\n{hints}\n" if hints else ""
     if followup:
         digest = (progress_digest or "").strip()
         user_content = (
@@ -206,9 +293,10 @@ async def call_manager_plan_llm(
             "请阅读「用户对话」与「已完成子任务」摘要，输出 JSON。\n\n"
             f"## 用户对话\n{body}\n\n"
             f"## 已完成子任务\n{digest if digest else '（尚无）'}"
+            f"{hints_block}"
         )
     else:
-        user_content = f"请根据以下对话输出规划 JSON：\n{body}"
+        user_content = f"请根据以下对话输出规划 JSON：\n{body}{hints_block}"
     llm_messages = [
         {"role": "system", "content": _manager_system_prompt(followup=followup)},
         {"role": "user", "content": user_content},

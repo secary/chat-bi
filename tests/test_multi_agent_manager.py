@@ -7,13 +7,32 @@ import unittest
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from backend.agent.multi_agent_manager import call_manager_plan_llm, validate_and_order_tasks
+from backend.agent.multi_agent_manager import (
+    _manager_context_hints,
+    call_manager_plan_llm,
+    validate_and_order_tasks,
+)
 from backend.agent.multi_agent_messages import build_subtask_messages
 from backend.agent.prompt_builder import SkillDoc
 from backend.agent.prompt_subagent import build_react_system_prompt_for_subagent
 
 
 class MultiAgentManagerTest(unittest.TestCase):
+    def test_manager_context_hints_upload_and_adopt(self) -> None:
+        msgs = [
+            {"role": "user", "content": "请分析 /tmp/chatbi-uploads/session_1.csv"},
+            {"role": "assistant", "content": "上传表分析建议：…"},
+            {"role": "user", "content": "采纳 sales_trend_monthly"},
+        ]
+        h = _manager_context_hints(msgs)
+        self.assertIn("upload_analyst", h)
+        self.assertIn("demo_query", h)
+        self.assertIn("采纳", h)
+
+    def test_manager_context_hints_empty_without_cues(self) -> None:
+        msgs = [{"role": "user", "content": "1-4 月各区域销售额排行"}]
+        self.assertEqual(_manager_context_hints(msgs), "")
+
     def test_validate_rejects_over_cap(self) -> None:
         raw = [
             {"agent_id": "a", "handoff_instruction": "one", "depends_on": None},
@@ -92,6 +111,50 @@ class MultiAgentManagerTest(unittest.TestCase):
         import asyncio
 
         asyncio.run(run())
+
+    def test_call_manager_plan_llm_injects_context_hints(self) -> None:
+        payload = {
+            "user_intent_summary": "采纳上传指标",
+            "decomposition_reason": "test",
+            "finalize_after_this_batch": True,
+            "tasks": [
+                {
+                    "agent_id": "upload_analyst",
+                    "handoff_instruction": "执行采纳",
+                    "depends_on": None,
+                }
+            ],
+        }
+        captured: dict[str, str] = {}
+
+        async def run():
+            mock_resp = MagicMock()
+            mock_resp.choices = [MagicMock(message=MagicMock(content=json.dumps(payload)))]
+
+            async def _acompletion(**kwargs):
+                msgs = kwargs.get("messages") or []
+                captured["last_user"] = str(msgs[-1].get("content") or "")
+                return mock_resp
+
+            with patch(
+                "backend.agent.multi_agent_manager.chatbi_acompletion",
+                new_callable=AsyncMock,
+                side_effect=_acompletion,
+            ):
+                await call_manager_plan_llm(
+                    [
+                        {"role": "user", "content": "读 /tmp/chatbi-uploads/a.csv"},
+                        {"role": "assistant", "content": "上传表分析建议 …"},
+                        {"role": "user", "content": "采纳 m1"},
+                    ],
+                    trace_id="t-hints",
+                )
+
+        import asyncio
+
+        asyncio.run(run())
+        self.assertIn("系统自动检测", captured["last_user"])
+        self.assertIn("upload_analyst", captured["last_user"])
 
     def test_subagent_react_prompt_omits_unassigned_skills(self) -> None:
         doc = SkillDoc(

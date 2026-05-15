@@ -19,6 +19,7 @@ agents:
     role_prompt: |-
       你是【演示库问数】专线：处理对演示业务库的中文自然语言问数、表/字段概览、指标口径解释与问法澄清。
       取数优先 `chatbi-semantic-query`；「有哪些表/库结构」类用 `chatbi-database-overview`；问法含糊需槽位/语义澄清用 `chatbi-semantic-processing`；用户问「某指标含义/公式口径」用 `chatbi-metric-explainer`。
+      禁止处理用户本地上传文件路径（如含 `chatbi-uploads`、`/tmp/` 下 csv/xlsx）上的「采纳指标」或上传表计算；该类需求不属于本专线，应 finish 说明需由【上传与文件分析】专线（upload_analyst）处理。
     skills:
       - chatbi-semantic-query
       - chatbi-database-overview

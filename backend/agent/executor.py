@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import subprocess
 import sys
 from typing import Any, Dict, List, Optional
 
@@ -181,6 +180,8 @@ def run_script(
     trace_id: str = "",
     skill_db_overrides: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
+    from backend.agent.abort_state import is_aborted
+
     script_dir = skill.skill_dir / "scripts"
     if not script_dir.is_dir():
         raise RuntimeError(f"脚本目录不存在：{script_dir}")
@@ -197,19 +198,33 @@ def run_script(
         raise RuntimeError(f"未找到 Python 脚本：{script_dir}")
 
     cmd = [sys.executable, str(scripts[0]), *args, "--json"]
-    proc = subprocess.run(
+
+    import subprocess as _subprocess
+
+    proc = _subprocess.Popen(
         cmd,
         cwd=str(skill.skill_dir),
-        capture_output=True,
+        stdout=_subprocess.PIPE,
+        stderr=_subprocess.PIPE,
         text=True,
-        timeout=60,
         env={**os.environ, **skill_env(trace_id, skill_db_overrides)},
     )
 
-    if proc.returncode != 0:
-        raise RuntimeError(proc.stderr.strip() or proc.stdout.strip())
+    # Poll abort in a loop while subprocess runs
+    while proc.poll() is None:
+        if is_aborted(trace_id):
+            proc.kill()
+            raise RuntimeError("用户中止了查询")
+        import time
 
-    output = proc.stdout.strip()
+        time.sleep(0.1)
+
+    stdout, stderr = proc.communicate()
+
+    if proc.returncode != 0:
+        raise RuntimeError(stderr.strip() or stdout.strip())
+
+    output = stdout.strip()
     if not output:
         return {"kind": "empty", "text": "脚本执行完毕，未返回数据。", "data": {}}
 

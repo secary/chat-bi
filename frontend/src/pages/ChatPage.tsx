@@ -38,7 +38,7 @@ export function ChatPage() {
   const [sidebarOpen, setSidebarOpen] = useState(() => readSidebarOpenPreference());
   const [pdfExporting, setPdfExporting] = useState(false);
 
-  const { messages, loading, assistantPending, sendMessage } = useChat(
+  const { messages, loading, assistantPending, sendMessage, abort } = useChat(
     sessionId,
     dbConnId,
     multiAgents,
@@ -199,6 +199,7 @@ export function ChatPage() {
                 <ChatComposerDock
                   suggestedPrompts={suggestedPrompts}
                   onSend={sendMessage}
+                  onAbort={loading ? abort : undefined}
                   inputBusy={inputBusy}
                   booting={booting}
                   sessionId={sessionId}
@@ -221,6 +222,7 @@ export function ChatPage() {
               <ChatComposerDock
                 suggestedPrompts={suggestedPrompts}
                 onSend={sendMessage}
+                onAbort={loading ? abort : undefined}
                 inputBusy={inputBusy}
                 booting={booting}
                 sessionId={sessionId}

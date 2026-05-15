@@ -24,6 +24,7 @@ from backend.session_repo import (
     touch_session,
     update_session_title,
 )
+from backend.agent.abort_state import clear_abort, get_abort_event
 from backend.trace import log_event
 from backend.vision.chart_table_extract import enrich_last_user_message_with_vision
 
@@ -36,6 +37,18 @@ class ChatRequest(BaseModel):
     session_id: Optional[int] = None
     db_connection_id: Optional[int] = None
     multi_agents: bool = False
+
+
+@router.post("/abort")
+async def abort_chat(
+    request: Request,
+    user: dict = Depends(get_current_user),
+):
+    """Abort an in-progress chat request by trace_id."""
+    trace_id = request_trace_id(request)
+    get_abort_event(trace_id).set()
+    log_event(trace_id, "http.chat", "abort.requested", level="INFO")
+    return {"status": "aborted", "trace_id": trace_id}
 
 
 def _accumulate_assistant(acc: Dict[str, Any], event: Dict[str, Any]) -> None:
@@ -96,6 +109,8 @@ async def chat(
     user: dict = Depends(get_current_user),
 ):
     trace_id = request_trace_id(request)
+    # Create abort event for this trace_id before processing
+    get_abort_event(trace_id)
     skill_db = resolve_skill_db_env(req.db_connection_id)
     memory_block = format_memory_for_prompt(int(user["id"]))
 
@@ -236,6 +251,8 @@ async def chat(
                         str(exc),
                         level="WARN",
                     )
+            # Clean up abort flag on completion
+            clear_abort(trace_id)
 
     # turn every stream_chat content into sse event.
     # it will turn yield contents into  text/event-stream

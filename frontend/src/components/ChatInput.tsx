@@ -3,11 +3,12 @@ import { newTraceId, uploadFile } from '../api/client';
 
 interface ChatInputProps {
   onSend: (text: string, traceId?: string) => void;
+  onAbort?: () => void;
   loading: boolean;
   disabled?: boolean;
 }
 
-export function ChatInput({ onSend, loading, disabled = false }: ChatInputProps) {
+export function ChatInput({ onSend, onAbort, loading, disabled = false }: ChatInputProps) {
   const [message, setMessage] = useState('');
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -17,6 +18,10 @@ export function ChatInput({ onSend, loading, disabled = false }: ChatInputProps)
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (loading && onAbort) {
+      onAbort();
+      return;
+    }
     if (message.trim() && !loading && !uploading && !disabled) {
       onSend(message, pendingTraceId);
       setMessage('');
@@ -104,9 +109,13 @@ export function ChatInput({ onSend, loading, disabled = false }: ChatInputProps)
         <button
           type="submit"
           disabled={loading || uploading || !message.trim() || disabled}
-          className="h-11 shrink-0 rounded-xl bg-accent px-5 text-sm font-medium text-white transition-colors hover:bg-accent-hover active:scale-[0.97] disabled:opacity-50 disabled:bg-gray-300"
+          className={`h-11 shrink-0 rounded-xl px-5 text-sm font-medium transition-colors active:scale-[0.97] ${
+            loading
+              ? 'bg-red-500 text-white hover:bg-red-600'
+              : 'bg-accent text-white hover:bg-accent-hover'
+          } disabled:opacity-50 disabled:bg-gray-300`}
         >
-          {loading ? '处理中' : '发送'}
+          {loading ? '中止' : '发送'}
         </button>
       </div>
       <div

@@ -319,7 +319,16 @@ async def stream_chat_react(
     LLM decides next action {"thought", "action", "skill", "skill_args"} → executes a skill → summarizes observation → repeats.
     The agent_max_steps is 8 by default. If the agent_max_steps is reached, the agent will return the last result.
     """
+    from backend.agent.abort_state import is_aborted as _is_aborted
+
     for step in range(settings.agent_max_steps):
+        if _is_aborted(trace_id):
+            log_event(trace_id, "agent.runner", "aborted", level="INFO")
+            yield {"type": "thinking", "content": "用户中止了查询。"}
+            _sink_write(result_sink, last_result, last_skill_name)
+            yield {"type": "done", "content": None}
+            return
+
         log_event(
             trace_id,
             "agent.planner",

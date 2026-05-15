@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ChatMessage } from '../types/message';
-import { getSessionMessagesApi, streamChat } from '../api/client';
+import { getSessionMessagesApi, streamChat, abortChat, newTraceId } from '../api/client';
 import { isWaitingForAssistantMessage } from '../lib/chatPending';
 import { logger } from '../lib/logger';
 
@@ -31,6 +31,7 @@ export interface UseChatReturn {
   /** Last loaded message is user — assistant row not yet in DB (e.g. navigated away mid-stream). */
   assistantPending: boolean;
   sendMessage: (text: string, traceId?: string) => Promise<void>;
+  abort: () => void;
 }
 
 const MULTI_AGENTS_KEY = 'chatbi_multi_agents';
@@ -44,6 +45,7 @@ export function useChat(
   const [loading, setLoading] = useState(false);
   const messagesRef = useRef(messages);
   const streamingRef = useRef(false);
+  const currentTraceIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -153,6 +155,8 @@ export function useChat(
             }));
 
       try {
+        const traceIdToUse = traceId || newTraceId();
+        currentTraceIdRef.current = traceIdToUse;
         for await (const event of streamChat(
           {
             message: text,
@@ -161,7 +165,7 @@ export function useChat(
             db_connection_id: dbConnectionId ?? undefined,
             multi_agents: multiAgents,
           },
-          traceId,
+          traceIdToUse,
         )) {
           setMessages((prev) => {
             const idx = prev.length - 1;
@@ -215,12 +219,20 @@ export function useChat(
       } finally {
         streamingRef.current = false;
         setLoading(false);
+        currentTraceIdRef.current = null;
       }
     },
     [loading, sessionId, dbConnectionId, multiAgents],
   );
 
-  return { messages, loading, assistantPending, sendMessage };
+  const abort = useCallback(() => {
+    const tid = currentTraceIdRef.current;
+    if (tid) {
+      void abortChat(tid);
+    }
+  }, []);
+
+  return { messages, loading, assistantPending, sendMessage, abort };
 }
 
 export function readMultiAgentsPreference(): boolean {

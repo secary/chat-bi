@@ -49,6 +49,8 @@ async def stream_chat_multi_agent(
       2. Each subtask runs stream_specialist (subagent ReAct / legacy).
       3. Synthesis LLM merges all batches for the user.
     """
+    from backend.agent.abort_state import is_aborted as _is_aborted
+
     log_event(
         trace_id,
         "agent.multi",
@@ -63,6 +65,12 @@ async def stream_chat_multi_agent(
     last_skill_name: Optional[str] = None
 
     for rnd in range(1, n_rounds + 1):
+        if _is_aborted(trace_id):
+            log_event(trace_id, "agent.multi", "aborted", level="INFO")
+            yield {"type": "thinking", "content": "用户中止了查询。"}
+            yield {"type": "done", "content": None}
+            return
+
         digest = "\n\n".join(progress_lines)
         plan = await call_manager_plan_llm(
             messages,
@@ -131,6 +139,12 @@ async def stream_chat_multi_agent(
                 "content": "[Manager-规划] 子任务校验失败，按已有结果汇总。",
             }
             break
+
+        if _is_aborted(trace_id):
+            log_event(trace_id, "agent.multi", "aborted", level="INFO")
+            yield {"type": "thinking", "content": "用户中止了查询。"}
+            yield {"type": "done", "content": None}
+            return
 
         obs_by_idx: Dict[int, str] = {}
         for orig_idx, task in ordered:

@@ -98,8 +98,9 @@ class Settings:
     )
 
     agent_react: bool = field(
-        default_factory=lambda: os.getenv("CHATBI_AGENT_REACT", "1").strip().lower()
-        not in ("0", "false", "no", "off")
+        default_factory=lambda: (
+            os.getenv("CHATBI_AGENT_REACT", "1").strip().lower() not in ("0", "false", "no", "off")
+        )
     )
     agent_max_steps: int = field(
         default_factory=lambda: max(1, int(os.getenv("CHATBI_AGENT_MAX_STEPS", "8")))
@@ -113,8 +114,9 @@ class Settings:
     )
     # 生产默认开启；本地开发可在 env.dev / compose 中设为 0/false 跳过登录
     auth_enabled: bool = field(
-        default_factory=lambda: os.getenv("CHATBI_AUTH_ENABLED", "1").strip().lower()
-        not in ("0", "false", "no", "off")
+        default_factory=lambda: (
+            os.getenv("CHATBI_AUTH_ENABLED", "1").strip().lower() not in ("0", "false", "no", "off")
+        )
     )
     auth_dev_user_id: int = field(
         default_factory=lambda: max(1, int(os.getenv("CHATBI_AUTH_DEV_USER_ID", "1")))

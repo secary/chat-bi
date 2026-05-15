@@ -1,6 +1,19 @@
 ---
 name: chatbi-semantic-query
 description: Use when Codex or another agent needs to answer Chinese natural-language data questions against the local ChatBI demo MySQL database, map business terms to governed metrics and dimensions, generate safe read-only SQL, execute metric queries, or return JSON/table results for sales, revenue, gross margin, target achievement, customer, retention, region, channel, product, and monthly trend analysis.
+trigger_conditions:
+  - 用户用中文问演示库业务指标、排行、趋势、汇总或具体数值
+  - 短句问数如「1-4月销售额排行」「各区域销售额」
+  - 用户明确查询演示业务库且与上传文件无关
+when_not_to_use:
+  - 对话含本地上传路径（chatbi-uploads、/tmp/ 下 csv/xlsx）
+  - 用户只问库表清单或 schema（用 chatbi-database-overview）
+  - 用户问环比/比上月（用 chatbi-comparison）
+  - 用户只要指标口径不要数值（用 chatbi-metric-explainer）
+required_context:
+  - 演示库可连接；首参优先保留用户原问句
+validator_requires:
+  - no_upload_path_in_thread
 ---
 
 # ChatBI Semantic Query

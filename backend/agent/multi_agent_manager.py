@@ -14,6 +14,7 @@ from backend.agent.multi_agent_registry import (
 )
 from backend.agent.planner import parse_json_object
 from backend.agent.abort_async import ChatAbortedError, await_with_abort
+from backend.agent.upload_path_detect import has_upload_file_reference
 from backend.llm_runtime import chatbi_acompletion
 from backend.trace import log_event
 
@@ -47,17 +48,6 @@ def _latest_user_content(messages: List[Dict[str, str]]) -> str:
     return ""
 
 
-def _has_upload_file_reference(text: str) -> bool:
-    if not text:
-        return False
-    low = text.lower()
-    if "chatbi-uploads" in low:
-        return True
-    if "/tmp/" in text and any(ext in low for ext in (".csv", ".xlsx", ".xls")):
-        return True
-    return False
-
-
 def _has_upload_analysis_proposal_cue(text: str) -> bool:
     if not text:
         return False
@@ -81,7 +71,7 @@ def _manager_context_hints(messages: List[Dict[str, str]]) -> str:
     blob = _dialogue_text_for_scan(messages, 32)
     latest_user = _latest_user_content(messages)
     lines: List[str] = []
-    if _has_upload_file_reference(blob):
+    if has_upload_file_reference(blob):
         lines.append(
             "- 对话中曾出现**本地上传/临时文件路径**（如含 `chatbi-uploads`、`/tmp/` 与 csv/xlsx）。"
             "凡需在该数据上**计算指标、执行「采纳」、按提案出图/看板**，必须派 **upload_analyst**"

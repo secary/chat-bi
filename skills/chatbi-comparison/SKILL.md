@@ -1,6 +1,15 @@
 ---
 name: chatbi-comparison
 description: Use when the user asks for month-over-month (环比) comparison of business metrics such as sales, gross margin, order count, or customer count. Triggers on phrases like "环比", "上月对比", "月度对比", "和上个月比", "比上月", "月环比". Returns a comparison table with absolute change and percentage change, plus a grouped bar chart plan.
+trigger_conditions:
+  - 用户问环比、月度对比、比上月/上月、月环比
+when_not_to_use:
+  - 普通排行或趋势问数（用 chatbi-semantic-query）
+  - 对话主题是上传文件分析
+required_context:
+  - 首参为用户原问句；演示数据默认 2026 年
+validator_requires:
+  - no_upload_path_in_thread
 ---
 
 # ChatBI Comparison

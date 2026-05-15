@@ -1,6 +1,14 @@
 ---
 name: chatbi-semantic-processing
 description: Banking ChatBI semantic processing for intelligent BI questions. Use when Codex needs to normalize ambiguous Chinese or bilingual banking business questions into a standard Query Intent JSON by resolving metric synonyms, dimension synonyms, time expressions, missing slots, ambiguity, and downstream Text-to-SQL readiness.
+trigger_conditions:
+  - 问法含糊、缺槽位，需生成 Query Intent 或澄清问题
+  - 用户问题含多义指标/维度/时间需规范化
+when_not_to_use:
+  - 问法已足够清晰可直接 chatbi-semantic-query
+  - 用户只要指标定义解释（用 chatbi-metric-explainer）
+required_context:
+  - 用户原问句；可选上游 schema 提示
 ---
 
 # ChatBI Semantic Processing

@@ -182,6 +182,7 @@ async def stream_chat_multi_agent(
                 memory_block=memory_block,
                 result_sink=sink,
                 subagent_mode=True,
+                specialist_agent_id=agent_id,
             ):
                 if _is_aborted(trace_id):
                     log_event(trace_id, "agent.multi", "aborted", level="INFO")

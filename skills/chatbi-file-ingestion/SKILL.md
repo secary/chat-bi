@@ -1,6 +1,16 @@
 ---
 name: chatbi-file-ingestion
 description: Use when Codex or another agent needs to read a user-uploaded CSV or Excel file for ChatBI, validate whether it matches the existing sales_order or customer_profile schema, and return a compact table structure profile for downstream analysis.
+trigger_conditions:
+  - 对话含本地上传 CSV/XLSX 路径，需校验结构或读取行
+  - 用户要对上传附件做分析、预览字段
+when_not_to_use:
+  - 用户只问演示库问数、与上传无关
+  - 同一文件已解析且 rows 在 Observation 中（改调 chatbi-auto-analysis 或 finish）
+required_context:
+  - 上传文件路径（常含 chatbi-uploads 或 /tmp/）
+validator_requires:
+  - upload_path_or_rows
 ---
 
 # ChatBI File Ingestion

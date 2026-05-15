@@ -21,6 +21,10 @@ from backend.agent.prompt_builder import (
 from backend.agent.prompt_subagent import build_system_prompt_for_subagent
 from backend.agent.query_decision import is_query_plus_decision_text
 from backend.agent.react_runner import stream_chat_react
+from backend.agent.skill_call_validator import (
+    dialogue_text_from_messages,
+    validate_skill_call,
+)
 from backend.config import settings
 from backend.trace import log_event
 
@@ -136,6 +140,7 @@ async def _stream_chat_legacy(
     role_prompt: Optional[str] = None,
     result_sink: Optional[Dict[str, Any]] = None,
     subagent_mode: bool = False,
+    specialist_agent_id: Optional[str] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """Single LLM JSON plan with optional two-step query and advice execution."""
     log_event(
@@ -145,6 +150,8 @@ async def _stream_chat_legacy(
         payload={"message_count": len(messages), "mode": "legacy"},
     )
     skills = skill_docs if skill_docs is not None else scan_skills_enabled(settings.skills_dir)
+    allowed_slugs = {d.skill_dir.name for d in skills}
+    dialogue_text = dialogue_text_from_messages(messages)
     user_text = latest_user_content(messages)
     if should_skip_skill_for_message(user_text):
         log_event(trace_id, "agent.runner", "skip_skill_small_talk")
@@ -212,6 +219,33 @@ async def _stream_chat_legacy(
             yield {"type": "done", "content": None}
             return
 
+        validation = validate_skill_call(
+            skill_doc,
+            allowed_slugs=allowed_slugs,
+            dialogue_text=dialogue_text,
+            last_result=previous_result,
+            user_text=user_text,
+        )
+        if not validation.ok:
+            log_event(
+                trace_id,
+                "agent.skill",
+                "validation_rejected",
+                validation.reason[:500],
+                payload={
+                    "proposed_skill": skill_name,
+                    "reason": validation.reason,
+                    "rule": validation.rule,
+                    "user_snippet": (user_text or "")[:200],
+                    "agent_id": specialist_agent_id or "single",
+                },
+                level="WARNING",
+            )
+            _legacy_sink_write(result_sink, previous_result, last_skill_executed)
+            yield {"type": "error", "content": validation.reason}
+            yield {"type": "done", "content": None}
+            return
+
         yield {"type": "thinking", "content": f"已选择技能「{skill_name}」"}
         if step["phase"] == "建议":
             yield {"type": "thinking", "content": "正在基于当前问题生成经营决策建议..."}
@@ -228,7 +262,12 @@ async def _stream_chat_legacy(
                 trace_id,
                 "agent.skill",
                 "started",
-                payload={"skill": skill_name, "args": args},
+                payload={
+                    "skill": skill_name,
+                    "args": args,
+                    "agent_id": specialist_agent_id or "single",
+                    "validator_requires": list(skill_doc.validator_requires or []),
+                },
             )
             result = run_script(
                 skill_doc,
@@ -277,6 +316,7 @@ async def stream_specialist(
     memory_block: Optional[str] = None,
     result_sink: Optional[Dict[str, Any]] = None,
     subagent_mode: bool = False,
+    specialist_agent_id: Optional[str] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """One specialist pass: ReAct or Legacy with a filtered skill list."""
     if settings.agent_react:
@@ -289,6 +329,7 @@ async def stream_specialist(
             role_prompt=role_prompt,
             result_sink=result_sink,
             subagent_react=subagent_mode,
+            specialist_agent_id=specialist_agent_id,
         ):
             yield event
         return
@@ -301,5 +342,6 @@ async def stream_specialist(
         role_prompt=role_prompt,
         result_sink=result_sink,
         subagent_mode=subagent_mode,
+        specialist_agent_id=specialist_agent_id,
     ):
         yield event

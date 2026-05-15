@@ -1,6 +1,16 @@
 ---
 name: chatbi-chart-recommendation
 description: BI chart recommendation for ChatBI and analytics workflows. Use when Codex needs to choose chart types and emit frontend-ready chart recommendation JSON from a user's analysis intent, Query Intent JSON, SQL result metadata, or tabular data, especially after natural language to SQL to data pipelines.
+trigger_conditions:
+  - 已有 SQL 结果、表格 rows 或 Observation 中的查询数据
+  - 用户问适合什么图表、如何可视化已有结果
+when_not_to_use:
+  - 尚未取数、无 rows 或 preview_rows
+  - 用户只要原始数值、未要求可视化
+required_context:
+  - 上一步取数或上传解析的 Observation
+validator_requires:
+  - prior_observation
 ---
 
 # Chart Recommendation

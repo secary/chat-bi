@@ -1,6 +1,16 @@
 ---
 name: chatbi-dashboard-orchestration
 description: Dashboard auto-orchestration for ChatBI and analytics workflows. Use when Codex needs to generate a dashboard layout and frontend-ready dashboard JSON from multiple chart recommendations, Query Intent JSON objects, SQL result summaries, or BI analysis goals, especially when turning generated charts into a coherent dashboard.
+trigger_conditions:
+  - 已有图表建议、KPI 或多块分析结果，要编排 dashboard JSON
+  - 用户明确要生成看板、仪表盘排版
+when_not_to_use:
+  - 尚无图表或 KPI 数据
+  - 用户只要单图推荐（用 chatbi-chart-recommendation）
+required_context:
+  - 上游 Observation 含 charts/kpis 或 chart specs
+validator_requires:
+  - prior_observation
 ---
 
 # Dashboard Orchestration

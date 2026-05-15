@@ -59,8 +59,8 @@
 
 | 轮次 | 完成内容                                                                                                             | 验证                                                                                        |
 | ---- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| 140  | Skill YAML 元数据（选用/禁用/必备上下文）注入单/多 Agent 提示；`skill_call_validator` 执行前校验 + `validation_rejected` trace 延迟反馈；11 个 SKILL.md 补全 | `ruff check/format`、`pytest tests/test_skill_metadata_parse.py tests/test_skill_call_validator.py tests/test_react_runner.py tests/test_multi_agent_manager.py -q` |
 | 139  | 对话「中止」：LLM 调用可响应 `/abort`；多专线子任务流式循环内轮询中止；SSE 在断连或中止时停止拉流；前端 `fetch` 同步 `AbortSignal` | `ruff`、`pytest tests/test_abort_async.py tests/test_react_runner.py tests/test_multi_agent_manager.py -q`；`frontend` ESLint |
-| 135  | 经营建议 KPI 全 0：`chatbi-decision-advisor` 与问数共用「用户原述」入参；解析「2026 年前四个月」时间窗；决策 SQL WHERE 同列多 `=` 合并为 `IN` | `ruff check/format`、`pytest tests/test_decision_advisor_focus.py tests/test_executor_file_ingestion_args.py -q` |
 | 136  | 多 Agent 上传采纳看板：宽度随主栏自适应；KPI/图表按数量与断点网格排布（单指标全宽+大屏双列），表头与卡片 `min-w-0` 防溢出 | `frontend` ESLint |
 | 137  | Manager：`上传路径/采纳/上传提案` 会话线索注入规划；system 增加路由硬约束与专线技能边界；`test_multi_agent_manager` 覆盖线索与 LLM 入参 | `ruff check/format`、`pytest tests/test_multi_agent_manager.py -q` |
 | 138  | `load_messages_ui` 恢复 `dashboardReady`/`analysisProposal`/`planSummary`，离开聊天页再返回可看板；`test_session_repo_payload` | `pytest tests/test_session_repo_payload.py -q`、`ruff` |

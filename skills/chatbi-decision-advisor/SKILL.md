@@ -1,6 +1,16 @@
 ---
 name: chatbi-decision-advisor
 description: Use when Codex or another agent needs to generate rule-based decision recommendations from the local ChatBI demo database by computing sales, target achievement, gross margin, region, channel, product, and customer retention metrics first, then deriving structured business advice, actions, priorities, and evidence. Use for 决策意见, 经营建议, 管理建议, 下一步动作, and recommendation generation from existing ChatBI data.
+trigger_conditions:
+  - 用户要经营建议、决策意见、管理建议或下一步动作
+  - 问题含区域/渠道/产品等业务范围可供脚本取数
+when_not_to_use:
+  - 用户只要单一指标查询结果（用 chatbi-semantic-query）
+  - 对话主题是上传文件分析
+required_context:
+  - 演示库问数场景；首参保留用户原述
+validator_requires:
+  - no_upload_path_in_thread
 ---
 
 # ChatBI Decision Advisor

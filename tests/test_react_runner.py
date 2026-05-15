@@ -19,7 +19,25 @@ cursors_stub.DictCursor = object
 sys.modules.setdefault("pymysql.cursors", cursors_stub)
 
 from backend.agent.react_runner import _auto_analysis_args, stream_chat_react
+from backend.agent.prompt_builder import SkillDoc, scan_skills_enabled
 from backend.config import settings
+
+
+def _skill_docs_without_validator_requires() -> list[SkillDoc]:
+    docs = scan_skills_enabled(settings.skills_dir)
+    return [
+        SkillDoc(
+            d.name,
+            d.description,
+            d.content,
+            d.skill_dir,
+            trigger_conditions=d.trigger_conditions,
+            when_not_to_use=d.when_not_to_use,
+            required_context=d.required_context,
+            validator_requires=[],
+        )
+        for d in docs
+    ]
 
 
 async def _collect(events_gen):
@@ -162,6 +180,7 @@ class ReactRunnerTest(unittest.TestCase):
                             stream_chat_react(
                                 [{"role": "user", "content": "请推荐图表"}],
                                 trace_id="t3",
+                                skill_docs=_skill_docs_without_validator_requires(),
                             )
                         )
                         chart_events = [e for e in events if e.get("type") == "chart"]
@@ -335,7 +354,10 @@ class ReactRunnerTest(unittest.TestCase):
                                 [
                                     {
                                         "role": "user",
-                                        "content": "请根据我上传的文件生成可视化图表",
+                                        "content": (
+                                            "请根据我上传的文件 /tmp/chatbi-uploads/sample.csv "
+                                            "生成可视化图表"
+                                        ),
                                     }
                                 ],
                                 trace_id="t6",
@@ -523,6 +545,14 @@ class ReactRunnerTest(unittest.TestCase):
             "skill_args": ["请推荐指标"],
             "thought": "生成可确认的指标方案",
         }
+        file_result = {
+            "kind": "file_ingestion",
+            "text": "文件读取完成",
+            "data": {
+                "file": "/tmp/chatbi-uploads/sample.csv",
+                "rows": [{"门店": "南京东路店", "销售额": "100"}],
+            },
+        }
         auto_result = {
             "kind": "auto_analysis",
             "text": "请确认是否采纳以下指标。",
@@ -542,19 +572,67 @@ class ReactRunnerTest(unittest.TestCase):
                     "backend.agent.react_runner.call_llm_for_react_step",
                     new_callable=AsyncMock,
                 ) as mock_llm:
-                    mock_llm.return_value = first
-                    with patch("backend.agent.react_runner.run_script") as mock_run:
-                        mock_run.return_value = auto_result
+                    mock_llm.side_effect = [first, first]
+
+                    def _run_script(skill_doc, args, **kwargs):
+                        if skill_doc.name == "chatbi-file-ingestion":
+                            return file_result
+                        if skill_doc.name == "chatbi-auto-analysis":
+                            return auto_result
+                        raise AssertionError(skill_doc.name)
+
+                    with patch(
+                        "backend.agent.react_runner.run_script",
+                        side_effect=_run_script,
+                    ):
                         events = await _collect(
                             stream_chat_react(
-                                [{"role": "user", "content": "请分析上传文件适合哪些指标"}],
+                                [
+                                    {
+                                        "role": "user",
+                                        "content": (
+                                            "请分析上传文件 /tmp/chatbi-uploads/sample.csv "
+                                            "适合哪些指标"
+                                        ),
+                                    }
+                                ],
                                 trace_id="t9",
                             )
                         )
-                        mock_llm.assert_awaited_once()
-                        mock_run.assert_called_once()
+                        self.assertEqual(mock_llm.await_count, 2)
                         self.assertTrue([e for e in events if e.get("type") == "analysis_proposal"])
                         self.assertEqual(events[-1].get("type"), "done")
+
+        asyncio.run(run())
+
+    def test_validation_rejects_chart_without_prior_observation(self):
+        first = {
+            "action": "call_skill",
+            "skill": "chatbi-chart-recommendation",
+            "skill_args": ["请推荐图表"],
+            "thought": "直接推荐",
+        }
+
+        async def run():
+            cfg = replace(settings, agent_react=True, agent_max_steps=3)
+            with patch("backend.agent.react_runner.settings", cfg):
+                with patch(
+                    "backend.agent.react_runner.call_llm_for_react_step",
+                    new_callable=AsyncMock,
+                ) as mock_llm:
+                    mock_llm.return_value = first
+                    with patch("backend.agent.react_runner.run_script") as mock_run:
+                        events = await _collect(
+                            stream_chat_react(
+                                [{"role": "user", "content": "请推荐图表"}],
+                                trace_id="t-val",
+                            )
+                        )
+                        mock_run.assert_not_called()
+                        thinking = " ".join(
+                            e.get("content", "") for e in events if e.get("type") == "thinking"
+                        )
+                        self.assertIn("技能校验未通过", thinking)
 
         asyncio.run(run())
 

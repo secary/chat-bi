@@ -42,6 +42,23 @@ class ChatbiComparisonMonthParseTest(unittest.TestCase):
         self.assertEqual(cur, 3)
         self.assertEqual(prev, 2)
 
+    def test_pair_xiangdui(self) -> None:
+        q = "各区域2026年1月相对2月的销售额环比变化是多少？"
+        year, cur, prev = MODULE.detect_months(q, FakeDb())
+        self.assertEqual((year, cur, prev), (2026, 2, 1))
+
+    def test_pair_xiangjiao(self) -> None:
+        year, cur, prev = MODULE.detect_months("1月相较于2月销售额环比", FakeDb())
+        self.assertEqual((year, cur, prev), (2026, 2, 1))
+
+    def test_pair_duibi(self) -> None:
+        year, cur, prev = MODULE.detect_months("4月对比3月销售额环比", FakeDb())
+        self.assertEqual((year, cur, prev), (2026, 4, 3))
+
+    def test_findall_fallback_two_months(self) -> None:
+        year, cur, prev = MODULE.detect_months("2026年1月2月各区域销售额", FakeDb())
+        self.assertEqual((year, cur, prev), (2026, 2, 1))
+
 
 if __name__ == "__main__":
     unittest.main()

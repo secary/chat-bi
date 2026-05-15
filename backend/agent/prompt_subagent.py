@@ -52,6 +52,16 @@ def _react_upload_section(slugs: Set[str]) -> str:
     return "\n## 上传与文件（仅适用于本专线已列出的技能）\n" + "\n".join(lines)
 
 
+def _react_comparison_retry_rule(slugs: Set[str]) -> str:
+    if "chatbi-comparison" not in slugs:
+        return ""
+    return (
+        "- 环比/对比：若 Observation 的 comparison_period 或列名月份与用户原述/交办不符，"
+        "或对比期数值全为 0，必须再 call_skill（首参改为显式「X月和Y月」句式），不得直接 finish；"
+        "重试仍失败再 finish 说明原因。"
+    )
+
+
 def _react_preview_rule(slugs: Set[str]) -> str:
     alts: List[str] = []
     for slug, label in (
@@ -118,6 +128,7 @@ def build_react_system_prompt_for_subagent(skills_docs: List[SkillDoc]) -> str:
         AGENT_REACT_SUBAGENT_HEADER,
         _react_upload_section(slugs),
         AGENT_REACT_SUBAGENT_JSON,
+        _react_comparison_retry_rule(slugs),
         _react_preview_rule(slugs),
         "\n## 可用 Skill\n",
         *_skills_markdown_lines(skills_docs),

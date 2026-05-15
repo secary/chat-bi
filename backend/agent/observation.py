@@ -64,7 +64,15 @@ def summarize_observation(skill_name: str, result: Dict[str, Any]) -> str:
         cols = list(rows[0].keys()) if rows else []
         base["columns"] = cols
         base["sample_rows"] = rows[:5]
-    else:
+    if skill_name == "chatbi-comparison" and isinstance(data, dict):
+        meta = data.get("comparison_meta")
+        if isinstance(meta, dict):
+            base["comparison_period"] = {
+                "year": meta.get("year"),
+                "cur_month": meta.get("cur_month"),
+                "prev_month": meta.get("prev_month"),
+            }
+    if not rows:
         base["text_excerpt"] = text
         base["kpis"] = result.get("kpis") or []
         if skill_name == "chatbi-semantic-query" and isinstance(data, dict) and not rows:

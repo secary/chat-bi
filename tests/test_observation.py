@@ -43,6 +43,22 @@ class ObservationTest(unittest.TestCase):
         self.assertIn("sql_excerpt", payload)
         self.assertIn("empty_result_hint", payload)
 
+    def test_summarize_comparison_includes_comparison_period(self):
+        result = {
+            "kind": "table",
+            "text": "2026年2月 vs 1月",
+            "data": {
+                "rows": [{"dimension": "华东", "2月销售额": 100, "1月销售额": 90}],
+                "comparison_meta": {"year": 2026, "cur_month": 2, "prev_month": 1},
+            },
+        }
+        raw = summarize_observation("chatbi-comparison", result)
+        payload = json.loads(raw)
+        self.assertEqual(
+            payload["comparison_period"],
+            {"year": 2026, "cur_month": 2, "prev_month": 1},
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

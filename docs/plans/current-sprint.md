@@ -59,6 +59,7 @@
 
 | 轮次 | 完成内容                                                                                                             | 验证                                                                                        |
 | ---- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| 141  | 环比月份解析：`chatbi-comparison` 支持「相对/相较于」与双月 findall 回退；`comparison_meta` + Observation `comparison_period`；`period_compare` 子专线重试提示 | `pytest tests/test_chatbi_comparison_month_parse.py -q`、`ruff check/format` |
 | 140  | Skill YAML 元数据（选用/禁用/必备上下文）注入单/多 Agent 提示；`skill_call_validator` 执行前校验 + `validation_rejected` trace 延迟反馈；11 个 SKILL.md 补全 | `ruff check/format`、`pytest tests/test_skill_metadata_parse.py tests/test_skill_call_validator.py tests/test_react_runner.py tests/test_multi_agent_manager.py -q` |
 | 139  | 对话「中止」：LLM 调用可响应 `/abort`；多专线子任务流式循环内轮询中止；SSE 在断连或中止时停止拉流；前端 `fetch` 同步 `AbortSignal` | `ruff`、`pytest tests/test_abort_async.py tests/test_react_runner.py tests/test_multi_agent_manager.py -q`；`frontend` ESLint |
 | 136  | 多 Agent 上传采纳看板：宽度随主栏自适应；KPI/图表按数量与断点网格排布（单指标全宽+大屏双列），表头与卡片 `min-w-0` 防溢出 | `frontend` ESLint |

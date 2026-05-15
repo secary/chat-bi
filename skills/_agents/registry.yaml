@@ -31,6 +31,7 @@ agents:
     role_prompt: |-
       你是【环比与经营对比】专线：专门处理「环比」「月度对比」「比上月/上月」等跨期指标对比类问题。
       只使用 `chatbi-comparison`，将用户或 Manager 交办中的原问句作为脚本首参；不要编造未在 Observation 中出现的对比结果。
+      调用后对照 Observation 的 comparison_period / 列名中的月份与【用户原述】【Manager 交办】是否一致；若月份不符、对比期全为 0 或无法计算环比，不得直接 finish，应再 call_skill 并将首参改写为显式双月句式（如「2026年1月和2月各区域销售额环比」），保留指标与维度词；改写后仍失败再 finish 说明已重试。
     skills:
       - chatbi-comparison
 

@@ -151,27 +151,43 @@ def detect_mode(question: str) -> str:
     return "month_pair"
 
 
-def detect_months(question: str, db: MysqlCli) -> Tuple[int, int, int]:
-    """Return (year, current_month, prev_month) for month_pair mode."""
-    q = _normalize_month_placeholders(_q(question))
-    pair = re.search(r"(\d{1,2})月[和与对比vsvs]+(\d{1,2})月", q)
-    if pair:
-        m1, m2 = int(pair.group(1)), int(pair.group(2))
-        return 2026, max(m1, m2), min(m1, m2)
-    single = re.search(r"(\d{1,2})月", q)
-    if single:
-        cur = int(single.group(1))
-        return 2026, cur, (cur - 1) if cur > 1 else 12
-    rows = db.query(
-        "SELECT MAX(MONTH(order_date)) AS m FROM sales_order WHERE YEAR(order_date)=2026"
-    )
-    cur = int(rows[0]["m"]) if rows else 4
-    return 2026, cur, (cur - 1) if cur > 1 else 12
+_MONTH_CONNECTOR = r"(?:和|与|对比|较|对|vs|相对|相较于|相比|对照)+"
+
+
+def _pair_from_two_months(m1: int, m2: int) -> Tuple[int, int]:
+    return max(m1, m2), min(m1, m2)
 
 
 def detect_year(question: str) -> int:
     m = re.search(r"(202\d)年", question)
     return int(m.group(1)) if m else 2026
+
+
+def detect_months(question: str, db: MysqlCli) -> Tuple[int, int, int]:
+    """Return (year, current_month, prev_month) for month_pair mode."""
+    year = detect_year(question)
+    q = _normalize_month_placeholders(_q(question))
+    pair = re.search(rf"(\d{{1,2}})月{_MONTH_CONNECTOR}(\d{{1,2}})月", q)
+    if pair:
+        m1, m2 = int(pair.group(1)), int(pair.group(2))
+        cur, prev = _pair_from_two_months(m1, m2)
+        return year, cur, prev
+    found = [int(m) for m in re.findall(r"(\d{1,2})月", q)]
+    distinct: List[int] = []
+    for m in found:
+        if m not in distinct:
+            distinct.append(m)
+    if len(distinct) >= 2:
+        cur, prev = _pair_from_two_months(distinct[0], distinct[1])
+        return year, cur, prev
+    if len(distinct) == 1:
+        cur = distinct[0]
+        return year, cur, (cur - 1) if cur > 1 else 12
+    rows = db.query(
+        f"SELECT MAX(MONTH(order_date)) AS m FROM sales_order WHERE YEAR(order_date)={year}"
+    )
+    cur = int(rows[0]["m"]) if rows else 4
+    return year, cur, (cur - 1) if cur > 1 else 12
 
 
 # ---------------------------------------------------------------------------
@@ -262,7 +278,10 @@ def run_month_pair(
         "kind": "table",
         "text": text,
         "chart_plan": chart_plan,
-        "data": {"rows": raw_rows},
+        "data": {
+            "rows": raw_rows,
+            "comparison_meta": {"year": year, "cur_month": cur, "prev_month": prev},
+        },
         "charts": [],
         "kpis": kpis,
     }

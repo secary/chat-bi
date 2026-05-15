@@ -91,8 +91,7 @@ AGENT_REACT_SUBAGENT_HEADER = """你是 ChatBI 的一条「子任务专线」ReA
 """
 
 
-AGENT_REACT_SUBAGENT_JSON = (
-    """## 每一步 JSON 字段
+AGENT_REACT_SUBAGENT_JSON = """## 每一步 JSON 字段
 - `action`（必填）：`call_skill`、`finish` 或 `ask`
 - `thought`（可选）：一句中文简要思考
 
@@ -117,9 +116,7 @@ AGENT_REACT_SUBAGENT_JSON = (
 - 意图不清时输出 `ask`，不得臆断。
 - 每轮最多一次 `call_skill` 或 `ask`；需要多技能时分多轮输出。
 - 演示数据默认年份为 2026；不要把用户未给出的年份/维度擅自改写。
-- """
-    + SKILL_SELECTION_HINT
-)
+- """ + SKILL_SELECTION_HINT
 
 
 def build_react_system_prompt_for_subagent(skills_docs: List[SkillDoc]) -> str:

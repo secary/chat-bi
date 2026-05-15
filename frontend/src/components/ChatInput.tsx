@@ -108,7 +108,8 @@ export function ChatInput({ onSend, onAbort, loading, disabled = false }: ChatIn
         />
         <button
           type="submit"
-          disabled={loading || uploading || !message.trim() || disabled}
+          disabled={loading ? false : (uploading || !message.trim() || disabled)}
+          onClick={loading ? undefined : undefined}
           className={`h-11 shrink-0 rounded-xl px-5 text-sm font-medium transition-colors active:scale-[0.97] ${
             loading
               ? 'bg-red-500 text-white hover:bg-red-600'

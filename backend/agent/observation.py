@@ -1,21 +1,44 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any, Dict
 
-"""
-turn skill result into a compact json string format for llm input.
-"""
+# Compact observation summaries for agent tool results (fed back into agent prompts).
+
+_WHERE_SPLIT = re.compile(r"\bWHERE\b", re.IGNORECASE)
+_GROUP_ORDER_LIMIT = re.compile(r"\b(GROUP\s+BY|ORDER\s+BY|LIMIT)\b", re.IGNORECASE)
+_EQ_COL_PATTERN = re.compile(r"^`([^`]+)`\s*=\s*")
 
 
-"""
-turn skill result into a compact json string format for llm input.
-"""
+def _where_clause_excerpt(sql: str) -> str:
+    m = _WHERE_SPLIT.search(sql)
+    if not m:
+        return ""
+    tail = sql[m.end() :].strip()
+    cut = _GROUP_ORDER_LIMIT.search(tail)
+    if cut:
+        return tail[: cut.start()].strip()
+    return tail
 
 
-"""
-turn skill result into a compact json string format for llm input.
-"""
+def _where_has_repeated_equality_on_same_column(where_sql: str) -> bool:
+    """Heuristic: multiple ``col =`` on the same column (not IN) often contradict."""
+    if not where_sql.strip():
+        return False
+    parts = [p.strip() for p in where_sql.split(" AND ")]
+    seen_eq: set[str] = set()
+    for part in parts:
+        if " IN (" in part.upper():
+            continue
+        em = _EQ_COL_PATTERN.match(part)
+        if not em:
+            continue
+        col = em.group(1)
+        if col in seen_eq:
+            return True
+        seen_eq.add(col)
+    return False
 
 
 def summarize_observation(skill_name: str, result: Dict[str, Any]) -> str:
@@ -34,14 +57,26 @@ def summarize_observation(skill_name: str, result: Dict[str, Any]) -> str:
         "error": None,
     }
 
+    if isinstance(data, dict) and isinstance(data.get("rows"), list):
+        base["row_count"] = len(rows)
+
     if rows:
         cols = list(rows[0].keys()) if rows else []
-        base["row_count"] = len(rows)
         base["columns"] = cols
         base["sample_rows"] = rows[:5]
     else:
         base["text_excerpt"] = text
         base["kpis"] = result.get("kpis") or []
+        if skill_name == "chatbi-semantic-query" and isinstance(data, dict) and not rows:
+            sql = str(data.get("sql") or "")
+            if sql:
+                base["sql_excerpt"] = sql[:800]
+            where_ex = _where_clause_excerpt(sql)
+            if where_ex and _where_has_repeated_equality_on_same_column(where_ex):
+                base["empty_result_hint"] = (
+                    "WHERE 中对同一列出现多个「=」等值条件时通常互斥，查询恒为空；"
+                    "应改为 IN 或单一条件。若由 Manager 交办枚举维度值引起，可仅用用户原述重试问数。"
+                )
 
     charts = result.get("charts") or []
     if charts:

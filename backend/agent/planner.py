@@ -33,9 +33,12 @@ async def call_llm_for_react_step(
         raise RuntimeError(f"LLM 调用失败：{type(exc).__name__}: {exc}") from exc
 
     content = resp.choices[0].message.content
-    if not content:
+    if content is None or not str(content).strip():
         return None
-    return parse_json_object(content)
+    try:
+        return parse_json_object(content)
+    except (json.JSONDecodeError, ValueError):
+        return None
 
 
 """
@@ -62,19 +65,23 @@ async def call_llm_for_plan(
         raise RuntimeError(f"LLM 调用失败：{type(exc).__name__}: {exc}") from exc
 
     content = resp.choices[0].message.content
-    if not content:
+    if content is None or not str(content).strip():
         return None
-    return parse_json_object(content)
-
-
-"""
-
-"""
+    try:
+        return parse_json_object(content)
+    except (json.JSONDecodeError, ValueError):
+        return None
 
 
 def parse_json_object(content: str) -> Dict[str, Any]:
     text = content.strip()
+    if not text:
+        raise ValueError("empty JSON content")
     fence_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
     if fence_match:
-        text = fence_match.group(1)
-    return json.loads(text)
+        text = fence_match.group(1).strip()
+    decoder = json.JSONDecoder()
+    obj, _end = decoder.raw_decode(text)
+    if not isinstance(obj, dict):
+        raise ValueError("JSON root must be an object")
+    return obj

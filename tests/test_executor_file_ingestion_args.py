@@ -59,3 +59,18 @@ def test_file_ingestion_includes_rows_after_metric_confirmation():
     ]
     out = skill_args_for_execution("chatbi-file-ingestion", ["继续"], messages)
     assert out == [path, "--question", "采纳全部指标并生成看板", "--include-rows"]
+
+
+def test_semantic_query_prefers_user_original_block_in_composed_message():
+    composed = (
+        "【Manager 交办】\n华东华北华南西南\n\n【用户原述】\n各个区域的销售额可以做成柱状图来划分。"
+    )
+    messages = [{"role": "user", "content": composed}]
+    out = skill_args_for_execution("chatbi-semantic-query", [], messages)
+    assert out == ["各个区域的销售额可以做成柱状图来划分。"]
+
+
+def test_semantic_query_falls_back_to_full_user_when_no_original_marker():
+    messages = [{"role": "user", "content": "1-4月各区域销售额排行"}]
+    out = skill_args_for_execution("chatbi-semantic-query", [], messages)
+    assert out == ["1-4月各区域销售额排行"]

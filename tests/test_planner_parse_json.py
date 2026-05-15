@@ -40,6 +40,12 @@ class ParseJsonObjectTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             parse_json_object("[1, 2]")
 
+    def test_empty_content_raises_value_error(self) -> None:
+        with self.assertRaises(ValueError):
+            parse_json_object("")
+        with self.assertRaises(ValueError):
+            parse_json_object("   \n")
+
 
 if __name__ == "__main__":
     unittest.main()

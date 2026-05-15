@@ -13,6 +13,7 @@ from backend.config import settings
 _UPLOAD_PATH_RE = re.compile(r"/tmp/chatbi-uploads/[A-Za-z0-9._-]+", re.IGNORECASE)
 _FILE_INGESTION_VALUE_OPTIONS = {"--table", "--sample-size", "--question"}
 _FILE_INGESTION_FLAG_OPTIONS = {"--include-rows"}
+_USER_ORIGINAL_MARKER = "【用户原述】"
 
 
 def find_skill(skills: List[SkillDoc], name: str) -> Optional[SkillDoc]:
@@ -26,8 +27,11 @@ def find_skill(skills: List[SkillDoc], name: str) -> Optional[SkillDoc]:
 def skill_args_for_execution(
     skill_name: str, args: List[str], messages: List[Dict[str, str]]
 ) -> List[str]:
+    if skill_name == "chatbi-semantic-query":
+        latest_user = latest_user_question_for_semantic_query(messages)
+        if latest_user:
+            return [latest_user]
     if skill_name in {
-        "chatbi-semantic-query",
         "chatbi-decision-advisor",
         "chatbi-semantic-processing",
         "chatbi-auto-analysis",
@@ -47,6 +51,16 @@ def latest_user_content(messages: List[Dict[str, str]]) -> str:
         if message.get("role") == "user" and message.get("content"):
             return message["content"]
     return ""
+
+
+def latest_user_question_for_semantic_query(messages: List[Dict[str, str]]) -> str:
+    """Prefer the user-original block from multi-agent composed messages."""
+    content = latest_user_content(messages)
+    if not content or _USER_ORIGINAL_MARKER not in content:
+        return content
+    idx = content.rfind(_USER_ORIGINAL_MARKER)
+    tail = content[idx + len(_USER_ORIGINAL_MARKER) :].strip()
+    return tail or content
 
 
 def file_ingestion_args(args: List[str], messages: List[Dict[str, str]]) -> List[str]:

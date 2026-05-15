@@ -9,8 +9,6 @@ when_not_to_use:
   - 用户只要单图推荐（用 chatbi-chart-recommendation）
 required_context:
   - 上游 Observation 含 charts/kpis 或 chart specs
-validator_requires:
-  - prior_observation
 ---
 
 # Dashboard Orchestration

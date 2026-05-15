@@ -9,8 +9,6 @@ when_not_to_use:
   - 对话主题是上传文件分析
 required_context:
   - 演示库问数场景；首参保留用户原述
-validator_requires:
-  - no_upload_path_in_thread
 ---
 
 # ChatBI Decision Advisor

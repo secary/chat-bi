@@ -23,8 +23,6 @@ when_not_to_use:
   - 用户问 B
 required_context:
   - 需要 C
-validator_requires:
-  - prior_observation
 ---
 
 # Body
@@ -34,7 +32,6 @@ validator_requires:
         self.assertEqual(meta["trigger_conditions"], ["用户问 A"])
         self.assertEqual(meta["when_not_to_use"], ["用户问 B"])
         self.assertEqual(meta["required_context"], ["需要 C"])
-        self.assertEqual(meta["validator_requires"], ["prior_observation"])
         self.assertIn("# Body", body)
 
     def test_legacy_single_line_frontmatter_fallback(self):
@@ -67,11 +64,10 @@ Content
         self.assertIn("禁用1", joined)
         self.assertIn("**必备上下文**", joined)
 
-    def test_scan_skills_loads_validator_requires_from_disk(self):
+    def test_scan_skills_loads_trigger_conditions_from_disk(self):
         docs = scan_skills(settings.skills_dir)
         by_slug = {d.skill_dir.name: d for d in docs}
         chart = by_slug.get("chatbi-chart-recommendation")
         self.assertIsNotNone(chart)
         assert chart is not None
-        self.assertIn("prior_observation", chart.validator_requires)
         self.assertTrue(chart.trigger_conditions)

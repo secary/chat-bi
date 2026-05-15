@@ -8,8 +8,6 @@ when_not_to_use:
   - 对话主题是上传文件分析
 required_context:
   - 首参为用户原问句；演示数据默认 2026 年
-validator_requires:
-  - no_upload_path_in_thread
 ---
 
 # ChatBI Comparison

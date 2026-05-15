@@ -59,6 +59,7 @@
 
 | 轮次 | 完成内容                                                                                                             | 验证                                                                                        |
 | ---- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| 142  | 移除 Agent 执行前技能校验（`skill_call_validator`）；各 SKILL 去掉 `validator_requires`；由 LLM 提示与专线边界选技能 | `pytest tests/test_react_runner.py tests/test_skill_metadata_parse.py -q`、`ruff check/format` |
 | 141  | 环比月份解析：`chatbi-comparison` 支持「相对/相较于」与双月 findall 回退；`comparison_meta` + Observation `comparison_period`；`period_compare` 子专线重试提示 | `pytest tests/test_chatbi_comparison_month_parse.py -q`、`ruff check/format` |
 | 140  | Skill YAML 元数据（选用/禁用/必备上下文）注入单/多 Agent 提示；`skill_call_validator` 执行前校验 + `validation_rejected` trace 延迟反馈；11 个 SKILL.md 补全 | `ruff check/format`、`pytest tests/test_skill_metadata_parse.py tests/test_skill_call_validator.py tests/test_react_runner.py tests/test_multi_agent_manager.py -q` |
 | 139  | 对话「中止」：LLM 调用可响应 `/abort`；多专线子任务流式循环内轮询中止；SSE 在断连或中止时停止拉流；前端 `fetch` 同步 `AbortSignal` | `ruff`、`pytest tests/test_abort_async.py tests/test_react_runner.py tests/test_multi_agent_manager.py -q`；`frontend` ESLint |

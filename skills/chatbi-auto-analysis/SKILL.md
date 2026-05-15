@@ -9,8 +9,6 @@ when_not_to_use:
   - 演示库自然语言问数
 required_context:
   - 上传路径或上一轮 file-ingestion 的 rows
-validator_requires:
-  - upload_path_or_rows
 ---
 
 ## Workflow

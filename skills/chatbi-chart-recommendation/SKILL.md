@@ -9,8 +9,6 @@ when_not_to_use:
   - 用户只要原始数值、未要求可视化
 required_context:
   - 上一步取数或上传解析的 Observation
-validator_requires:
-  - prior_observation
 ---
 
 # Chart Recommendation

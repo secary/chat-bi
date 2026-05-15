@@ -12,8 +12,6 @@ when_not_to_use:
   - 用户只要指标口径不要数值（用 chatbi-metric-explainer）
 required_context:
   - 演示库可连接；首参优先保留用户原问句
-validator_requires:
-  - no_upload_path_in_thread
 ---
 
 # ChatBI Semantic Query

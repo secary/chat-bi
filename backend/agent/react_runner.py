@@ -25,11 +25,6 @@ from backend.agent.prompt_builder import (
 from backend.agent.prompt_subagent import build_react_system_prompt_for_subagent
 from backend.agent.query_decision import is_query_plus_decision_text
 from backend.agent.react_followup import run_decision_followup
-from backend.agent.skill_call_validator import (
-    dialogue_text_from_messages,
-    validate_skill_call,
-    validation_observation_payload,
-)
 from backend.agent.upload_context import get_cached_file_data
 from backend.config import settings
 from backend.trace import log_event
@@ -262,7 +257,6 @@ def _skill_log_payload(
     payload: Dict[str, Any] = {
         "skill": skill_name,
         "agent_id": agent_id or "single",
-        "validator_requires": list(skill_doc.validator_requires or []),
     }
     if extra:
         payload.update(extra)
@@ -484,42 +478,6 @@ async def stream_chat_react(
             }
             yield {"type": "done", "content": None}
             return
-
-        validation = validate_skill_call(
-            skill_doc,
-            allowed_slugs=allowed_slugs,
-            dialogue_text=dialogue_text_from_messages(working),
-            last_result=last_result,
-            user_text=user_text,
-        )
-        if not validation.ok:
-            raw_args = plan.get("skill_args") or []
-            assistant_note = json.dumps(
-                {"action": "call_skill", "skill": skill_name, "skill_args": raw_args},
-                ensure_ascii=False,
-            )
-            obs = validation_observation_payload(skill_name, validation, allowed_slugs)
-            log_event(
-                trace_id,
-                "agent.skill",
-                "validation_rejected",
-                validation.reason[:500],
-                payload={
-                    "proposed_skill": skill_name,
-                    "reason": validation.reason,
-                    "rule": validation.rule,
-                    "user_snippet": (user_text or "")[:200],
-                    "agent_id": specialist_agent_id or "single",
-                },
-                level="WARNING",
-            )
-            working.append({"role": "assistant", "content": assistant_note})
-            working.append({"role": "user", "content": OBS_HEADER + obs})
-            yield {
-                "type": "thinking",
-                "content": f"技能校验未通过：{validation.reason}",
-            }
-            continue
 
         yield {"type": "thinking", "content": f"正在执行 Skill「{skill_name}」..."}
 

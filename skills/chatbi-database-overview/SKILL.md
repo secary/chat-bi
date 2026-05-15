@@ -9,8 +9,6 @@ when_not_to_use:
   - 用户在上传文件上分析（非本技能职责）
 required_context:
   - 演示业务库可连接
-validator_requires:
-  - no_metric_query_in_thread
 ---
 
 # ChatBI Database Overview

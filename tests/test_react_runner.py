@@ -19,25 +19,8 @@ cursors_stub.DictCursor = object
 sys.modules.setdefault("pymysql.cursors", cursors_stub)
 
 from backend.agent.react_runner import _auto_analysis_args, stream_chat_react
-from backend.agent.prompt_builder import SkillDoc, scan_skills_enabled
+from backend.agent.prompt_builder import scan_skills_enabled
 from backend.config import settings
-
-
-def _skill_docs_without_validator_requires() -> list[SkillDoc]:
-    docs = scan_skills_enabled(settings.skills_dir)
-    return [
-        SkillDoc(
-            d.name,
-            d.description,
-            d.content,
-            d.skill_dir,
-            trigger_conditions=d.trigger_conditions,
-            when_not_to_use=d.when_not_to_use,
-            required_context=d.required_context,
-            validator_requires=[],
-        )
-        for d in docs
-    ]
 
 
 async def _collect(events_gen):
@@ -180,7 +163,7 @@ class ReactRunnerTest(unittest.TestCase):
                             stream_chat_react(
                                 [{"role": "user", "content": "请推荐图表"}],
                                 trace_id="t3",
-                                skill_docs=_skill_docs_without_validator_requires(),
+                                skill_docs=scan_skills_enabled(settings.skills_dir),
                             )
                         )
                         chart_events = [e for e in events if e.get("type") == "chart"]
@@ -602,37 +585,6 @@ class ReactRunnerTest(unittest.TestCase):
                         self.assertEqual(mock_llm.await_count, 2)
                         self.assertTrue([e for e in events if e.get("type") == "analysis_proposal"])
                         self.assertEqual(events[-1].get("type"), "done")
-
-        asyncio.run(run())
-
-    def test_validation_rejects_chart_without_prior_observation(self):
-        first = {
-            "action": "call_skill",
-            "skill": "chatbi-chart-recommendation",
-            "skill_args": ["请推荐图表"],
-            "thought": "直接推荐",
-        }
-
-        async def run():
-            cfg = replace(settings, agent_react=True, agent_max_steps=3)
-            with patch("backend.agent.react_runner.settings", cfg):
-                with patch(
-                    "backend.agent.react_runner.call_llm_for_react_step",
-                    new_callable=AsyncMock,
-                ) as mock_llm:
-                    mock_llm.return_value = first
-                    with patch("backend.agent.react_runner.run_script") as mock_run:
-                        events = await _collect(
-                            stream_chat_react(
-                                [{"role": "user", "content": "请推荐图表"}],
-                                trace_id="t-val",
-                            )
-                        )
-                        mock_run.assert_not_called()
-                        thinking = " ".join(
-                            e.get("content", "") for e in events if e.get("type") == "thinking"
-                        )
-                        self.assertIn("技能校验未通过", thinking)
 
         asyncio.run(run())
 

@@ -9,8 +9,6 @@ when_not_to_use:
   - 同一文件已解析且 rows 在 Observation 中（改调 chatbi-auto-analysis 或 finish）
 required_context:
   - 上传文件路径（常含 chatbi-uploads 或 /tmp/）
-validator_requires:
-  - upload_path_or_rows
 ---
 
 # ChatBI File Ingestion

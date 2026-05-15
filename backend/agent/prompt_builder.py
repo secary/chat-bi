@@ -23,7 +23,6 @@ class SkillDoc:
         trigger_conditions: List[str] | None = None,
         when_not_to_use: List[str] | None = None,
         required_context: List[str] | None = None,
-        validator_requires: List[str] | None = None,
     ):
         self.name = name
         self.description = description
@@ -32,7 +31,6 @@ class SkillDoc:
         self.trigger_conditions = list(trigger_conditions or [])
         self.when_not_to_use = list(when_not_to_use or [])
         self.required_context = list(required_context or [])
-        self.validator_requires = list(validator_requires or [])
 
 
 def _coerce_str_list(value: Any) -> List[str]:
@@ -85,7 +83,6 @@ def _skill_doc_from_path(path: Path, meta: dict[str, Any], body: str) -> SkillDo
         trigger_conditions=_coerce_str_list(meta.get("trigger_conditions")),
         when_not_to_use=_coerce_str_list(meta.get("when_not_to_use")),
         required_context=_coerce_str_list(meta.get("required_context")),
-        validator_requires=_coerce_str_list(meta.get("validator_requires")),
     )
 
 

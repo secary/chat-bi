@@ -476,8 +476,12 @@ async def stream_chat_react(
 
         skill_doc = find_skill(skills, skill_name)
         if not skill_doc:
+            available = ", ".join(sorted(allowed_slugs)) if allowed_slugs else "（无）"
             _sink_write(result_sink, last_result, last_skill_name)
-            yield {"type": "error", "content": f"未找到技能：{skill_name}"}
+            yield {
+                "type": "error",
+                "content": f"未找到技能：{skill_name}。本专线可用技能：{available}",
+            }
             yield {"type": "done", "content": None}
             return
 

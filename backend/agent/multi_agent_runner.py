@@ -202,10 +202,18 @@ async def stream_chat_multi_agent(
                 elif et == "kpi_cards":
                     pass
                 elif et == "error":
+                    err_content = str(event.get("content") or "")
                     yield {
                         "type": "thinking",
-                        "content": f"[{label}] 错误：{event.get('content')}",
+                        "content": f"[{label}] 错误：{err_content}",
                     }
+                    # Track skill-not-found errors for Manager re-planning
+                    if "未找到技能" in err_content:
+                        missing = err_content.split("未找到技能：")[-1].strip()
+                        progress_lines.append(
+                            f"[技能缺失提示] {label} 无法执行 skill「{missing}」，"
+                            f"该专线不具备此技能。Manager 应在下一轮重新指派到拥有「{missing}」的专线。"
+                        )
 
             lr = sink.get("last_result")
             lsn = sink.get("last_skill_name")
@@ -218,6 +226,15 @@ async def stream_chat_multi_agent(
                 if isinstance(lr, dict)
                 else (acc_text[:1200] if acc_text else "（无工具结果）")
             )
+            # Detect skill-not-found from accumulated text (silent failure case)
+            if "未找到技能" in acc_text and not any("未找到技能" in line for line in progress_lines):
+                missing_match = [s for s in acc_text.split("\n") if "未找到技能" in s]
+                if missing_match:
+                    missing = missing_match[0].split("未找到技能：")[-1].strip()
+                    progress_lines.append(
+                        f"[技能缺失提示] {label} 无法执行 skill「{missing}」，"
+                        f"该专线不具备此技能。Manager 应在下一轮重新指派到拥有「{missing}」的专线。"
+                    )
             obs_by_idx[orig_idx] = obs
             hi = str(task["handoff_instruction"])
             progress_lines.append(

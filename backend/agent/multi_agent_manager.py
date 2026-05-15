@@ -109,8 +109,8 @@ def _registry_capability_block() -> str:
         if not docs:
             continue
         lab = agent_label(aid)
-        names = ", ".join(d.skill_dir.name for d in docs)
-        lines_out.append(f"- `{aid}`（{lab}）可用技能：{names}")
+        names = ", ".join(f"`{d.skill_dir.name}`" for d in docs)
+        lines_out.append(f"- `{aid}`（{lab}）拥有：{names}")
     return (
         "\n".join(lines_out) if lines_out else "（当前无可用专线：请检查 registry 与技能启用状态）"
     )
@@ -119,8 +119,15 @@ def _registry_capability_block() -> str:
 def _manager_routing_rules_block() -> str:
     return """## 路由硬约束（违反将导致子专线报错或无法出数）
 - **upload_analyst**：用户本地上传文件（路径常含 `chatbi-uploads`、`/tmp/…csv|xlsx`）、上传表分析提案、以及用户**采纳**某上传表指标后的计算与看板，**必须**派此专线；依赖 `chatbi-file-ingestion` 与 `chatbi-auto-analysis`。
-- **demo_query**：仅用于对**演示业务库**的自然语言问数、库表概览、指标口径解释等；**不得**用于在**上传文件数据**上执行采纳或指标计算（该专线**没有** `chatbi-file-ingestion`）。
-- **viz_board**：出图/看板编排；若数据来自上传表，须依赖 **upload_analyst** 先产出表格或 Observation（`depends_on` 指向其下标），不可让 demo_query 代算上传指标。"""
+- **demo_query**：仅用于对**演示业务库**的中文自然语言问数、表/字段概览、指标口径解释与问法澄清；**不得**用于在**上传文件数据**上执行采纳或指标计算（该专线**没有** `chatbi-file-ingestion`）。
+- **period_compare**：专门处理「环比」「月度对比」「比上月/本季」等跨期对比类问题；**只有**它拥有 `chatbi-comparison`。
+- **viz_board**：出图/看板编排；若数据来自上传表，须依赖 **upload_analyst** 先产出表格或 Observation（`depends_on` 指向其下标），不可让 demo_query 代算上传指标。
+
+## 技能缺失处理
+若上一轮出现「未找到技能：XXX」的子任务失败，请检查：
+1. XXX 技能属于哪个专线（参考上方「专线与能力」表）
+2. 重新将任务指派给正确的专线
+3. **禁止**重复指派给已失败的同一专线"""
 
 
 def _manager_system_prompt(*, followup: bool) -> str:
@@ -158,7 +165,7 @@ def _manager_system_prompt(*, followup: bool) -> str:
 - 不要输出 Markdown 围栏。"""
     return f"""你是 ChatBI 多专线的 **Manager**（后续轮规划）。用户对话与「已完成子任务」摘要在用户消息中。
 请判断：是否还需派新的专线子任务；若 Observation 已足够达成用户目标，则不再派发。
-派发前请核对各专线**可用技能**，避免重复派发错误专线（例如上传采纳却派 demo_query）。
+派发前请核对各专线**拥有技能**，避免重复派发错误专线。
 
 ## 专线与能力
 {caps}

@@ -4,6 +4,7 @@ import json
 import re
 from typing import Any, Dict, List, Optional
 
+from backend.agent.abort_async import ChatAbortedError, await_with_abort
 from backend.llm_runtime import chatbi_acompletion
 
 """
@@ -12,7 +13,9 @@ Each ReAct round, tell LLM should return "action", such as skill/finish/answer/d
 
 
 async def call_llm_for_react_step(
-    system_prompt: str, messages: List[Dict[str, str]]
+    system_prompt: str,
+    messages: List[Dict[str, str]],
+    trace_id: str = "",
 ) -> Optional[Dict[str, Any]]:
     llm_messages = [
         {"role": "system", "content": system_prompt},
@@ -24,11 +27,16 @@ async def call_llm_for_react_step(
     ]
 
     try:
-        resp = await chatbi_acompletion(
-            messages=llm_messages,
-            response_format={"type": "json_object"},
-            temperature=0.1,
+        resp = await await_with_abort(
+            chatbi_acompletion(
+                messages=llm_messages,
+                response_format={"type": "json_object"},
+                temperature=0.1,
+            ),
+            trace_id,
         )
+    except ChatAbortedError:
+        raise
     except Exception as exc:
         raise RuntimeError(f"LLM 调用失败：{type(exc).__name__}: {exc}") from exc
 
@@ -47,7 +55,9 @@ async def call_llm_for_react_step(
 
 
 async def call_llm_for_plan(
-    system_prompt: str, messages: List[Dict[str, str]]
+    system_prompt: str,
+    messages: List[Dict[str, str]],
+    trace_id: str = "",
 ) -> Optional[Dict[str, Any]]:
     llm_messages = [
         {"role": "system", "content": system_prompt},
@@ -56,11 +66,16 @@ async def call_llm_for_plan(
     ]
 
     try:
-        resp = await chatbi_acompletion(
-            messages=llm_messages,
-            response_format={"type": "json_object"},
-            temperature=0.1,
+        resp = await await_with_abort(
+            chatbi_acompletion(
+                messages=llm_messages,
+                response_format={"type": "json_object"},
+                temperature=0.1,
+            ),
+            trace_id,
         )
+    except ChatAbortedError:
+        raise
     except Exception as exc:
         raise RuntimeError(f"LLM 调用失败：{type(exc).__name__}: {exc}") from exc
 

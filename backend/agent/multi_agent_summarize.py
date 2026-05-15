@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, List, Optional
 
+from backend.agent.abort_async import ChatAbortedError, await_with_abort
 from backend.agent.planner import parse_json_object
 from backend.llm_runtime import chatbi_acompletion
 from backend.trace import log_event
@@ -41,11 +42,16 @@ async def call_summarize_llm(
         {"role": "user", "content": body},
     ]
     try:
-        resp = await chatbi_acompletion(
-            messages=llm_messages,
-            response_format={"type": "json_object"},
-            temperature=0.2,
+        resp = await await_with_abort(
+            chatbi_acompletion(
+                messages=llm_messages,
+                response_format={"type": "json_object"},
+                temperature=0.2,
+            ),
+            trace_id,
         )
+    except ChatAbortedError:
+        raise
     except Exception as exc:
         log_event(
             trace_id,

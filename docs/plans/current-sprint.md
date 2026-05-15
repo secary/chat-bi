@@ -59,7 +59,7 @@
 
 | 轮次 | 完成内容                                                                                                             | 验证                                                                                        |
 | ---- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| 134  | 多 Agent 问数：同一列多枚举过滤合并为 `IN`；`chatbi-semantic-query` 入参优先取「用户原述」；ReAct/单次规划 JSON 解析失败不再抛裸异常；空结果 Observation 附 SQL 与互斥条件提示 | `ruff check/format`、`pytest tests/test_semantic_query_core.py tests/test_executor_file_ingestion_args.py tests/test_observation.py tests/test_planner_parse_json.py -q` |
+| 139  | 对话「中止」：LLM 调用可响应 `/abort`；多专线子任务流式循环内轮询中止；SSE 在断连或中止时停止拉流；前端 `fetch` 同步 `AbortSignal` | `ruff`、`pytest tests/test_abort_async.py tests/test_react_runner.py tests/test_multi_agent_manager.py -q`；`frontend` ESLint |
 | 135  | 经营建议 KPI 全 0：`chatbi-decision-advisor` 与问数共用「用户原述」入参；解析「2026 年前四个月」时间窗；决策 SQL WHERE 同列多 `=` 合并为 `IN` | `ruff check/format`、`pytest tests/test_decision_advisor_focus.py tests/test_executor_file_ingestion_args.py -q` |
 | 136  | 多 Agent 上传采纳看板：宽度随主栏自适应；KPI/图表按数量与断点网格排布（单指标全宽+大屏双列），表头与卡片 `min-w-0` 防溢出 | `frontend` ESLint |
 | 137  | Manager：`上传路径/采纳/上传提案` 会话线索注入规划；system 增加路由硬约束与专线技能边界；`test_multi_agent_manager` 覆盖线索与 LLM 入参 | `ruff check/format`、`pytest tests/test_multi_agent_manager.py -q` |

@@ -87,6 +87,7 @@ export function newTraceId(): string {
 export async function* streamChat(
   req: ChatRequest,
   traceId = newTraceId(),
+  options?: { signal?: AbortSignal },
 ): AsyncGenerator<SseEvent> {
   const response = await fetch(CHAT_URL, {
     method: 'POST',
@@ -95,6 +96,7 @@ export async function* streamChat(
       'X-Trace-Id': traceId,
     }),
     body: JSON.stringify(req),
+    signal: options?.signal,
   });
 
   if (response.status === 401) {

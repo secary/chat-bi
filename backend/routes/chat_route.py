@@ -24,7 +24,7 @@ from backend.session_repo import (
     touch_session,
     update_session_title,
 )
-from backend.agent.abort_state import clear_abort, get_abort_event
+from backend.agent.abort_state import clear_abort, get_abort_event, is_aborted
 from backend.trace import log_event
 from backend.vision.chart_table_extract import enrich_last_user_message_with_vision
 
@@ -196,18 +196,26 @@ async def chat(
                     log_event(trace_id, "http.chat", "request.disconnected", level="WARN")
                 disconnected = next_disconnected
                 _accumulate_assistant(acc, event)
-                if disconnected:
-                    continue
-                log_event(
-                    trace_id,
-                    "http.chat",
-                    "sse.event",
-                    payload={"type": event.get("type")},
-                )
-                yield {
-                    "event": "message",
-                    "data": json.dumps(event, ensure_ascii=False),
-                }
+                if not disconnected:
+                    log_event(
+                        trace_id,
+                        "http.chat",
+                        "sse.event",
+                        payload={"type": event.get("type")},
+                    )
+                    yield {
+                        "event": "message",
+                        "data": json.dumps(event, ensure_ascii=False),
+                    }
+                if disconnected or is_aborted(trace_id):
+                    if is_aborted(trace_id) and not disconnected:
+                        log_event(
+                            trace_id,
+                            "http.chat",
+                            "sse.abort_stop_consumer",
+                            level="INFO",
+                        )
+                    break
             log_event(
                 trace_id,
                 "http.chat",

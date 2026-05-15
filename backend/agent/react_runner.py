@@ -14,6 +14,7 @@ from backend.agent.executor import (
 from backend.agent.formatter import stream_result_events
 from backend.agent.intent_guard import small_talk_reply, should_skip_skill_for_message
 from backend.agent.observation import summarize_observation
+from backend.agent.abort_async import ChatAbortedError
 from backend.agent.planner import call_llm_for_react_step
 from backend.agent.prompt_builder import (
     SkillDoc,
@@ -341,7 +342,13 @@ async def stream_chat_react(
             将system prompt + 对话的上下文 + skill所执行的结果obs，一起传给LLM，得到下一步的决策。
             LLM 返回 {"thought", "action", "skill", "skill_args"}
             """
-            plan = await call_llm_for_react_step(system_prompt, working)
+            plan = await call_llm_for_react_step(system_prompt, working, trace_id=trace_id)
+        except ChatAbortedError:
+            log_event(trace_id, "agent.runner", "aborted", level="INFO")
+            yield {"type": "thinking", "content": "用户中止了查询。"}
+            _sink_write(result_sink, last_result, last_skill_name)
+            yield {"type": "done", "content": None}
+            return
         except Exception as exc:
             if last_result:
                 yield {

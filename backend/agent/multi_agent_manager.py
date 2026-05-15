@@ -13,6 +13,7 @@ from backend.agent.multi_agent_registry import (
     skills_for_agent,
 )
 from backend.agent.planner import parse_json_object
+from backend.agent.abort_async import ChatAbortedError, await_with_abort
 from backend.llm_runtime import chatbi_acompletion
 from backend.trace import log_event
 
@@ -302,11 +303,16 @@ async def call_manager_plan_llm(
         {"role": "user", "content": user_content},
     ]
     try:
-        resp = await chatbi_acompletion(
-            messages=llm_messages,
-            response_format={"type": "json_object"},
-            temperature=0.15,
+        resp = await await_with_abort(
+            chatbi_acompletion(
+                messages=llm_messages,
+                response_format={"type": "json_object"},
+                temperature=0.15,
+            ),
+            trace_id,
         )
+    except ChatAbortedError:
+        raise
     except Exception as exc:
         log_event(
             trace_id,

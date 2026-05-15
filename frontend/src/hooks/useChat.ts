@@ -46,6 +46,7 @@ export function useChat(
   const messagesRef = useRef(messages);
   const streamingRef = useRef(false);
   const currentTraceIdRef = useRef<string | null>(null);
+  const streamAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -53,7 +54,6 @@ export function useChat(
 
   useEffect(() => {
     if (sessionId == null) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- clear when session cleared
       setMessages([]);
       return;
     }
@@ -157,6 +157,8 @@ export function useChat(
       try {
         const traceIdToUse = traceId || newTraceId();
         currentTraceIdRef.current = traceIdToUse;
+        const ac = new AbortController();
+        streamAbortRef.current = ac;
         for await (const event of streamChat(
           {
             message: text,
@@ -166,6 +168,7 @@ export function useChat(
             multi_agents: multiAgents,
           },
           traceIdToUse,
+          { signal: ac.signal },
         )) {
           setMessages((prev) => {
             const idx = prev.length - 1;
@@ -208,15 +211,25 @@ export function useChat(
           });
         }
       } catch (err) {
-        logger.error('stream chat', err);
-        setMessages((prev) => {
-          const idx = prev.length - 1;
-          const last = prev[idx];
-          if (!last || last.role !== 'assistant') return prev;
-          const nextLast: ChatMessage = { ...last, error: String(err) };
-          return [...prev.slice(0, idx), nextLast];
-        });
+        const aborted =
+          err instanceof DOMException
+            ? err.name === 'AbortError'
+            : err != null &&
+              typeof err === 'object' &&
+              'name' in err &&
+              (err as { name?: string }).name === 'AbortError';
+        if (!aborted) {
+          logger.error('stream chat', err);
+          setMessages((prev) => {
+            const idx = prev.length - 1;
+            const last = prev[idx];
+            if (!last || last.role !== 'assistant') return prev;
+            const nextLast: ChatMessage = { ...last, error: String(err) };
+            return [...prev.slice(0, idx), nextLast];
+          });
+        }
       } finally {
+        streamAbortRef.current = null;
         streamingRef.current = false;
         setLoading(false);
         currentTraceIdRef.current = null;
@@ -230,6 +243,7 @@ export function useChat(
     if (tid) {
       void abortChat(tid);
     }
+    streamAbortRef.current?.abort();
   }, []);
 
   return { messages, loading, assistantPending, sendMessage, abort };

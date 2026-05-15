@@ -50,6 +50,7 @@ MODULE_SUITES: dict[str, list[str]] = {
     ],
     "agent": [
         "tests/test_agent_runner_contract.py",
+        "tests/test_abort_async.py",
         "tests/test_agent_skill_protocol.py",
         "tests/test_agent_workflow.py",
         "tests/test_chat_route_disconnect.py",

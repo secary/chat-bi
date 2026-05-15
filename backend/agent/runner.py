@@ -11,6 +11,7 @@ from backend.agent.executor import (
 )
 from backend.agent.formatter import stream_result_events
 from backend.agent.intent_guard import small_talk_reply, should_skip_skill_for_message
+from backend.agent.abort_async import ChatAbortedError
 from backend.agent.planner import call_llm_for_plan
 from backend.agent.prompt_builder import (
     SkillDoc,
@@ -162,7 +163,14 @@ async def _stream_chat_legacy(
 
     yield {"type": "thinking", "content": "正在分析您的问题，理解业务语义..."}
     log_event(trace_id, "agent.planner", "started", payload={"skill_count": len(skills)})
-    plan = await call_llm_for_plan(system_prompt, messages)
+    try:
+        plan = await call_llm_for_plan(system_prompt, messages, trace_id=trace_id)
+    except ChatAbortedError:
+        log_event(trace_id, "agent.runner", "aborted", level="INFO")
+        _legacy_sink_write(result_sink, None, None)
+        yield {"type": "thinking", "content": "用户中止了查询。"}
+        yield {"type": "done", "content": None}
+        return
     log_event(
         trace_id,
         "agent.planner",

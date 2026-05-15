@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
+from backend.agent.abort_async import ChatAbortedError
 from backend.agent.multi_agent_manager import call_manager_plan_llm, validate_and_order_tasks
 from backend.agent.multi_agent_messages import build_subtask_messages
 from backend.agent.multi_agent_registry import (
@@ -72,12 +73,18 @@ async def stream_chat_multi_agent(
             return
 
         digest = "\n\n".join(progress_lines)
-        plan = await call_manager_plan_llm(
-            messages,
-            trace_id=trace_id,
-            round_index=rnd,
-            progress_digest=digest,
-        )
+        try:
+            plan = await call_manager_plan_llm(
+                messages,
+                trace_id=trace_id,
+                round_index=rnd,
+                progress_digest=digest,
+            )
+        except ChatAbortedError:
+            log_event(trace_id, "agent.multi", "aborted", level="INFO")
+            yield {"type": "thinking", "content": "用户中止了查询。"}
+            yield {"type": "done", "content": None}
+            return
         if not plan or not isinstance(plan, dict):
             if rnd == 1:
                 log_event(trace_id, "agent.multi", "fallback_single", level="INFO")
@@ -176,6 +183,11 @@ async def stream_chat_multi_agent(
                 result_sink=sink,
                 subagent_mode=True,
             ):
+                if _is_aborted(trace_id):
+                    log_event(trace_id, "agent.multi", "aborted", level="INFO")
+                    yield {"type": "thinking", "content": "用户中止了查询。"}
+                    yield {"type": "done", "content": None}
+                    return
                 et = event.get("type")
                 if et == "thinking":
                     c = str(event.get("content") or "")
@@ -271,7 +283,13 @@ async def stream_chat_multi_agent(
 
     q = _latest_user_question(messages)
     yield {"type": "thinking", "content": "[Manager-汇总] 正在整合各子任务结论..."}
-    synth = await call_summarize_llm(q, all_blocks, trace_id=trace_id)
+    try:
+        synth = await call_summarize_llm(q, all_blocks, trace_id=trace_id)
+    except ChatAbortedError:
+        log_event(trace_id, "agent.multi", "aborted", level="INFO")
+        yield {"type": "thinking", "content": "用户中止了查询。"}
+        yield {"type": "done", "content": None}
+        return
     if not synth or not isinstance(synth, dict):
         yield {
             "type": "text",

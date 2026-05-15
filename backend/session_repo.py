@@ -117,7 +117,15 @@ def load_messages_ui(session_id: int) -> List[Dict[str, Any]]:
             except json.JSONDecodeError:
                 payload = None
         if isinstance(payload, dict):
-            for key in ("thinking", "chart", "kpiCards", "error"):
+            for key in (
+                "thinking",
+                "chart",
+                "kpiCards",
+                "planSummary",
+                "analysisProposal",
+                "dashboardReady",
+                "error",
+            ):
                 if key in payload:
                     entry[key] = payload[key]
         result.append(entry)

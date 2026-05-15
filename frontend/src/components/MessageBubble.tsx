@@ -169,11 +169,26 @@ function withDashboardTheme(option: Record<string, unknown>): Record<string, unk
       };
     }
     if (series.type === 'pie') {
+      const lbl = (series.label ?? {}) as Record<string, unknown>;
+      const lblLine = (series.labelLine ?? {}) as Record<string, unknown>;
       return {
         ...series,
-        radius: ['42%', '72%'],
-        label: { color: '#334155', ...(series.label as Record<string, unknown> | undefined) },
-        labelLine: { lineStyle: { color: 'rgba(148, 163, 184, 0.4)' } },
+        center: Array.isArray(series.center) ? series.center : ['50%', '44%'],
+        radius: ['26%', '42%'],
+        avoidLabelOverlap: true,
+        label: {
+          color: '#334155',
+          fontSize: 11,
+          lineHeight: 15,
+          ...lbl,
+        },
+        labelLine: {
+          length: 6,
+          length2: 4,
+          smooth: 0.15,
+          lineStyle: { color: 'rgba(148, 163, 184, 0.45)', width: 1 },
+          ...lblLine,
+        },
         itemStyle: { borderColor: '#ffffff', borderWidth: 2, ...(series.itemStyle as Record<string, unknown> | undefined) },
       };
     }
@@ -420,7 +435,7 @@ function DashboardMiddlewareCard({
             return (
               <div
                 key={i}
-                className="min-w-0 overflow-hidden rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,_#ffffff,_#f8fafc)] shadow-[0_10px_32px_rgba(148,163,184,0.14)]"
+                className="min-w-0 rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,_#ffffff,_#f8fafc)] shadow-[0_10px_32px_rgba(148,163,184,0.14)]"
               >
                 <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
                   <div>
@@ -435,7 +450,7 @@ function DashboardMiddlewareCard({
                     {Array.isArray(opt.series) ? `${opt.series.length} series` : '1 series'}
                   </span>
                 </div>
-                <div className="px-3 pb-8 pt-2">
+                <div className="px-4 pb-8 pt-2 sm:px-5">
                   <ReactECharts
                     option={opt}
                     style={{ height: 360, width: '100%' }}

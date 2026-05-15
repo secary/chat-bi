@@ -278,7 +278,7 @@ chat_session
 
 chat_message
   id, session_id, role (user/assistant/system), content, payload_json
-  payload_json 可存储: {thinking, chart, kpiCards, error}
+  payload_json 可存储: {thinking, chart, kpiCards, planSummary, analysisProposal, dashboardReady, error}
 
 user_memory
   id, user_id, kind (session_summary/long_term),

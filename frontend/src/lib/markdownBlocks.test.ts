@@ -29,4 +29,28 @@ describe('parseMarkdownBlocks', () => {
       { type: 'line', content: '- 列表' },
     ]);
   });
+
+  it('parses h4 heading without hash prefix in content', () => {
+    const blocks = parseMarkdownBlocks('#### 华东区域（销售额61.3万元）');
+    expect(blocks[0]).toEqual({
+      type: 'heading',
+      level: 4,
+      content: '华东区域（销售额61.3万元）',
+    });
+  });
+
+  it('parses horizontal rule', () => {
+    const blocks = parseMarkdownBlocks('上文\n---\n下文');
+    expect(blocks[1]).toEqual({ type: 'hr' });
+  });
+
+  it('parses display math block', () => {
+    const blocks = parseMarkdownBlocks('$$\n\\frac{a}{b}\n$$');
+    expect(blocks[0]).toMatchObject({ type: 'math', display: true, latex: '\\frac{a}{b}' });
+  });
+
+  it('parses single-line display math', () => {
+    const blocks = parseMarkdownBlocks('$$x = 1$$');
+    expect(blocks[0]).toMatchObject({ type: 'math', display: true, latex: 'x = 1' });
+  });
 });

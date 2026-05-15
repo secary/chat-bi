@@ -7,9 +7,12 @@ RUN npm ci
 
 FROM deps AS dev
 
+COPY docker-entrypoint.dev.sh /entrypoint.sh
+RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
+
 EXPOSE 5173
 
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+ENTRYPOINT ["/entrypoint.sh"]
 
 FROM deps AS build
 

@@ -473,6 +473,112 @@ class AutoAnalysisSkillTest(unittest.TestCase):
         self.assertEqual(proposals[0]["name"], "投资金额趋势")
         self.assertEqual(proposals[1]["name"], "投资金额按客户分层分布")
 
+    def test_retention_cohort_table_gets_structured_metric_proposals(self):
+        PLANNER.propose_metrics_with_llm = lambda question, profile, **kwargs: []
+        payload = MODULE.execute_analysis(
+            "帮我分析这张留存 cohort 表",
+            [
+                {
+                    "cohort_month": "2026-01",
+                    "follow_month_offset": "0",
+                    "customer_type": "新客",
+                    "cohort_size": "100",
+                    "retained_count": "100",
+                    "retention_rate_pct": "100",
+                },
+                {
+                    "cohort_month": "2026-01",
+                    "follow_month_offset": "1",
+                    "customer_type": "新客",
+                    "cohort_size": "100",
+                    "retained_count": "72",
+                    "retention_rate_pct": "72",
+                },
+                {
+                    "cohort_month": "2026-02",
+                    "follow_month_offset": "1",
+                    "customer_type": "老客",
+                    "cohort_size": "80",
+                    "retained_count": "66",
+                    "retention_rate_pct": "82.5",
+                },
+            ],
+            "propose",
+            [],
+        )
+
+        proposals = payload["data"]["analysis_proposal"]["proposed_metrics"]
+        names = [item["name"] for item in proposals]
+        self.assertIn("整体留存率趋势", names)
+        self.assertIn("各 cohort 留存率热力矩阵", names)
+        self.assertIn("各 cohort 留存人数", names)
+        self.assertIn("按客户类型留存率对比", names)
+
+    def test_retention_cohort_table_executes_selected_templates(self):
+        retention_rows = [
+            {
+                "cohort_month": "2026-01",
+                "follow_month_offset": "0",
+                "customer_type": "新客",
+                "cohort_size": "100",
+                "retained_count": "100",
+                "retention_rate_pct": "100",
+            },
+            {
+                "cohort_month": "2026-01",
+                "follow_month_offset": "1",
+                "customer_type": "新客",
+                "cohort_size": "100",
+                "retained_count": "72",
+                "retention_rate_pct": "72",
+            },
+            {
+                "cohort_month": "2026-02",
+                "follow_month_offset": "0",
+                "customer_type": "老客",
+                "cohort_size": "80",
+                "retained_count": "80",
+                "retention_rate_pct": "100",
+            },
+            {
+                "cohort_month": "2026-02",
+                "follow_month_offset": "1",
+                "customer_type": "老客",
+                "cohort_size": "80",
+                "retained_count": "66",
+                "retention_rate_pct": "82.5",
+            },
+        ]
+        PLANNER.propose_metrics_with_llm = lambda question, profile, **kwargs: []
+        proposal_payload = MODULE.execute_analysis(
+            "帮我分析这张留存 cohort 表",
+            retention_rows,
+            "propose",
+            [],
+        )
+        metric_plans = proposal_payload["data"]["analysis_proposal"]["proposed_metrics"]
+        selected_ids = [
+            "overall_retention_rate_by_offset",
+            "retention_rate_heatmap",
+            "retention_rate_by_segment",
+        ]
+
+        payload = MODULE.execute_analysis(
+            "采纳全部指标",
+            retention_rows,
+            "execute",
+            selected_ids,
+            metric_plans=metric_plans,
+        )
+
+        self.assertEqual(payload["data"]["status"], "ready")
+        metric_names = [item["name"] for item in payload["data"]["metrics"]]
+        self.assertIn("整体留存率趋势", metric_names)
+        self.assertIn("各 cohort 留存率热力矩阵", metric_names)
+        self.assertIn("按客户类型留存率对比", metric_names)
+        self.assertTrue(any(chart["series"][0]["type"] == "line" for chart in payload["charts"]))
+        self.assertTrue(any(chart["series"][0]["type"] == "heatmap" for chart in payload["charts"]))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -84,9 +84,20 @@ def group_rows(
             value = row.get(field)
             if spec.get("transform") == "month":
                 value = month_key(value)
+            if spec.get("transform") == "offset_label":
+                value = format_offset_label(value)
             parts.append((alias, str(value or "未分类")))
         grouped[tuple(parts)].append(row)
     return grouped
+
+
+def format_offset_label(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return "M?"
+    if text.startswith("M"):
+        return text
+    return f"M{text}"
 
 
 def eval_formula(formula: Dict[str, Any], rows: Sequence[Dict[str, Any]]) -> Decimal:

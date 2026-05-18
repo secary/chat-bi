@@ -9,6 +9,10 @@ interface MessageBubbleProps {
   message: ChatMessage;
 }
 
+function normalizeComparableMarkdown(value: string | undefined): string {
+  return String(value ?? '').replace(/\s+/g, ' ').trim();
+}
+
 function formatAxisNumber(value: unknown): string {
   const num = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(num)) return String(value ?? '');
@@ -492,6 +496,15 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   }
 
   const isWideDashboard = Boolean(message.dashboardReady);
+  const contentText = String(message.content ?? '');
+  const proposalMarkdown = message.analysisProposal?.markdown;
+  const dashboardMarkdown = message.dashboardReady?.markdown;
+  const hideContentBubble =
+    Boolean(contentText) &&
+    (normalizeComparableMarkdown(contentText) ===
+      normalizeComparableMarkdown(proposalMarkdown) ||
+      normalizeComparableMarkdown(contentText) ===
+        normalizeComparableMarkdown(dashboardMarkdown));
 
   return (
     <div className="mb-4 animate-fade-in">
@@ -511,7 +524,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
 
         <ThinkingBubble steps={message.thinking || []} />
 
-        {message.content && (
+        {message.content && !hideContentBubble && (
           <div className="prose prose-sm max-w-none rounded-2xl rounded-tl-sm bg-surface px-5 py-3.5 text-sm leading-relaxed text-gray-800 shadow-card">
             <FormattedMarkdown content={message.content} />
           </div>

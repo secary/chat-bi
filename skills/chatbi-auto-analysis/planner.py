@@ -152,6 +152,33 @@ def build_analysis_hints(
                 "fields": {"stages": [item["field"] for item in funnel_stages[:6]]},
             }
         )
+    retention_shape = detect_retention_cohort_shape(profile)
+    if retention_shape:
+        hints.extend(
+            [
+                {
+                    "method": "留存率趋势",
+                    "metric_name_hint": "整体留存率趋势",
+                    "why": "识别到 cohort 留存结构，可按留存月偏移观察整体留存率变化。",
+                    "fields": {
+                        "retained": retention_shape["retained_field"],
+                        "base": retention_shape["base_field"],
+                        "offset": retention_shape["offset_field"],
+                    },
+                },
+                {
+                    "method": "cohort 对比",
+                    "metric_name_hint": "各 cohort 留存率热力矩阵",
+                    "why": "识别到 cohort 月份与留存月偏移，可对比不同 cohort 在各偏移期的留存表现。",
+                    "fields": {
+                        "cohort": retention_shape["cohort_field"],
+                        "offset": retention_shape["offset_field"],
+                        "retained": retention_shape["retained_field"],
+                        "base": retention_shape["base_field"],
+                    },
+                },
+            ]
+        )
     return {
         "domain_guess": profile.get("domain_guess", ""),
         "row_count": profile.get("row_count", 0),
@@ -177,6 +204,7 @@ def fallback_metric_plans(
     category_fields = [str(item) for item in profile.get("categorical_columns", []) if item][:4]
     id_fields = [str(item) for item in profile.get("id_columns", []) if item][:2]
     funnel_stages = detect_funnel_stages(profile, column_labels=column_labels)
+    retention_shape = detect_retention_cohort_shape(profile)
     status_fields = [
         str(item.get("name"))
         for item in profile.get("columns", [])
@@ -206,6 +234,9 @@ def fallback_metric_plans(
                 0.72,
             )
         )
+
+    if retention_shape:
+        proposals.extend(retention_metric_plans(retention_shape, column_labels=column_labels))
 
     for time_field in time_fields[:1]:
         for numeric in numeric_fields[:2]:
@@ -312,6 +343,87 @@ def fallback_metric_plans(
             )
 
     return dedupe_metric_plans(proposals)[:10]
+
+
+def retention_metric_plans(
+    shape: Dict[str, str],
+    column_labels: Optional[Dict[str, str]] = None,
+) -> List[Dict[str, Any]]:
+    cohort_field = shape["cohort_field"]
+    offset_field = shape["offset_field"]
+    retained_field = shape["retained_field"]
+    base_field = shape["base_field"]
+    segment_field = shape.get("segment_field") or ""
+
+    def label(field: str) -> str:
+        return _field_display_name(field, column_labels)
+
+    plans: List[Dict[str, Any]] = [
+        metric(
+            "overall_retention_rate_by_offset",
+            "整体留存率趋势",
+            f"sum({retained_field}) / sum({base_field}) * 100%",
+            "line",
+            [{"field": offset_field, "transform": "offset_label", "alias": "留存周期"}],
+            {
+                "op": "ratio_percent",
+                "numerator": {"op": "sum", "field": retained_field},
+                "denominator": {"op": "sum", "field": base_field},
+            },
+            0.82,
+        ),
+        metric(
+            "retained_count_by_cohort_month",
+            "各 cohort 留存人数",
+            f"sum({retained_field})",
+            "bar",
+            [{"field": cohort_field, "alias": label(cohort_field)}],
+            {"op": "sum", "field": retained_field},
+            0.76,
+        ),
+        metric(
+            "retention_rate_heatmap",
+            "各 cohort 留存率热力矩阵",
+            f"sum({retained_field}) / sum({base_field}) * 100%",
+            "heatmap",
+            [
+                {"field": cohort_field, "alias": label(cohort_field)},
+                {"field": offset_field, "transform": "offset_label", "alias": "留存周期"},
+            ],
+            {
+                "op": "ratio_percent",
+                "numerator": {"op": "sum", "field": retained_field},
+                "denominator": {"op": "sum", "field": base_field},
+            },
+            0.84,
+        ),
+        metric(
+            "cohort_size_by_month",
+            "各 cohort 客户规模",
+            f"sum({base_field})",
+            "bar",
+            [{"field": cohort_field, "alias": label(cohort_field)}],
+            {"op": "sum", "field": base_field},
+            0.74,
+        ),
+    ]
+    if segment_field:
+        plans.append(
+            metric(
+                "retention_rate_by_segment",
+                f"按{label(segment_field)}留存率对比",
+                f"sum({retained_field}) / sum({base_field}) * 100%",
+                "bar",
+                [{"field": segment_field, "alias": label(segment_field)}],
+                {
+                    "op": "ratio_percent",
+                    "numerator": {"op": "sum", "field": retained_field},
+                    "denominator": {"op": "sum", "field": base_field},
+                },
+                0.78,
+            )
+        )
+    return plans
 
 
 def merge_metric_plans(
@@ -435,6 +547,88 @@ def looks_like_stage_volume_field(field: str) -> bool:
         token in normalized
         for token in ["count", "cnt", "qty", "num", "volume", "数量", "户数", "笔数"]
     )
+
+
+def detect_retention_cohort_shape(profile: Dict[str, Any]) -> Optional[Dict[str, str]]:
+    columns = [
+        item for item in profile.get("columns", []) if isinstance(item, dict) and item.get("name")
+    ]
+    names = [str(item["name"]) for item in columns]
+
+    cohort_field = first(
+        [
+            name
+            for name in names
+            if any(token in name.lower() for token in ["cohort_month", "cohort", "start_month"])
+            or any(token in name for token in ["cohort月", "分群月", "首购月", "建群月"])
+        ]
+    )
+    offset_field = first(
+        [
+            name
+            for name in names
+            if any(
+                token in name.lower()
+                for token in ["follow_month_offset", "month_offset", "offset", "tenure"]
+            )
+            or any(token in name for token in ["账龄", "月份偏移", "留存月", "第几月"])
+        ]
+    )
+    retained_field = first(
+        [
+            name
+            for name in names
+            if any(
+                token in name.lower()
+                for token in ["retained_count", "retained_users", "retained_customers"]
+            )
+            or any(token in name for token in ["留存人数", "留存客户", "留存数"])
+        ]
+    )
+    base_field = first(
+        [
+            name
+            for name in names
+            if any(
+                token in name.lower()
+                for token in ["cohort_size", "base_count", "base_customers", "customer_count"]
+            )
+            or any(token in name for token in ["cohort规模", "分群规模", "客户规模", "总客户数"])
+        ]
+    )
+    segment_field = first(
+        [
+            name
+            for name in names
+            if any(
+                token in name.lower()
+                for token in ["customer_type", "customer_segment", "segment", "cohort_type"]
+            )
+            or any(token in name for token in ["客户类型", "客户分层", "客群", "用户类型"])
+        ]
+    )
+    rate_field = first(
+        [
+            name
+            for name in names
+            if any(
+                token in name.lower()
+                for token in ["retention_rate", "retention_pct", "retention_ratio"]
+            )
+            or any(token in name for token in ["留存率"])
+        ]
+    )
+
+    if cohort_field and offset_field and retained_field and base_field:
+        return {
+            "cohort_field": cohort_field,
+            "offset_field": offset_field,
+            "retained_field": retained_field,
+            "base_field": base_field,
+            "segment_field": segment_field,
+            "rate_field": rate_field or "",
+        }
+    return None
 
 
 def extract_json(text: str) -> Dict[str, Any]:

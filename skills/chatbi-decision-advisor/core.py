@@ -13,9 +13,11 @@ from _shared.runtime import (
     context_cancelled,
     context_timeout,
     ensure_active,
+    load_local_module,
     resolve_db_config,
 )  # noqa: E402
-import decision_advisor_core as advisor_core  # noqa: E402
+
+advisor_core = load_local_module(__file__, "engine.py")
 
 
 @dataclass(frozen=True)

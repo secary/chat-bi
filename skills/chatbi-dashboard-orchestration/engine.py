@@ -13,8 +13,11 @@ sys.path.insert(0, str(CURRENT_DIR.parent / "chatbi-auto-analysis"))
 sys.path.insert(0, str(CURRENT_DIR.parent / "chatbi-chart-recommendation"))
 
 from _shared.output import kpi, skill_response  # noqa: E402
+from _shared.runtime import load_local_module  # noqa: E402
 from display_names import domain_display_name, field_display_name  # noqa: E402
-from chart_recommendation_core import recommend_chart  # noqa: E402
+
+_CHART_ENGINE = load_local_module(__file__, "../chatbi-chart-recommendation/engine.py")
+recommend_chart = _CHART_ENGINE.recommend_chart
 
 
 def orchestrate_from_input(raw: str) -> Dict[str, Any]:

@@ -8,9 +8,11 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from _shared.runtime import ensure_active  # noqa: E402
+from _shared.runtime import ensure_active, load_local_module  # noqa: E402
 from _shared.trace import log_skill_event  # noqa: E402
-from dashboard_orchestration_core import orchestrate_from_input  # noqa: E402
+
+_ENGINE = load_local_module(__file__, "engine.py")
+orchestrate_from_input = _ENGINE.orchestrate_from_input
 
 
 @dataclass(frozen=True)

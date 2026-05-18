@@ -9,9 +9,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from _shared.output import skill_response  # noqa: E402
-from _shared.runtime import ensure_active  # noqa: E402
+from _shared.runtime import ensure_active, load_local_module  # noqa: E402
 from _shared.trace import log_skill_event  # noqa: E402
-from semantic_processing_core import parse_question, render_summary  # noqa: E402
+
+_ENGINE = load_local_module(__file__, "engine.py")
+parse_question = _ENGINE.parse_question
+render_summary = _ENGINE.render_summary
 
 
 @dataclass(frozen=True)

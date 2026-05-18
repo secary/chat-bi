@@ -11,6 +11,7 @@ sys.path.insert(0, str(CURRENT_DIR.parent))
 sys.path.insert(0, str(CURRENT_DIR.parent.parent))
 
 from _shared.output import kpi, skill_response  # noqa: E402
+from _shared.runtime import load_local_module  # noqa: E402
 from display_names import domain_display_name  # noqa: E402
 from formula_executor import derive_metric, validate_metric_plans  # noqa: E402
 from planner import propose_metrics  # noqa: E402
@@ -174,9 +175,8 @@ def extract_requested_metric_ids(question: str, proposals: Sequence[Dict[str, An
 
 
 def build_chart(metric_result: Dict[str, Any]) -> Dict[str, Any]:
-    chart_dir = CURRENT_DIR.parents[1] / "chatbi-chart-recommendation"
-    sys.path.insert(0, str(chart_dir))
-    from chart_recommendation_core import recommend_chart
+    module = load_local_module(__file__, "../chatbi-chart-recommendation/engine.py")
+    recommend_chart = getattr(module, "recommend_chart")
 
     payload = recommend_chart(
         str(metric_result.get("name") or ""),
@@ -193,9 +193,8 @@ def build_dashboard_middleware(
     metrics: Sequence[Dict[str, Any]],
     charts: Sequence[Dict[str, Any]],
 ) -> Dict[str, Any]:
-    dashboard_dir = CURRENT_DIR.parents[1] / "chatbi-dashboard-orchestration"
-    sys.path.insert(0, str(dashboard_dir))
-    from dashboard_orchestration_core import build_dashboard_package
+    module = load_local_module(__file__, "../chatbi-dashboard-orchestration/engine.py")
+    build_dashboard_package = getattr(module, "build_dashboard_package")
 
     payload = build_dashboard_package(
         question,

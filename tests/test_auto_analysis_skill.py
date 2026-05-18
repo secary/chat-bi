@@ -8,8 +8,10 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT_DIR = ROOT / "skills/chatbi-auto-analysis/scripts"
-SCRIPT = SCRIPT_DIR / "auto_analysis_core.py"
+SKILL_DIR = ROOT / "skills/chatbi-auto-analysis"
+SCRIPT_DIR = SKILL_DIR / "scripts"
+SCRIPT = SKILL_DIR / "auto_analysis_core.py"
+sys.path.insert(0, str(SKILL_DIR))
 sys.path.insert(0, str(SCRIPT_DIR))
 SPEC = importlib.util.spec_from_file_location("auto_analysis_core", SCRIPT)
 MODULE = importlib.util.module_from_spec(SPEC)

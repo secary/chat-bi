@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import importlib.util
 import json
 import os
 import subprocess
@@ -11,6 +12,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "skills/chatbi-file-ingestion/scripts/inspect_uploaded_table.py"
+API = ROOT / "skills/chatbi-file-ingestion/api.py"
+sys.path.insert(0, str(ROOT / "skills"))
+sys.path.insert(0, str(ROOT / "skills" / "chatbi-file-ingestion"))
 
 
 class FileIngestionSkillTest(unittest.TestCase):
@@ -146,6 +150,35 @@ class FileIngestionSkillTest(unittest.TestCase):
         self.assertIn("评分", result["data"]["analysis"]["columns"])
         self.assertEqual(result["data"]["table_profile"]["columns"][2]["name"], "评分")
         self.assertIn("通用结构画像", result["text"])
+
+    def test_core_honors_cancellation_checkpoints(self):
+        spec = importlib.util.spec_from_file_location("file_ingestion_api", API)
+        module = importlib.util.module_from_spec(spec)
+        assert spec and spec.loader
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        run_file_ingestion = module.run_file_ingestion
+        FileIngestionRequest = module.FileIngestionRequest
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "large.csv"
+            with path.open("w", encoding="utf-8", newline="") as handle:
+                writer = csv.writer(handle)
+                writer.writerow(["门店", "城市", "评分", "客流"])
+                for i in range(250):
+                    writer.writerow([f"门店{i}", "上海", "4.7", str(300 + i)])
+
+            class Ctx:
+                def __init__(self) -> None:
+                    self.calls = 0
+
+                def check_active(self) -> None:
+                    self.calls += 1
+                    if self.calls >= 2:
+                        raise RuntimeError("用户中止了查询")
+
+            with self.assertRaisesRegex(RuntimeError, "用户中止了查询"):
+                run_file_ingestion(FileIngestionRequest(input_path=str(path)), Ctx())
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "skills"))
-sys.path.insert(0, str(ROOT / "skills" / "chatbi-semantic-query" / "scripts"))
+sys.path.insert(0, str(ROOT / "skills" / "chatbi-semantic-query"))
 
 from semantic_query.parsing import pick_metric
 from semantic_query.planner import make_plan

@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / "skills/chatbi-comparison/scripts/chatbi_comparison.py"
+SCRIPT = ROOT / "skills/chatbi-comparison/chatbi_comparison.py"
 SPEC = importlib.util.spec_from_file_location("chatbi_comparison_core", SCRIPT)
 MODULE = importlib.util.module_from_spec(SPEC)
 assert SPEC and SPEC.loader

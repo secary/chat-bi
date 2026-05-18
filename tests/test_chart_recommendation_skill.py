@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / "skills/chatbi-chart-recommendation/scripts/chart_recommendation_core.py"
+SCRIPT = ROOT / "skills/chatbi-chart-recommendation/chart_recommendation_core.py"
 SPEC = importlib.util.spec_from_file_location("chart_recommendation_core", SCRIPT)
 MODULE = importlib.util.module_from_spec(SPEC)
 assert SPEC and SPEC.loader

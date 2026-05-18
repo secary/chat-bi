@@ -6,14 +6,14 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / "skills/chatbi-decision-advisor/scripts/generate_decision_advice.py"
-SPEC = importlib.util.spec_from_file_location("decision_advisor_focus", SCRIPT)
+CORE = ROOT / "skills/chatbi-decision-advisor/core.py"
+SPEC = importlib.util.spec_from_file_location("decision_advisor_core_api", CORE)
 MODULE = importlib.util.module_from_spec(SPEC)
 assert SPEC and SPEC.loader
 sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
 
-sys.path.insert(0, str(ROOT / "skills/chatbi-decision-advisor/scripts"))
+sys.path.insert(0, str(ROOT / "skills/chatbi-decision-advisor"))
 import decision_advisor_core as decision_core  # noqa: E402
 
 

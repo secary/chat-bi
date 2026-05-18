@@ -6,8 +6,8 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / "skills/chatbi-database-overview/scripts/database_overview.py"
-SPEC = importlib.util.spec_from_file_location("database_overview", SCRIPT)
+CORE = ROOT / "skills/chatbi-database-overview/core.py"
+SPEC = importlib.util.spec_from_file_location("database_overview_core", CORE)
 MODULE = importlib.util.module_from_spec(SPEC)
 assert SPEC and SPEC.loader
 sys.modules[SPEC.name] = MODULE

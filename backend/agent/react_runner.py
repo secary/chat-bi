@@ -15,6 +15,13 @@ from backend.agent.executor import (
 from backend.agent.formatter import stream_result_events
 from backend.agent.intent_guard import small_talk_reply, should_skip_skill_for_message
 from backend.agent.observation import summarize_observation
+from backend.agent.skill_history import (
+    clear_skill_sink,
+    get_skill_executions,
+    merge_results_for_finish,
+    record_skill_execution,
+    sync_skill_sink,
+)
 from backend.agent.abort_async import ChatAbortedError
 from backend.agent.planner import call_llm_for_react_step
 from backend.agent.prompt_builder import (
@@ -30,64 +37,21 @@ from backend.config import settings
 from backend.trace import log_event
 
 OBS_HEADER = "以下为工具执行后的 Observation（JSON 摘要），请基于事实继续推理：\n"
-_VISUAL_FIRST_SKILLS = {
-    "chatbi-chart-recommendation",
-    "chatbi-dashboard-orchestration",
-}
 
 
-def _merge_finish_result(
-    plan: Dict[str, Any],
-    last_result: Optional[Dict[str, Any]],
-    last_skill_name: Optional[str] = None,
-) -> Dict[str, Any]:
-    """
-    Merges the final LLM finish text with the last skill result.
-    Suppresses finish text when the skill already produced visual content (charts/kpis),
-    or when the last skill is a decision-advisor that already provided text.
-    """
-    merged: Dict[str, Any] = dict(last_result or {})
-    if _should_suppress_finish_text(last_skill_name, merged):
-        merged["text"] = ""
-        return merged
-    if last_skill_name == "chatbi-decision-advisor" and merged.get("text"):
-        return merged
-    # skill 已生成图表时，保留 skill 自带文本，不被 LLM finish 文本覆盖
-    if merged.get("chart_plan") or merged.get("charts"):
-        return merged
-    if plan.get("text"):
-        merged["text"] = plan["text"]
-    return merged
-
-
-def _should_suppress_finish_text(
-    last_skill_name: Optional[str], result: Optional[Dict[str, Any]]
-) -> bool:
-    """
-    Returns True when the last skill is a visual-first skill
-    (chatbi-chart-recommendation, chatbi-dashboard-orchestration) and already
-    produced charts or KPIs, so the LLM finish
-    text should not overwrite the visual content.
-    """
-    if last_skill_name not in _VISUAL_FIRST_SKILLS:
-        return False
-    if not isinstance(result, dict):
-        return False
-    has_charts = bool(result.get("charts"))
-    has_kpis = bool(result.get("kpis"))
-    return has_charts or has_kpis
-
-
-def _sink_write(
-    sink: Optional[Dict[str, Any]],
-    last_result: Optional[Dict[str, Any]],
+def _finish_merged(
+    result_sink: Optional[Dict[str, Any]],
+    finish_plan: Dict[str, Any],
     last_skill_name: Optional[str],
-) -> None:
-    """Writes the last executed result and skill name into the result sink dict."""
-    if sink is None:
-        return
-    sink["last_result"] = last_result
-    sink["last_skill_name"] = last_skill_name
+    last_result: Optional[Dict[str, Any]] = None,
+    local_executions: Optional[List[Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
+    executions = get_skill_executions(result_sink) or (local_executions or [])
+    if not executions and isinstance(last_result, dict):
+        from backend.agent.skill_history import merge_finish_result
+
+        return merge_finish_result(finish_plan, last_result, last_skill_name)
+    return merge_results_for_finish(executions, finish_plan, last_skill_name)
 
 
 def _rows_for_followup_chart(result: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -321,7 +285,7 @@ async def stream_chat_react(
     latest_proposal = _latest_analysis_proposal(messages)
     if should_skip_skill_for_message(user_text):
         log_event(trace_id, "agent.runner", "skip_skill_small_talk", payload={"mode": "react"})
-        _sink_write(result_sink, None, None)
+        clear_skill_sink(result_sink)
         yield {"type": "thinking", "content": "识别为简单话语，直接回复。"}
         yield {"type": "text", "content": small_talk_reply(user_text)}
         yield {"type": "done", "content": None}
@@ -357,6 +321,7 @@ async def stream_chat_react(
     working = [dict(m) for m in messages]
     last_skill_name: Optional[str] = None
     last_result: Optional[Dict[str, Any]] = None
+    local_executions: List[Dict[str, Any]] = []
     called_skills: list[str] = []
     last_ingestion_rows: List[Dict[str, Any]] = list(cached_upload_rows)
     last_ingestion_column_labels: Optional[Dict[str, Any]] = None
@@ -374,7 +339,7 @@ async def stream_chat_react(
         if _is_aborted(trace_id):
             log_event(trace_id, "agent.runner", "aborted", level="INFO")
             yield {"type": "thinking", "content": "用户中止了查询。"}
-            _sink_write(result_sink, last_result, last_skill_name)
+            sync_skill_sink(result_sink, last_result, last_skill_name)
             yield {"type": "done", "content": None}
             return
 
@@ -394,7 +359,7 @@ async def stream_chat_react(
         except ChatAbortedError:
             log_event(trace_id, "agent.runner", "aborted", level="INFO")
             yield {"type": "thinking", "content": "用户中止了查询。"}
-            _sink_write(result_sink, last_result, last_skill_name)
+            sync_skill_sink(result_sink, last_result, last_skill_name)
             yield {"type": "done", "content": None}
             return
         except Exception as exc:
@@ -403,25 +368,27 @@ async def stream_chat_react(
                     "type": "thinking",
                     "content": f"模型收尾失败，展示最后一次工具结果：{exc}",
                 }
-                async for event in stream_result_events(
-                    last_skill_name or "skill", {}, last_result
-                ):
+                merged = _finish_merged(
+                    result_sink, {}, last_skill_name, last_result, local_executions
+                )
+                async for event in stream_result_events(last_skill_name or "skill", {}, merged):
                     yield event
-                _sink_write(result_sink, last_result, last_skill_name)
+                sync_skill_sink(result_sink, last_result, last_skill_name)
                 yield {"type": "done", "content": None}
                 return
             raise
         if not plan:
             if last_result:
                 yield {"type": "thinking", "content": "模型未返回有效 JSON，展示最后一次工具结果。"}
-                async for event in stream_result_events(
-                    last_skill_name or "skill", {}, last_result
-                ):
+                merged = _finish_merged(
+                    result_sink, {}, last_skill_name, last_result, local_executions
+                )
+                async for event in stream_result_events(last_skill_name or "skill", {}, merged):
                     yield event
-                _sink_write(result_sink, last_result, last_skill_name)
+                sync_skill_sink(result_sink, last_result, last_skill_name)
                 yield {"type": "done", "content": None}
                 return
-            _sink_write(result_sink, None, None)
+            sync_skill_sink(result_sink, None, None)
             yield {"type": "error", "content": "模型未返回有效 JSON。"}
             yield {"type": "done", "content": None}
             return
@@ -433,7 +400,9 @@ async def stream_chat_react(
         action = str(plan.get("action") or "finish").strip().lower()
         if action in ("finish", "done", "answer"):
             yield {"type": "thinking", "content": "正在整理回答..."}
-            merged = _merge_finish_result(plan, last_result, last_skill_name)
+            merged = _finish_merged(
+                result_sink, plan, last_skill_name, last_result, local_executions
+            )
             skill_label = last_skill_name or "chatbi-semantic-query"
             async for event in stream_result_events(skill_label, plan, merged):
                 yield event
@@ -443,7 +412,7 @@ async def stream_chat_react(
                 "completed",
                 payload={"mode": "react", "steps": step + 1},
             )
-            _sink_write(result_sink, last_result, last_skill_name)
+            sync_skill_sink(result_sink, last_result, last_skill_name)
             yield {"type": "done", "content": None}
             return
 
@@ -457,12 +426,12 @@ async def stream_chat_react(
                 "completed",
                 payload={"mode": "react", "action": "ask", "steps": step + 1},
             )
-            _sink_write(result_sink, last_result, last_skill_name)
+            sync_skill_sink(result_sink, last_result, last_skill_name)
             yield {"type": "done", "content": None}
             return
 
         if action != "call_skill":
-            _sink_write(result_sink, last_result, last_skill_name)
+            sync_skill_sink(result_sink, last_result, last_skill_name)
             yield {
                 "type": "error",
                 "content": f"无法识别的 action：{plan.get('action')}",
@@ -475,7 +444,7 @@ async def stream_chat_react(
         """
         skill_name = plan.get("skill")
         if not skill_name or not isinstance(skill_name, str):
-            _sink_write(result_sink, last_result, last_skill_name)
+            sync_skill_sink(result_sink, last_result, last_skill_name)
             yield {"type": "error", "content": "call_skill 缺少有效的 skill 名称。"}
             yield {"type": "done", "content": None}
             return
@@ -493,7 +462,7 @@ async def stream_chat_react(
         skill_doc = find_skill(skills, skill_name)
         if not skill_doc:
             available = ", ".join(sorted(allowed_slugs)) if allowed_slugs else "（无）"
-            _sink_write(result_sink, last_result, last_skill_name)
+            sync_skill_sink(result_sink, last_result, last_skill_name)
             yield {
                 "type": "error",
                 "content": f"未找到技能：{skill_name}。本专线可用技能：{available}",
@@ -536,7 +505,9 @@ async def stream_chat_react(
                 "type": "thinking",
                 "content": "文件已解析完成，正在整理结果...",
             }
-            merged = _merge_finish_result(plan, last_result, last_skill_name)
+            merged = _finish_merged(
+                result_sink, plan, last_skill_name, last_result, local_executions
+            )
             async for event in stream_result_events(last_skill_name or skill_name, plan, merged):
                 yield event
             log_event(
@@ -545,7 +516,7 @@ async def stream_chat_react(
                 "completed",
                 payload={"mode": "react", "short_circuit": "repeated_file_ingestion"},
             )
-            _sink_write(result_sink, last_result, last_skill_name)
+            sync_skill_sink(result_sink, last_result, last_skill_name)
             yield {"type": "done", "content": None}
             return
         assistant_note = json.dumps(
@@ -588,6 +559,18 @@ async def stream_chat_react(
             last_skill_name = skill_name
             last_result = result
             called_skills.append(skill_name)
+            record_skill_execution(result_sink, skill_name, result, step + 1)
+            if result_sink is None:
+                local_executions.append(
+                    {
+                        "skill": skill_name,
+                        "result": result,
+                        "observation": summarize_observation(skill_name, result),
+                        "step": step + 1,
+                    }
+                )
+            else:
+                local_executions = get_skill_executions(result_sink)
             if skill_name == "chatbi-file-ingestion":
                 ingested = _rows_for_followup_chart(result)
                 if ingested:
@@ -647,7 +630,10 @@ async def stream_chat_react(
                     "type": "thinking",
                     "content": "自动分析已生成结构化结果，正在展示...",
                 }
-                async for event in stream_result_events(skill_name, plan, result):
+                merged = _finish_merged(
+                    result_sink, plan, last_skill_name, last_result, local_executions
+                )
+                async for event in stream_result_events(skill_name, plan, merged):
                     yield event
                 log_event(
                     trace_id,
@@ -655,7 +641,7 @@ async def stream_chat_react(
                     "completed",
                     payload={"mode": "react", "short_circuit": "auto_analysis"},
                 )
-                _sink_write(result_sink, last_result, last_skill_name)
+                sync_skill_sink(result_sink, last_result, last_skill_name)
                 yield {"type": "done", "content": None}
                 return
             obs = summarize_observation(skill_name, result)
@@ -697,6 +683,25 @@ async def stream_chat_react(
                     last_skill_name = "chatbi-decision-advisor"
                     last_result = advice_result
                     called_skills.append("chatbi-decision-advisor")
+                    record_skill_execution(
+                        result_sink,
+                        "chatbi-decision-advisor",
+                        advice_result,
+                        step + 1,
+                    )
+                    if result_sink is None:
+                        local_executions.append(
+                            {
+                                "skill": "chatbi-decision-advisor",
+                                "result": advice_result,
+                                "observation": summarize_observation(
+                                    "chatbi-decision-advisor", advice_result
+                                ),
+                                "step": step + 1,
+                            }
+                        )
+                    else:
+                        local_executions = get_skill_executions(result_sink)
                     working.extend(followup_messages)
                 except Exception as exc:
                     yield {"type": "error", "content": f"决策建议执行失败：{exc}"}
@@ -723,7 +728,9 @@ async def stream_chat_react(
 
             final result: skill result(chart/kpis/text) + llm result(text)
         """
-        merged = _merge_finish_result(fallback_plan, last_result, last_skill_name)
+        merged = _finish_merged(
+            result_sink, fallback_plan, last_skill_name, last_result, local_executions
+        )
         """
         stream_result_events:
         transfer the skill result to the frontend page by sse.
@@ -741,5 +748,5 @@ async def stream_chat_react(
         "completed",
         payload={"mode": "react", "exhausted": True},
     )
-    _sink_write(result_sink, last_result, last_skill_name)
+    sync_skill_sink(result_sink, last_result, last_skill_name)
     yield {"type": "done", "content": None}

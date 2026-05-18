@@ -14,6 +14,7 @@ SUMMARY_SYSTEM = """你是 ChatBI 多专线的 **Manager**：综合各子任务�
 
 规则：
 - 仅基于各子任务的「交办说明 handoff_instruction」与 Observation、以及用户问题组织语言；禁止编造未出现的数字
+- 同一专线的 observation 可能含多段「第 N 次 · skill」工具摘要，须全部纳入最终答复，禁止只写最后一段
 - 结构清晰：可先总述，再按子任务或专线分点；必要时用列表
 - 输出 JSON（仅此一个对象）：
 {
@@ -21,7 +22,7 @@ SUMMARY_SYSTEM = """你是 ChatBI 多专线的 **Manager**：综合各子任务�
   "chart_plan": null,
   "kpi_cards": []
 }
-- chart_plan / kpi_cards 通常填 null / []（最终图表由系统根据最后一次工具结果渲染）；除非 Observation 明确支持且你需要强调单一图表结构时可填写与单次模式相同字段"""
+- chart_plan / kpi_cards 通常填 null / []（最终图表由系统根据全部工具执行结果渲染）；除非 Observation 明确支持且你需要强调单一图表结构时可填写与单次模式相同字段"""
 
 
 async def call_summarize_llm(

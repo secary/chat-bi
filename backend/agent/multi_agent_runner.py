@@ -16,6 +16,11 @@ from backend.agent.multi_agent_registry import (
 )
 from backend.agent.multi_agent_summarize import call_summarize_llm
 from backend.agent.observation import summarize_observation
+from backend.agent.skill_history import (
+    build_combined_observation,
+    get_skill_executions,
+    merge_results_for_finish,
+)
 from backend.agent.formatter import stream_result_events
 from backend.agent.runner import stream_specialist
 from backend.trace import log_event
@@ -65,6 +70,7 @@ async def stream_chat_multi_agent(
     progress_lines: List[str] = []
     last_result: Optional[Dict[str, Any]] = None
     last_skill_name: Optional[str] = None
+    all_skill_executions: List[Dict[str, Any]] = []
 
     for rnd in range(1, n_rounds + 1):
         if _is_aborted(trace_id):
@@ -221,10 +227,17 @@ async def stream_chat_multi_agent(
                 last_result = lr
             if isinstance(lsn, str) and lsn:
                 last_skill_name = lsn
+            executions = get_skill_executions(sink)
+            if executions:
+                all_skill_executions.extend(executions)
             obs = (
-                summarize_observation(str(lsn or "skill"), lr)
-                if isinstance(lr, dict)
-                else (acc_text[:1200] if acc_text else "（无工具结果）")
+                build_combined_observation(executions)
+                if executions
+                else (
+                    summarize_observation(str(lsn or "skill"), lr)
+                    if isinstance(lr, dict)
+                    else (acc_text[:1200] if acc_text else "（无工具结果）")
+                )
             )
             # Detect skill-not-found from accumulated text (silent failure case)
             if "未找到技能" in acc_text and not any(
@@ -257,8 +270,15 @@ async def stream_chat_multi_agent(
                     "type": "thinking",
                     "content": "[Manager-汇总] 已生成结构化分析中间件，直接输出。",
                 }
+                merged_auto = merge_results_for_finish(
+                    all_skill_executions or get_skill_executions(sink),
+                    {},
+                    last_skill_name,
+                )
                 async for event in stream_result_events(
-                    last_skill_name or "chatbi-auto-analysis", {}, last_result or {}
+                    last_skill_name or "chatbi-auto-analysis",
+                    {},
+                    merged_auto if merged_auto else (last_result or {}),
                 ):
                     yield event
                 log_event(
@@ -322,9 +342,15 @@ async def stream_chat_multi_agent(
         return
 
     skill_label = last_skill_name or "chatbi-semantic-query"
-    merged: Dict[str, Any] = dict(last_result) if last_result else {}
-    if synth.get("text"):
-        merged["text"] = synth["text"]
+    merged = merge_results_for_finish(
+        all_skill_executions,
+        synth,
+        last_skill_name,
+    )
+    if not all_skill_executions and isinstance(last_result, dict):
+        merged = dict(last_result)
+        if synth.get("text"):
+            merged["text"] = synth["text"]
 
     yield {"type": "thinking", "content": "[Manager-汇总] 正在输出最终结论..."}
 

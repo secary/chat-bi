@@ -6,15 +6,15 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Optional, Sequence
+from typing import Any, Optional, Sequence
 
 CURRENT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(CURRENT_DIR))
 sys.path.insert(0, str(CURRENT_DIR.parents[1]))
 sys.path.insert(0, str(CURRENT_DIR.parents[2]))
 
-from _shared.trace import log_skill_event
-from chart_recommendation_core import recommend_from_input
+from _shared.trace import log_skill_event  # noqa: E402
+from chart_recommendation_core import recommend_from_input  # noqa: E402
 
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
@@ -25,13 +25,11 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def run_from_api(argv: Optional[Sequence[str]] = None, context: Any = None) -> dict[str, Any]:
     args = parse_args(argv)
     raw_input = args.input if args.input is not None else " ".join(args.input_terms)
     if not raw_input.strip():
-        print("ERROR: input is required", file=sys.stderr)
-        return 1
-
+        raise ValueError("input is required")
     log_skill_event(
         "skill.chatbi-chart-recommendation",
         "started",
@@ -51,6 +49,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "kpi_count": len(payload.get("kpis", []) or []),
         },
     )
+    return payload
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    args = parse_args(argv)
+    try:
+        payload = run_from_api(argv)
+    except Exception as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
     if args.json:
         print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:

@@ -8,31 +8,26 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 import sys
-from typing import Optional, Sequence
+from typing import Any, Optional, Sequence
 
 CURRENT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(CURRENT_DIR))
 sys.path.insert(0, str(CURRENT_DIR.parents[1]))
 
-from _shared.db import MysqlCli, default_db
-from decision_advisor_core import (
-    build_advices,
-    build_kpis,
-    build_payload,
-    build_scope,
-    dump_payload,
-    load_facts,
-    parse_focus_dimensions,
-    parse_focus_metrics,
-    render_markdown,
-)
+from _shared.db import MysqlCli, default_db  # noqa: E402
+import decision_advisor_core as advisor_core  # noqa: E402
 
 DEFAULT_DB = default_db()
+build_advices = advisor_core.build_advices
+parse_focus_dimensions = advisor_core.parse_focus_dimensions
+parse_focus_metrics = advisor_core.parse_focus_metrics
 
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate ChatBI decision advice")
-    parser.add_argument("question_terms", nargs="*", help="Optional Chinese scope, such as 华东2026年4月决策建议")
+    parser.add_argument(
+        "question_terms", nargs="*", help="Optional Chinese scope, such as 华东2026年4月决策建议"
+    )
     parser.add_argument("--question", help="Optional Chinese scope; overrides positional question")
     parser.add_argument("--json", action="store_true", help="print structured JSON")
     parser.add_argument("--host", default=DEFAULT_DB["host"])
@@ -43,7 +38,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def run_from_api(argv: Optional[Sequence[str]] = None, context: Any = None) -> dict[str, Any]:
     args = parse_args(argv)
     db = MysqlCli(
         {
@@ -55,13 +50,27 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         }
     )
     question = args.question if args.question is not None else " ".join(args.question_terms)
+    facts = advisor_core.load_facts(db, advisor_core.build_scope(db, question))
+    advices = advisor_core.build_advices(facts)
+    return advisor_core.build_payload(facts, advices)
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    args = parse_args(argv)
     try:
-        facts = load_facts(db, build_scope(db, question))
-        advices = build_advices(facts)
+        payload = run_from_api(argv)
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
-    print(dump_payload(build_payload(facts, advices)) if args.json else render_markdown(facts, advices))
+    if args.json:
+        print(advisor_core.dump_payload(payload))
+    else:
+        print(
+            advisor_core.render_markdown(
+                payload.get("data", {}).get("facts", {}),
+                payload.get("data", {}).get("advices", []),
+            )
+        )
     return 0
 
 

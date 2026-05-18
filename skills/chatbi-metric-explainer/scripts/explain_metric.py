@@ -7,7 +7,7 @@ import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
@@ -58,7 +58,9 @@ def load_aliases(db: MysqlCli) -> Dict[str, str]:
     return {row["alias_name"]: row["standard_name"] for row in rows}
 
 
-def pick_metric(question: str, metrics: Dict[str, MetricDef], aliases: Dict[str, str]) -> Optional[MetricDef]:
+def pick_metric(
+    question: str, metrics: Dict[str, MetricDef], aliases: Dict[str, str]
+) -> Optional[MetricDef]:
     normalized = normalize_text(question)
     candidates: List[tuple[int, MetricDef]] = []
     for alias, standard in aliases.items():
@@ -100,7 +102,9 @@ def load_field_details(db: MysqlCli, table: str, fields: List[str]) -> List[Dict
 
 
 def related_aliases(metric_name: str, aliases: Dict[str, str]) -> List[str]:
-    return sorted([alias for alias, standard in aliases.items() if standard == metric_name], key=len)
+    return sorted(
+        [alias for alias, standard in aliases.items() if standard == metric_name], key=len
+    )
 
 
 def render_text(metric: MetricDef, aliases: List[str], fields: List[Dict[str, str]]) -> str:
@@ -138,7 +142,9 @@ def explain_metric(question: str, db: MysqlCli) -> Dict[str, object]:
     aliases = load_aliases(db)
     metric = pick_metric(question, metrics, aliases)
     if not metric:
-        raise ValueError("未识别到可解释的指标，请明确说明指标名称，例如：销售额、毛利率、目标完成率。")
+        raise ValueError(
+            "未识别到可解释的指标，请明确说明指标名称，例如：销售额、毛利率、目标完成率。"
+        )
     fields = load_field_details(db, metric.table, extract_formula_fields(metric.formula))
     alias_list = related_aliases(metric.name, aliases)
     return skill_response(
@@ -169,7 +175,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def run_from_api(argv: Optional[Sequence[str]] = None, context: Any = None) -> Dict[str, object]:
     args = parse_args(argv)
     db = MysqlCli(
         {
@@ -180,8 +186,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "database": args.database,
         }
     )
+    return explain_metric(" ".join(args.question), db)
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    args = parse_args(argv)
     try:
-        result = explain_metric(" ".join(args.question), db)
+        result = run_from_api(argv)
     except Exception as exc:
         if args.json:
             print(json.dumps(skill_response("error", str(exc)), ensure_ascii=False))

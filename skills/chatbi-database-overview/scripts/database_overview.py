@@ -5,7 +5,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
@@ -222,7 +222,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def run_from_api(argv: Optional[Sequence[str]] = None, context: Any = None) -> Dict[str, object]:
     args = parse_args(argv)
     db = MysqlCli(
         {
@@ -234,8 +234,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         }
     )
     question = " ".join(args.question) if args.question else ""
+    return database_overview(db, args.database, max(1, args.include_columns), question)
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    args = parse_args(argv)
     try:
-        result = database_overview(db, args.database, max(1, args.include_columns), question)
+        result = run_from_api(argv)
     except Exception as exc:
         if args.json:
             print(json.dumps(skill_response("error", str(exc)), ensure_ascii=False))

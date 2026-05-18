@@ -13,7 +13,7 @@ import argparse
 import json
 from pathlib import Path
 import sys
-from typing import Optional, Sequence
+from typing import Any, Optional, Sequence
 
 CURRENT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(CURRENT_DIR))
@@ -44,7 +44,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def run_from_api(argv: Optional[Sequence[str]] = None, context: Any = None) -> dict[str, Any]:
     args = parse_args(argv)
     db = MysqlCli(
         {
@@ -56,28 +56,29 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         }
     )
     question = " ".join(args.question)
+    plan = make_plan(question, db)
+    rows = db.query(plan.sql)
+    if args.chart_html:
+        write_chart_html(args.chart_html, question, plan, rows)
+    return build_json_payload(question, plan.sql, rows, plan=plan)
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    args = parse_args(argv)
     try:
-        plan = make_plan(question, db)
-        rows = db.query(plan.sql)
+        payload = run_from_api(argv)
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
     if args.show_sql:
-        print(plan.sql)
+        print(payload["data"].get("sql", ""))
         print()
     if args.json:
-        print(
-            json.dumps(
-                build_json_payload(question, plan.sql, rows, plan=plan),
-                ensure_ascii=False,
-                indent=2,
-            )
-        )
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
-        print_table(rows)
+        print_table(payload["data"].get("rows", []))
     if args.chart_html:
-        write_chart_html(args.chart_html, question, plan, rows)
         print(f"\nchart: {args.chart_html}")
     return 0
 

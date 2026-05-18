@@ -3,7 +3,7 @@ from __future__ import annotations
 import csv
 import os
 import subprocess
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 
 def default_db() -> Dict[str, str]:
@@ -17,11 +17,20 @@ def default_db() -> Dict[str, str]:
 
 
 class MysqlCli:
-    def __init__(self, config: Dict[str, str]):
+    def __init__(
+        self,
+        config: Dict[str, str],
+        *,
+        cancelled: Optional[Callable[[], bool]] = None,
+        timeout_seconds: float = 30.0,
+    ):
         self.config = config
         self.mysql_cmd = os.getenv("CHATBI_MYSQL_CMD", "mysql")
+        self.cancelled = cancelled or (lambda: False)
+        self.timeout_seconds = timeout_seconds
 
     def query(self, sql: str) -> List[Dict[str, str]]:
+        self._check_active()
         base_cmd = [
             self.mysql_cmd,
             f"-h{self.config['host']}",
@@ -38,6 +47,7 @@ class MysqlCli:
             sql,
         ]
         proc = self._run_with_ssl_fallback(base_cmd, tail_cmd)
+        self._check_active()
         if proc.returncode != 0:
             raise RuntimeError(proc.stderr.strip() or proc.stdout.strip())
         lines = [line for line in proc.stdout.splitlines() if line.strip()]
@@ -51,12 +61,17 @@ class MysqlCli:
         attempts = [["--ssl-mode=DISABLED"], ["--ssl=0"], []]
         last_proc: Optional[subprocess.CompletedProcess[str]] = None
         for ssl_args in attempts:
-            proc = subprocess.run(
-                [*base_cmd, *ssl_args, *tail_cmd],
-                text=True,
-                capture_output=True,
-                check=False,
-            )
+            self._check_active()
+            try:
+                proc = subprocess.run(
+                    [*base_cmd, *ssl_args, *tail_cmd],
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                    timeout=self.timeout_seconds if self.timeout_seconds > 0 else None,
+                )
+            except subprocess.TimeoutExpired as exc:
+                raise RuntimeError("数据库查询超时") from exc
             last_proc = proc
             error = proc.stderr.strip()
             if proc.returncode == 0:
@@ -69,6 +84,10 @@ class MysqlCli:
         if last_proc is None:
             raise RuntimeError("mysql command was not executed")
         return last_proc
+
+    def _check_active(self) -> None:
+        if self.cancelled():
+            raise RuntimeError("用户中止了查询")
 
 
 def quote_ident(identifier: str) -> str:

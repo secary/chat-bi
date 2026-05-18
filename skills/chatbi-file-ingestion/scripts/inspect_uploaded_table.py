@@ -7,13 +7,14 @@ import sys
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 SKILLS_DIR = SCRIPT_DIR.parents[1]
 sys.path.insert(0, str(SKILLS_DIR))
 
 from _shared.output import skill_response  # noqa: E402
+from _shared.runtime import ensure_active  # noqa: E402
 from table_profile import build_table_profile  # noqa: E402
 
 Schema = Dict[str, Dict[str, str]]
@@ -73,13 +74,19 @@ def build_header_map() -> Dict[str, str]:
 HEADER_MAP = build_header_map()
 
 
-def read_csv(path: Path) -> Tuple[List[str], List[Dict[str, Any]]]:
+def read_csv(path: Path, context: Any = None) -> Tuple[List[str], List[Dict[str, Any]]]:
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
         reader = csv.DictReader(handle)
-        return list(reader.fieldnames or []), [dict(row) for row in reader]
+        headers = list(reader.fieldnames or [])
+        rows: List[Dict[str, Any]] = []
+        for idx, row in enumerate(reader, start=1):
+            if idx % 100 == 0:
+                ensure_active(context)
+            rows.append(dict(row))
+        return headers, rows
 
 
-def read_xlsx(path: Path) -> Tuple[List[str], List[Dict[str, Any]]]:
+def read_xlsx(path: Path, context: Any = None) -> Tuple[List[str], List[Dict[str, Any]]]:
     try:
         from openpyxl import load_workbook
     except ImportError as exc:
@@ -92,17 +99,19 @@ def read_xlsx(path: Path) -> Tuple[List[str], List[Dict[str, Any]]]:
         return [], []
     headers = [str(value).strip() if value is not None else "" for value in rows[0]]
     data_rows = []
-    for row in rows[1:]:
+    for idx, row in enumerate(rows[1:], start=1):
+        if idx % 100 == 0:
+            ensure_active(context)
         data_rows.append({header: value for header, value in zip(headers, row)})
     return headers, data_rows
 
 
-def read_table(path: Path) -> Tuple[List[str], List[Dict[str, Any]]]:
+def read_table(path: Path, context: Any = None) -> Tuple[List[str], List[Dict[str, Any]]]:
     suffix = path.suffix.lower()
     if suffix == ".csv":
-        return read_csv(path)
+        return read_csv(path, context)
     if suffix in {".xlsx", ".xlsm"}:
-        return read_xlsx(path)
+        return read_xlsx(path, context)
     raise ValueError("仅支持 .csv、.xlsx、.xlsm 文件")
 
 
@@ -154,13 +163,15 @@ def coerce_value(value: Any, value_type: str) -> Tuple[Any, Optional[str]]:
 
 
 def validate_rows(
-    rows: List[Dict[str, Any]], header_map: Dict[str, str], table: str
+    rows: List[Dict[str, Any]], header_map: Dict[str, str], table: str, context: Any = None
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     normalized_rows = []
     errors = []
     schema = SCHEMAS[table]
     reverse_map = {target: source for source, target in header_map.items()}
     for row_index, row in enumerate(rows, start=2):
+        if row_index % 100 == 0:
+            ensure_active(context)
         normalized = {}
         for field, config in schema.items():
             source_header = reverse_map.get(field)
@@ -180,10 +191,12 @@ def inspect_file(
     sample_size: int,
     include_rows: bool,
     question: str = "",
+    context: Any = None,
 ) -> Dict[str, Any]:
+    ensure_active(context)
     if not path.exists():
         raise FileNotFoundError(f"文件不存在：{path}")
-    headers, rows = read_table(path)
+    headers, rows = read_table(path, context)
     header_map = normalize_headers(headers)
     normalized_fields = list(header_map.values())
     unknown = [header for header in headers if header not in header_map]
@@ -201,7 +214,7 @@ def inspect_file(
         required = set(SCHEMAS[target_table].keys())
         present = set(normalized_fields)
         missing = sorted(required - present)
-        normalized_rows, type_errors = validate_rows(rows, header_map, target_table)
+        normalized_rows, type_errors = validate_rows(rows, header_map, target_table, context)
         valid = not missing and not type_errors
 
     if valid and target_table:
@@ -263,7 +276,7 @@ def inspect_file(
     )
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Inspect an uploaded ChatBI CSV/XLSX file.")
     parser.add_argument("file_path")
     parser.add_argument("--table", choices=sorted(SCHEMAS.keys()))
@@ -271,19 +284,25 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--include-rows", action="store_true")
     parser.add_argument("--question", default="")
     parser.add_argument("--json", action="store_true")
-    return parser.parse_args()
+    return parser.parse_args(argv)
+
+
+def run_from_api(argv: Optional[Sequence[str]] = None, context: Any = None) -> Dict[str, Any]:
+    args = parse_args(argv)
+    return inspect_file(
+        Path(args.file_path),
+        args.table,
+        args.sample_size,
+        args.include_rows,
+        question=str(args.question or ""),
+        context=context,
+    )
 
 
 def main() -> int:
     args = parse_args()
     try:
-        result = inspect_file(
-            Path(args.file_path),
-            args.table,
-            args.sample_size,
-            args.include_rows,
-            question=str(args.question or ""),
-        )
+        result = run_from_api()
     except Exception as exc:
         if args.json:
             print(json.dumps(skill_response("error", str(exc)), ensure_ascii=False))

@@ -12,10 +12,9 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence
+from typing import Any, Dict, Optional, Sequence
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
@@ -78,10 +77,7 @@ def insert_alias(
 
 
 def init_sql_line(alias_name: str, standard_name: str, object_type: str, description: str) -> str:
-    return (
-        f"('{alias_name}', '{standard_name}', '{object_type}', "
-        f"'{description}')"
-    )
+    return f"('{alias_name}', '{standard_name}', '{object_type}', " f"'{description}')"
 
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
@@ -104,7 +100,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def run_from_api(argv: Optional[Sequence[str]] = None, context: Any = None) -> dict[str, Any]:
     args = parse_args(argv)
     config = {
         "host": args.host,
@@ -114,34 +110,38 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "database": args.database,
     }
     db = MysqlCli(config)
+    object_type = infer_object_type(db, args.standard, args.type)
+    description = args.description or f"{args.alias}统一映射到{args.standard}{object_type}"
+    inserted = insert_alias(db, args.alias, args.standard, object_type, description)
+    status = "inserted" if inserted else "exists"
+    text = f"{status}: {args.alias} -> {args.standard} ({object_type})"
+    return skill_response(
+        kind="alias",
+        text=text,
+        data={
+            "status": status,
+            "alias": args.alias,
+            "standard": args.standard,
+            "object_type": object_type,
+            "init_sql": init_sql_line(args.alias, args.standard, object_type, description),
+        },
+    )
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    args = parse_args(argv)
     try:
-        object_type = infer_object_type(db, args.standard, args.type)
-        description = args.description or f"{args.alias}统一映射到{args.standard}{object_type}"
-        inserted = insert_alias(db, args.alias, args.standard, object_type, description)
+        payload = run_from_api(argv)
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
-
-    status = "inserted" if inserted else "exists"
-    text = f"{status}: {args.alias} -> {args.standard} ({object_type})"
     if args.json:
-        payload = skill_response(
-            kind="alias",
-            text=text,
-            data={
-                "status": status,
-                "alias": args.alias,
-                "standard": args.standard,
-                "object_type": object_type,
-                "init_sql": init_sql_line(args.alias, args.standard, object_type, description),
-            },
-        )
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 0
 
-    print(text)
+    print(payload["text"])
     if args.print_init_sql:
-        print(init_sql_line(args.alias, args.standard, object_type, description))
+        print(payload["data"]["init_sql"])
     return 0
 
 

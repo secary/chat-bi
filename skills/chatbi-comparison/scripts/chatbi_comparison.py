@@ -15,7 +15,7 @@ import json
 import re
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
@@ -486,12 +486,15 @@ def _pair_kpis(cur_total: float, prev_total: float, meta: Dict, cur: int, prev: 
 # ---------------------------------------------------------------------------
 
 
-def main() -> None:
+def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("question")
     parser.add_argument("--json", action="store_true", dest="json_out")
-    args = parser.parse_args()
+    return parser.parse_args(argv)
 
+
+def run_from_api(argv: Optional[Sequence[str]] = None, context: Any = None) -> Dict[str, Any]:
+    args = parse_args(argv)
     db = MysqlCli(DEFAULT_DB)
     question = args.question
 
@@ -500,16 +503,20 @@ def main() -> None:
     mode = detect_mode(question)
     year = detect_year(question)
 
+    if mode == "all_months":
+        return run_all_months(db, metric_meta, metric_name, year)
+    if mode == "quarterly":
+        return run_quarterly(db, metric_meta, metric_name, year)
+    _, cur_month, prev_month = detect_months(question, db)
+    return run_month_pair(
+        db, metric_meta, dim_field, dim_name, metric_name, year, cur_month, prev_month
+    )
+
+
+def main(argv: Optional[Sequence[str]] = None) -> None:
+    args = parse_args(argv)
     try:
-        if mode == "all_months":
-            out = run_all_months(db, metric_meta, metric_name, year)
-        elif mode == "quarterly":
-            out = run_quarterly(db, metric_meta, metric_name, year)
-        else:
-            _, cur_month, prev_month = detect_months(question, db)
-            out = run_month_pair(
-                db, metric_meta, dim_field, dim_name, metric_name, year, cur_month, prev_month
-            )
+        out = run_from_api(argv)
     except RuntimeError as exc:
         out = skill_response("error", f"查询失败：{exc}")
 

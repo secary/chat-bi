@@ -6,35 +6,44 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Optional, Sequence
+from typing import Any, Optional, Sequence
 
 CURRENT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(CURRENT_DIR))
 sys.path.insert(0, str(CURRENT_DIR.parents[1]))
 
-from _shared.output import skill_response
-from _shared.trace import log_skill_event
-from semantic_processing_core import parse_question, render_summary
+from _shared.output import skill_response  # noqa: E402
+from _shared.trace import log_skill_event  # noqa: E402
+from semantic_processing_core import parse_question, render_summary  # noqa: E402
 
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Normalize banking BI question to Query Intent JSON")
+    parser = argparse.ArgumentParser(
+        description="Normalize banking BI question to Query Intent JSON"
+    )
     parser.add_argument("question_terms", nargs="*", help="Chinese banking BI question")
     parser.add_argument("--question", help="Optional full question; overrides positional args")
     parser.add_argument("--json", action="store_true", help="Print structured SkillResult JSON")
     return parser.parse_args(argv)
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def run_from_api(argv: Optional[Sequence[str]] = None, context: Any = None) -> dict[str, Any]:
     args = parse_args(argv)
-    question = (args.question if args.question is not None else " ".join(args.question_terms)).strip()
+    question = (
+        args.question if args.question is not None else " ".join(args.question_terms)
+    ).strip()
     if not question:
-        print("ERROR: question is required", file=sys.stderr)
-        return 1
-
-    log_skill_event("skill.chatbi-semantic-processing", "started", "semantic processing started", {"question": question[:160]})
+        raise ValueError("question is required")
+    log_skill_event(
+        "skill.chatbi-semantic-processing",
+        "started",
+        "semantic processing started",
+        {"question": question[:160]},
+    )
     query_intent = parse_question(question)
-    payload = skill_response("semantic_intent", render_summary(query_intent), {"query_intent": query_intent})
+    payload = skill_response(
+        "semantic_intent", render_summary(query_intent), {"query_intent": query_intent}
+    )
     log_skill_event(
         "skill.chatbi-semantic-processing",
         "completed",
@@ -46,6 +55,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "missing_slots": query_intent["missing_slots"],
         },
     )
+    return payload
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    args = parse_args(argv)
+    try:
+        payload = run_from_api(argv)
+    except Exception as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
     print(json.dumps(payload, ensure_ascii=False, indent=2) if args.json else payload["text"])
     return 0
 

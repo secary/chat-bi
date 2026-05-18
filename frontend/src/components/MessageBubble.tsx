@@ -30,9 +30,20 @@ function trimZero(value: string): string {
   return value.replace(/\.0+$/, '').replace(/(\.\d*[1-9])0+$/, '$1');
 }
 
-function wrapCategoryLabel(value: unknown): string {
+function formatCategoryLabel(value: unknown): string {
   const text = String(value ?? '').trim();
   if (!text) return '';
+  const yearMonth = text.match(/^(\d{4})-(\d{2})$/);
+  if (yearMonth) {
+    return `${yearMonth[1]}\n${yearMonth[2]}`;
+  }
+  const fullDate = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (fullDate) {
+    return `${fullDate[2]}-${fullDate[3]}\n${fullDate[1]}`;
+  }
+  if (/^M\d+$/i.test(text)) {
+    return text.toUpperCase();
+  }
   if (text.length <= 4) return text;
   const parts: string[] = [];
   for (let index = 0; index < text.length; index += 4) {
@@ -41,9 +52,42 @@ function wrapCategoryLabel(value: unknown): string {
   return parts.slice(0, 2).join('\n');
 }
 
+function axisLabelConfig(axis: Record<string, unknown>, heatmap: boolean): Record<string, unknown> {
+  const count = axisCategoryCount(axis);
+  const dense = count >= 8;
+  return {
+    color: '#64748b',
+    margin: heatmap ? 18 : 12,
+    rotate: heatmap ? 0 : dense ? 0 : 0,
+    interval: 0,
+    hideOverlap: true,
+    lineHeight: heatmap ? 15 : 14,
+    formatter: formatCategoryLabel,
+    ...((axis.axisLabel as Record<string, unknown>) ?? {}),
+  };
+}
+
+function isHeatmapOption(option: Record<string, unknown>): boolean {
+  const series = Array.isArray(option.series) ? option.series : [];
+  return series.some((item) => (item as Record<string, unknown>)?.type === 'heatmap');
+}
+
+function axisCategoryCount(axis: unknown): number {
+  if (!axis || Array.isArray(axis)) return 0;
+  const data = (axis as Record<string, unknown>).data;
+  return Array.isArray(data) ? data.length : 0;
+}
+
+function heatmapChartHeight(option: Record<string, unknown>): number {
+  const xCount = axisCategoryCount(option.xAxis);
+  const yCount = axisCategoryCount(option.yAxis);
+  return Math.max(360, Math.min(560, 220 + yCount * 44 + Math.max(0, xCount - 4) * 10));
+}
+
 function withDashboardTheme(option: Record<string, unknown>): Record<string, unknown> {
   const next = structuredClone(option);
   const palette = ['#0ea5e9', '#22c55e', '#8b5cf6', '#f59e0b', '#f43f5e', '#14b8a6'];
+  const heatmap = isHeatmapOption(next);
 
   next.backgroundColor = 'transparent';
   next.textStyle = { color: '#334155' };
@@ -70,17 +114,17 @@ function withDashboardTheme(option: Record<string, unknown>): Record<string, unk
 
   const grid = (next.grid ?? {}) as Record<string, unknown>;
   const rawBottom = grid.bottom;
-  let bottomOut: number | string = 56;
+  let bottomOut: number | string = heatmap ? 96 : 56;
   if (typeof rawBottom === 'number' && !Number.isNaN(rawBottom)) {
-    bottomOut = Math.max(56, rawBottom);
+    bottomOut = Math.max(heatmap ? 96 : 56, rawBottom);
   } else if (rawBottom !== undefined && rawBottom !== null && rawBottom !== '') {
     bottomOut = rawBottom as string | number;
   }
   next.grid = {
     ...grid,
-    left: 48,
-    right: 24,
-    top: 36,
+    left: heatmap ? 72 : 48,
+    right: heatmap ? 36 : 24,
+    top: heatmap ? 24 : 36,
     bottom: bottomOut,
     containLabel: grid.containLabel !== undefined ? grid.containLabel : true,
   };
@@ -91,14 +135,7 @@ function withDashboardTheme(option: Record<string, unknown>): Record<string, unk
     ...(axis as Record<string, unknown>),
     axisLine: { lineStyle: { color: 'rgba(148, 163, 184, 0.22)' } },
     axisTick: { show: false },
-    axisLabel: {
-      color: '#64748b',
-      margin: 14,
-      rotate: 0,
-      interval: 0,
-      formatter: wrapCategoryLabel,
-      ...(((axis as Record<string, unknown>).axisLabel as Record<string, unknown>) ?? {}),
-    },
+    axisLabel: axisLabelConfig(axis as Record<string, unknown>, heatmap),
     splitLine: { show: false },
   }));
 
@@ -111,7 +148,10 @@ function withDashboardTheme(option: Record<string, unknown>): Record<string, unk
     axisLabel: {
       color: '#64748b',
       margin: 10,
-      formatter: formatAxisNumber,
+      formatter:
+        String((axis as Record<string, unknown>).type || '') === 'category'
+          ? formatCategoryLabel
+          : formatAxisNumber,
       ...(((axis as Record<string, unknown>).axisLabel as Record<string, unknown>) ?? {}),
     },
     splitLine: {
@@ -195,8 +235,53 @@ function withDashboardTheme(option: Record<string, unknown>): Record<string, unk
         itemStyle: { borderColor: '#ffffff', borderWidth: 2, ...(series.itemStyle as Record<string, unknown> | undefined) },
       };
     }
+    if (series.type === 'heatmap') {
+      const data = Array.isArray(series.data) ? series.data : [];
+      const dense = data.length > 18;
+      return {
+        ...series,
+        progressive: 0,
+        animation: false,
+        label: {
+          show: !dense,
+          color: '#0f172a',
+          fontSize: 10,
+          formatter: ({ value }: { value: unknown }) =>
+            Array.isArray(value) ? formatAxisNumber(value[2]) : formatAxisNumber(value),
+          ...(series.label as Record<string, unknown> | undefined),
+        },
+        itemStyle: {
+          borderColor: 'rgba(255,255,255,0.75)',
+          borderWidth: 1,
+          ...(series.itemStyle as Record<string, unknown> | undefined),
+        },
+      };
+    }
     return series;
   });
+
+  if (heatmap) {
+    const visualMap = (next.visualMap ?? {}) as Record<string, unknown>;
+    next.visualMap = {
+      ...visualMap,
+      show: false,
+      orient: 'horizontal',
+      left: 'center',
+      bottom: 18,
+      itemWidth: 220,
+      itemHeight: 12,
+      textStyle: { color: '#64748b', fontSize: 11 },
+      calculable: false,
+      inRange: {
+        color: ['#eff6ff', '#c7d2fe', '#93c5fd', '#6366f1'],
+      },
+    };
+    const heatmapTooltip = (next.tooltip ?? {}) as Record<string, unknown>;
+    next.tooltip = {
+      ...heatmapTooltip,
+      trigger: 'item',
+    };
+  }
 
   return next;
 }
@@ -391,6 +476,7 @@ function DashboardMiddlewareCard({
             const opt = withDashboardTheme(chart as Record<string, unknown>);
             const w = dashboard.widgets[i];
             if (!opt?.series || (Array.isArray(opt.series) && opt.series.length === 0)) return null;
+            const chartHeight = isHeatmapOption(opt) ? heatmapChartHeight(opt) : 360;
             return (
               <div
                 key={i}
@@ -412,7 +498,7 @@ function DashboardMiddlewareCard({
                 <div className="px-4 pb-8 pt-2 sm:px-5">
                   <ReactECharts
                     option={opt}
-                    style={{ height: 360, width: '100%' }}
+                    style={{ height: chartHeight, width: '100%' }}
                     notMerge
                     opts={{ renderer: 'canvas' }}
                   />

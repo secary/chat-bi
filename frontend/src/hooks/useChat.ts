@@ -286,39 +286,3 @@ export function writeSidebarOpenPreference(value: boolean): void {
     /* ignore */
   }
 }
-
-export function readMultiAgentsPreference(): boolean {
-  try {
-    return localStorage.getItem(MULTI_AGENTS_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
-export function writeMultiAgentsPreference(value: boolean): void {
-  try {
-    localStorage.setItem(MULTI_AGENTS_KEY, value ? '1' : '0');
-  } catch {
-    /* ignore */
-  }
-}
-
-const SIDEBAR_OPEN_KEY = 'chatbi_sidebar_open';
-
-export function readSidebarOpenPreference(): boolean {
-  try {
-    const v = localStorage.getItem(SIDEBAR_OPEN_KEY);
-    if (v === null) return true;
-    return v === '1';
-  } catch {
-    return true;
-  }
-}
-
-export function writeSidebarOpenPreference(value: boolean): void {
-  try {
-    localStorage.setItem(SIDEBAR_OPEN_KEY, value ? '1' : '0');
-  } catch {
-    /* ignore */
-  }
-}

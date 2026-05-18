@@ -4,6 +4,7 @@ import json
 import os
 import re
 import sys
+import tempfile
 from typing import Any, Dict, List, Optional
 
 from backend.agent.prompt_builder import SkillDoc
@@ -219,37 +220,45 @@ def run_script(
 
     import subprocess as _subprocess
 
-    proc = _subprocess.Popen(
-        cmd,
-        cwd=str(skill.skill_dir),
-        stdout=_subprocess.PIPE,
-        stderr=_subprocess.PIPE,
-        text=True,
-        env={**os.environ, **skill_env(trace_id, skill_db_overrides)},
-    )
+    with (
+        tempfile.TemporaryFile(mode="w+t", encoding="utf-8") as stdout_file,
+        tempfile.TemporaryFile(mode="w+t", encoding="utf-8") as stderr_file,
+    ):
+        proc = _subprocess.Popen(
+            cmd,
+            cwd=str(skill.skill_dir),
+            stdout=stdout_file,
+            stderr=stderr_file,
+            text=True,
+            env={**os.environ, **skill_env(trace_id, skill_db_overrides)},
+        )
 
-    # Poll abort in a loop while subprocess runs
-    while proc.poll() is None:
-        if is_aborted(trace_id):
-            proc.kill()
-            raise RuntimeError("用户中止了查询")
-        import time
+        # Avoid PIPE deadlocks when a skill returns large JSON payloads.
+        while proc.poll() is None:
+            if is_aborted(trace_id):
+                proc.kill()
+                proc.wait()
+                raise RuntimeError("用户中止了查询")
+            import time
 
-        time.sleep(0.1)
+            time.sleep(0.1)
 
-    stdout, stderr = proc.communicate()
+        stdout_file.seek(0)
+        stderr_file.seek(0)
+        stdout = stdout_file.read()
+        stderr = stderr_file.read()
 
-    if proc.returncode != 0:
-        raise RuntimeError(stderr.strip() or stdout.strip())
+        if proc.returncode != 0:
+            raise RuntimeError(stderr.strip() or stdout.strip())
 
-    output = stdout.strip()
-    if not output:
-        return {"kind": "empty", "text": "脚本执行完毕，未返回数据。", "data": {}}
+        output = stdout.strip()
+        if not output:
+            return {"kind": "empty", "text": "脚本执行完毕，未返回数据。", "data": {}}
 
-    try:
-        return normalize_skill_result(json.loads(output), skill.name)
-    except json.JSONDecodeError:
-        return {"kind": "text", "text": output, "data": {}}
+        try:
+            return normalize_skill_result(json.loads(output), skill.name)
+        except json.JSONDecodeError:
+            return {"kind": "text", "text": output, "data": {}}
 
 
 def skill_result_log_payload(result: Dict[str, Any]) -> Dict[str, Any]:

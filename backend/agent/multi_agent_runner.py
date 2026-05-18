@@ -23,6 +23,7 @@ from backend.agent.skill_history import (
 )
 from backend.agent.formatter import stream_result_events
 from backend.agent.runner import stream_specialist
+from backend.agent.data_source_intent import resolve_data_source
 from backend.trace import log_event
 
 
@@ -162,6 +163,8 @@ async def stream_chat_multi_agent(
             return
 
         obs_by_idx: Dict[int, str] = {}
+        skill_failure_this_batch = False
+        batch_data_intent = resolve_data_source(messages)
         for orig_idx, task in ordered:
             agent_id = str(task["agent_id"])
             label = agent_label(agent_id)
@@ -177,6 +180,7 @@ async def stream_chat_multi_agent(
                 messages,
                 str(task["handoff_instruction"]),
                 prior,
+                data_source_intent=batch_data_intent,
             )
             sink: Dict[str, Any] = {}
             acc_text = ""
@@ -214,7 +218,8 @@ async def stream_chat_multi_agent(
                         "content": f"[{label}] 错误：{err_content}",
                     }
                     # Track skill-not-found errors for Manager re-planning
-                    if "未找到技能" in err_content:
+                    if "未找到技能" in err_content or "skill_not_in_line" in err_content:
+                        skill_failure_this_batch = True
                         missing = err_content.split("未找到技能：")[-1].strip()
                         progress_lines.append(
                             f"[技能缺失提示] {label} 无法执行 skill「{missing}」，"
@@ -240,16 +245,26 @@ async def stream_chat_multi_agent(
                 )
             )
             # Detect skill-not-found from accumulated text (silent failure case)
-            if "未找到技能" in acc_text and not any(
-                "未找到技能" in line for line in progress_lines
+            if ("未找到技能" in acc_text or "skill_not_in_line" in acc_text) and not any(
+                "技能缺失提示" in line for line in progress_lines
             ):
-                missing_match = [s for s in acc_text.split("\n") if "未找到技能" in s]
+                skill_failure_this_batch = True
+                missing_match = [
+                    s for s in acc_text.split("\n") if "未找到技能" in s or "skill_not_in_line" in s
+                ]
                 if missing_match:
-                    missing = missing_match[0].split("未找到技能：")[-1].strip()
+                    line0 = missing_match[0]
+                    missing = (
+                        line0.split("未找到技能：")[-1].strip()
+                        if "未找到技能" in line0
+                        else "（见 Observation）"
+                    )
                     progress_lines.append(
                         f"[技能缺失提示] {label} 无法执行 skill「{missing}」，"
                         f"该专线不具备此技能。Manager 应在下一轮重新指派到拥有「{missing}」的专线。"
                     )
+            if "skill_not_in_line" in obs:
+                skill_failure_this_batch = True
             obs_by_idx[orig_idx] = obs
             hi = str(task["handoff_instruction"])
             progress_lines.append(
@@ -298,6 +313,12 @@ async def stream_chat_multi_agent(
             break
         fin = plan.get("finalize_after_this_batch")
         stop_planning = fin is None or bool(fin)
+        if skill_failure_this_batch and rnd < n_rounds:
+            stop_planning = False
+            yield {
+                "type": "thinking",
+                "content": "[Manager-规划] 子专线技能调用失败，将进行下一轮重新指派。",
+            }
         if stop_planning:
             yield {
                 "type": "thinking",

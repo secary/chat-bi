@@ -31,7 +31,21 @@ class MultiAgentManagerTest(unittest.TestCase):
 
     def test_manager_context_hints_empty_without_cues(self) -> None:
         msgs = [{"role": "user", "content": "1-4 月各区域销售额排行"}]
-        self.assertEqual(_manager_context_hints(msgs), "")
+        h = _manager_context_hints(msgs)
+        self.assertIn("demo_query", h)
+
+    def test_manager_context_hints_demo_db_opt_out(self) -> None:
+        msgs = [
+            {"role": "user", "content": "请分析 /tmp/chatbi-uploads/session_1.csv"},
+            {
+                "role": "user",
+                "content": "不考虑上传，从数据库查各区域 2026 年 1-4 月销售额排行",
+            },
+        ]
+        h = _manager_context_hints(msgs)
+        self.assertIn("demo_query", h)
+        self.assertIn("semantic-query", h)
+        self.assertIn("勿**派 **upload_analyst** 处理本轮问数", h)
 
     def test_validate_rejects_over_cap(self) -> None:
         raw = [
@@ -165,7 +179,7 @@ class MultiAgentManagerTest(unittest.TestCase):
         )
         text = build_react_system_prompt_for_subagent([doc])
         self.assertIn("chatbi-semantic-query", text)
-        self.assertNotIn("chatbi-file-ingestion", text)
+        self.assertNotIn("### chatbi-file-ingestion", text)
 
     def test_build_subtask_messages_preserves_prior_user(self) -> None:
         msgs = [
@@ -174,7 +188,8 @@ class MultiAgentManagerTest(unittest.TestCase):
             {"role": "user", "content": "original ask"},
         ]
         out = build_subtask_messages(msgs, "do the thing", prior_observation="prev summary")
-        self.assertTrue(out[-1]["content"].startswith("【Manager 交办】"))
+        self.assertIn("【本轮数据源】", out[-1]["content"])
+        self.assertTrue("【Manager 交办】" in out[-1]["content"])
         self.assertIn("original ask", out[-1]["content"])
         self.assertIn("prev summary", out[-1]["content"])
 

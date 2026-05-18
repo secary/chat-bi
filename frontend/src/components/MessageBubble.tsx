@@ -254,6 +254,50 @@ function chartGridClassName(count: number): string {
   return `${shell} grid-cols-1 min-[720px]:grid-cols-2`;
 }
 
+function resolveDashboardMeta(
+  dashboard: NonNullable<ChatMessage['dashboardReady']>,
+): {
+  eyebrow: string;
+  primaryBadge: string;
+  secondaryBadge: string;
+  containerClassName: string;
+} {
+  const domainLabel = dashboard.dataset.domain_label || dashboard.dataset.domain_guess || '分析看板';
+  const kind = dashboard.dashboard_kind || '';
+  const headerMeta = dashboard.header_meta;
+  const eyebrow = headerMeta?.eyebrow?.trim() || dashboard.title || '自动分析看板';
+  const primaryBadge = headerMeta?.primary_badge?.trim() || '自动生成看板';
+  const secondaryBadge = headerMeta?.secondary_badge?.trim() || domainLabel;
+
+  if (kind === 'wealth_product_board') {
+    return {
+      eyebrow,
+      primaryBadge,
+      secondaryBadge,
+      containerClassName:
+        'mt-3 min-w-0 overflow-hidden rounded-[28px] border border-amber-200 bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.14),_transparent_28%),linear-gradient(180deg,_#fffdf7_0%,_#fff7ed_100%)] shadow-[0_18px_50px_rgba(245,158,11,0.18)]',
+    };
+  }
+
+  if (kind === 'customer_analysis_board') {
+    return {
+      eyebrow,
+      primaryBadge,
+      secondaryBadge,
+      containerClassName:
+        'mt-3 min-w-0 overflow-hidden rounded-[28px] border border-emerald-200 bg-[radial-gradient(circle_at_top_left,_rgba(34,197,94,0.12),_transparent_28%),linear-gradient(180deg,_#ffffff_0%,_#f0fdf4_100%)] shadow-[0_18px_50px_rgba(34,197,94,0.14)]',
+    };
+  }
+
+  return {
+    eyebrow,
+    primaryBadge,
+    secondaryBadge,
+    containerClassName:
+      'mt-3 min-w-0 overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.08),_transparent_28%),linear-gradient(180deg,_#ffffff_0%,_#f8fafc_100%)] shadow-[0_18px_50px_rgba(148,163,184,0.18)]',
+  };
+}
+
 function DashboardMiddlewareCard({
   dashboard,
 }: {
@@ -266,16 +310,17 @@ function DashboardMiddlewareCard({
   const kpiCount = kpis.length;
   const singleKpiHero = kpiCount === 1;
   const domainLabel = dashboard.dataset.domain_label || dashboard.dataset.domain_guess;
+  const meta = resolveDashboardMeta(dashboard);
 
   return (
-    <div className="mt-3 min-w-0 overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.08),_transparent_28%),linear-gradient(180deg,_#ffffff_0%,_#f8fafc_100%)] shadow-[0_18px_50px_rgba(148,163,184,0.18)]">
+    <div className={meta.containerClassName}>
       <div className="border-b border-slate-200/90 px-4 py-4 sm:px-5 md:px-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <span className="inline-flex h-2.5 w-2.5 shrink-0 rounded-full bg-sky-500 shadow-[0_0_12px_rgba(14,165,233,0.35)]" />
               <span className="text-[11px] font-medium uppercase tracking-[0.32em] text-slate-500">
-                Auto Analysis Board
+                {meta.eyebrow}
               </span>
             </div>
             <div className="mt-2 break-words text-lg font-semibold tracking-wide text-slate-900 md:text-xl">
@@ -289,10 +334,10 @@ function DashboardMiddlewareCard({
           </div>
           <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
             <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[11px] font-medium text-sky-700">
-              自动生成看板
+              {meta.primaryBadge}
             </span>
             <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-medium text-slate-600">
-              上传文件分析
+              {meta.secondaryBadge}
             </span>
           </div>
         </div>

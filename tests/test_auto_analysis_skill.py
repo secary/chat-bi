@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SKILL_DIR = ROOT / "skills/chatbi-auto-analysis"
 SCRIPT_DIR = SKILL_DIR / "scripts"
 SCRIPT = SKILL_DIR / "auto_analysis_core.py"
+API = SKILL_DIR / "api.py"
 sys.path.insert(0, str(SKILL_DIR))
 sys.path.insert(0, str(SCRIPT_DIR))
 SPEC = importlib.util.spec_from_file_location("auto_analysis_core", SCRIPT)
@@ -194,6 +195,48 @@ class AutoAnalysisSkillTest(unittest.TestCase):
             from auto_analysis import main
 
             self.assertEqual(main(["--input-file", handle.name, "--json"]), 0)
+
+    def test_api_run_executes_confirmation_flow_from_input_file(self):
+        spec = importlib.util.spec_from_file_location("auto_analysis_api", API)
+        api_module = importlib.util.module_from_spec(spec)
+        assert spec and spec.loader
+        sys.modules[spec.name] = api_module
+        spec.loader.exec_module(api_module)
+
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json") as handle:
+            json.dump(
+                {
+                    "question": "采纳全部指标",
+                    "mode": "execute",
+                    "metric_plans": PLANNER.propose_metrics_with_llm("", {}),
+                    "rows": [
+                        {
+                            "start_date": "2026-01-03",
+                            "principal": "1000",
+                            "loan_status": "正常",
+                        },
+                        {
+                            "start_date": "2026-01-19",
+                            "principal": "3000",
+                            "loan_status": "逾期",
+                        },
+                        {
+                            "start_date": "2026-02-01",
+                            "principal": "2000",
+                            "loan_status": "正常",
+                        },
+                    ],
+                },
+                handle,
+                ensure_ascii=False,
+            )
+            handle.flush()
+
+            payload = api_module.run(["--input-file", handle.name])
+
+        self.assertEqual(payload["data"]["status"], "ready")
+        self.assertEqual(payload["charts"][0]["series"][0]["type"], "line")
+        self.assertIn("dashboard_middleware", payload["data"])
 
     def test_executes_formula_tree_without_metric_specific_branches(self):
         roi_like_plan = {

@@ -107,6 +107,9 @@ def build_auto_analysis_dashboard(question: str, payload: Dict[str, Any]) -> Dic
     profile = payload.get("profile") if isinstance(payload.get("profile"), dict) else {}
     kpi_values = _compute_kpi_values(metrics)
     table_rows, table_columns = _build_table_data(metrics)
+    dashboard_intent = infer_auto_analysis_intent(metrics, charts)
+    dashboard_kind = infer_auto_analysis_dashboard_kind(question, profile, metrics, charts)
+    header_meta = build_dashboard_header_meta(dashboard_kind, profile)
     widgets = [
         {
             "id": str(item.get("id") or f"metric_{idx + 1}"),
@@ -127,6 +130,9 @@ def build_auto_analysis_dashboard(question: str, payload: Dict[str, Any]) -> Dic
                 or domain_display_name(str(profile.get("domain_guess") or ""))
             ),
         },
+        "dashboard_kind": dashboard_kind,
+        "dashboard_intent": dashboard_intent,
+        "header_meta": header_meta,
         "widgets": widgets,
         "charts": charts,
         "metrics": metrics,
@@ -137,7 +143,7 @@ def build_auto_analysis_dashboard(question: str, payload: Dict[str, Any]) -> Dic
     dashboard_spec = build_generic_dashboard_spec(
         question=question,
         title=dashboard["title"],
-        intent=infer_auto_analysis_intent(metrics, charts),
+        intent=dashboard_intent,
         kpis=kpi_values,
         chart_titles=[widget["title"] for widget in widgets],
         table_columns=table_columns,
@@ -536,6 +542,61 @@ def infer_auto_analysis_intent(
     if any(str(item.get("chart_hint") or "") in {"line", "multi_line", "area"} for item in metrics):
         return "trend_analysis"
     return "uploaded_file_auto_analysis"
+
+
+def infer_auto_analysis_dashboard_kind(
+    question: str,
+    profile: Dict[str, Any],
+    metrics: Sequence[Dict[str, Any]],
+    charts: Sequence[Dict[str, Any]],
+) -> str:
+    text = " ".join(
+        [
+            str(question or ""),
+            str(profile.get("domain_guess") or ""),
+            str(profile.get("domain_label") or ""),
+            " ".join(str(item.get("name") or "") for item in metrics),
+        ]
+    ).lower()
+    if any(token in text for token in ["理财", "投资", "收益", "aum", "product", "基金", "资管"]):
+        return "wealth_product_board"
+    if any(token in text for token in ["客户", "留存", "流失", "customer", "cohort"]):
+        return "customer_analysis_board"
+    if any(_chart_series_type(chart) == "funnel" for chart in charts):
+        return "funnel_analysis_board"
+    return "uploaded_file_auto_analysis"
+
+
+def build_dashboard_header_meta(
+    dashboard_kind: str,
+    profile: Dict[str, Any],
+) -> Dict[str, str]:
+    domain_label = str(
+        profile.get("domain_label") or domain_display_name(str(profile.get("domain_guess") or ""))
+    )
+    if dashboard_kind == "wealth_product_board":
+        return {
+            "eyebrow": "理财产品分析看板",
+            "primary_badge": "财富经营",
+            "secondary_badge": domain_label,
+        }
+    if dashboard_kind == "customer_analysis_board":
+        return {
+            "eyebrow": "客户经营分析看板",
+            "primary_badge": "客户分析",
+            "secondary_badge": domain_label,
+        }
+    if dashboard_kind == "funnel_analysis_board":
+        return {
+            "eyebrow": "转化漏斗分析看板",
+            "primary_badge": "流程分析",
+            "secondary_badge": domain_label,
+        }
+    return {
+        "eyebrow": "自动分析看板",
+        "primary_badge": "自动生成看板",
+        "secondary_badge": domain_label,
+    }
 
 
 def _chart_series_type(chart: Dict[str, Any]) -> str:

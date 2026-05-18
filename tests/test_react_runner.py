@@ -588,6 +588,203 @@ class ReactRunnerTest(unittest.TestCase):
 
         asyncio.run(run())
 
+    def test_confirmation_followup_reuses_prior_analysis_proposal(self):
+        first = {
+            "action": "call_skill",
+            "skill": "chatbi-file-ingestion",
+            "skill_args": ["继续"],
+            "thought": "继续处理上传文件",
+        }
+        rows = [{"月份": "2026-01", "投资金额": "100"}]
+        auto_result = {
+            "kind": "auto_analysis",
+            "text": "看板已生成。",
+            "data": {
+                "status": "ready",
+                "dashboard_middleware": {
+                    "title": "理财产品分析看板",
+                    "widgets": [{"id": "investment_amount_trend"}],
+                    "charts": [],
+                    "metrics": [],
+                    "dataset": {"row_count": 1, "domain_guess": "wealth_product"},
+                    "markdown": "看板已生成。",
+                },
+            },
+        }
+        prior_proposal = {
+            "markdown": "请采纳指标。",
+            "proposed_metrics": [
+                {
+                    "id": "investment_amount_trend",
+                    "name": "投资金额趋势",
+                    "description": "按月观察投资金额趋势",
+                    "formula_md": "`sum(investment_amount)`",
+                    "matched_fields": {"metric": "investment_amount"},
+                    "chart_hint": "line",
+                    "confidence": 0.92,
+                    "selected": True,
+                }
+            ],
+        }
+
+        async def run():
+            cfg = replace(settings, agent_react=True, agent_max_steps=6)
+            with patch("backend.agent.react_runner.settings", cfg):
+                with patch(
+                    "backend.agent.react_runner.call_llm_for_react_step",
+                    new_callable=AsyncMock,
+                ) as mock_llm:
+                    mock_llm.return_value = first
+                    with patch(
+                        "backend.agent.react_runner.get_cached_rows",
+                        return_value=rows,
+                    ):
+
+                        def _run_script(skill_doc, args, **kwargs):
+                            self.assertEqual(skill_doc.name, "chatbi-auto-analysis")
+                            self.assertEqual(args[0], "--input-file")
+                            with open(args[1], encoding="utf-8") as handle:
+                                payload = json.load(handle)
+                            self.assertEqual(payload["question"], "采纳全部指标")
+                            self.assertEqual(payload["mode"], "execute")
+                            self.assertEqual(payload["rows"], rows)
+                            self.assertEqual(
+                                payload["metric_plans"][0]["id"], "investment_amount_trend"
+                            )
+                            return auto_result
+
+                        with patch(
+                            "backend.agent.react_runner.run_script",
+                            side_effect=_run_script,
+                        ) as mock_run:
+                            events = await _collect(
+                                stream_chat_react(
+                                    [
+                                        {
+                                            "role": "user",
+                                            "content": (
+                                                "请分析上传文件 /tmp/chatbi-uploads/sample.csv 适合哪些指标"
+                                            ),
+                                        },
+                                        {
+                                            "role": "assistant",
+                                            "content": "请确认是否采纳以下指标。",
+                                            "analysisProposal": prior_proposal,
+                                        },
+                                        {"role": "user", "content": "采纳全部指标"},
+                                    ],
+                                    trace_id="t10",
+                                )
+                            )
+                            mock_llm.assert_awaited_once()
+                            mock_run.assert_called_once()
+                            self.assertTrue(any(e.get("type") == "dashboard_ready" for e in events))
+                            self.assertEqual(events[-1].get("type"), "done")
+
+        asyncio.run(run())
+
+    def test_confirmation_followup_recovers_via_file_ingestion_then_auto_analysis(self):
+        first = {
+            "action": "call_skill",
+            "skill": "chatbi-file-ingestion",
+            "skill_args": ["继续"],
+            "thought": "继续处理上传文件",
+        }
+        file_result = {
+            "kind": "file_ingestion",
+            "text": "文件读取完成",
+            "data": {
+                "file": "/tmp/chatbi-uploads/sample.csv",
+                "rows": [{"月份": "2026-01", "投资金额": "100"}],
+                "column_labels": {"investment_amount": "投资金额"},
+            },
+        }
+        auto_result = {
+            "kind": "auto_analysis",
+            "text": "看板已生成。",
+            "data": {
+                "status": "ready",
+                "dashboard_middleware": {
+                    "title": "理财产品分析看板",
+                    "widgets": [{"id": "investment_amount_trend"}],
+                    "charts": [],
+                    "metrics": [],
+                    "dataset": {"row_count": 1, "domain_guess": "wealth_product"},
+                    "markdown": "看板已生成。",
+                },
+            },
+        }
+        prior_proposal = {
+            "markdown": "请采纳指标。",
+            "proposed_metrics": [
+                {
+                    "id": "investment_amount_trend",
+                    "name": "投资金额趋势",
+                    "description": "按月观察投资金额趋势",
+                    "formula_md": "`sum(investment_amount)`",
+                    "matched_fields": {"metric": "investment_amount"},
+                    "chart_hint": "line",
+                    "confidence": 0.92,
+                    "selected": True,
+                }
+            ],
+        }
+
+        async def run():
+            cfg = replace(settings, agent_react=True, agent_max_steps=6)
+            with patch("backend.agent.react_runner.settings", cfg):
+                with patch(
+                    "backend.agent.react_runner.call_llm_for_react_step",
+                    new_callable=AsyncMock,
+                ) as mock_llm:
+                    mock_llm.return_value = first
+                    with patch("backend.agent.react_runner.get_cached_rows", return_value=[]):
+                        calls: list[str] = []
+
+                        def _run_script(skill_doc, args, **kwargs):
+                            calls.append(skill_doc.name)
+                            if skill_doc.name == "chatbi-file-ingestion":
+                                return file_result
+                            self.assertEqual(skill_doc.name, "chatbi-auto-analysis")
+                            with open(args[1], encoding="utf-8") as handle:
+                                payload = json.load(handle)
+                            self.assertEqual(
+                                payload["metric_plans"][0]["id"], "investment_amount_trend"
+                            )
+                            self.assertEqual(payload["rows"], file_result["data"]["rows"])
+                            return auto_result
+
+                        with patch(
+                            "backend.agent.react_runner.run_script",
+                            side_effect=_run_script,
+                        ):
+                            events = await _collect(
+                                stream_chat_react(
+                                    [
+                                        {
+                                            "role": "user",
+                                            "content": (
+                                                "请分析上传文件 /tmp/chatbi-uploads/sample.csv 适合哪些指标"
+                                            ),
+                                        },
+                                        {
+                                            "role": "assistant",
+                                            "content": "请确认是否采纳以下指标。",
+                                            "analysisProposal": prior_proposal,
+                                        },
+                                        {"role": "user", "content": "采纳全部指标"},
+                                    ],
+                                    trace_id="t11",
+                                )
+                            )
+                            mock_llm.assert_awaited_once()
+                            self.assertEqual(
+                                calls, ["chatbi-file-ingestion", "chatbi-auto-analysis"]
+                            )
+                            self.assertTrue(any(e.get("type") == "dashboard_ready" for e in events))
+
+        asyncio.run(run())
+
 
 if __name__ == "__main__":
     unittest.main()

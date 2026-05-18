@@ -152,6 +152,8 @@ export function useChat(
           : messagesRef.current.slice(-10).map((m) => ({
               role: m.role,
               content: m.content,
+              analysisProposal: m.analysisProposal,
+              dashboardReady: m.dashboardReady,
             }));
 
       try {

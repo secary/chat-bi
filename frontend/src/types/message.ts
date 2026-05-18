@@ -68,6 +68,13 @@ export interface DashboardReady {
     domain_guess: string;
     domain_label?: string;
   };
+  dashboard_kind?: string;
+  dashboard_intent?: string;
+  header_meta?: {
+    eyebrow?: string;
+    primary_badge?: string;
+    secondary_badge?: string;
+  };
   widgets: Array<{ id: string; title: string; type: string; chart_index: number }>;
   charts: Record<string, unknown>[];
   metrics: Array<{ id: string; name: string; rows: Record<string, unknown>[] }>;
@@ -85,7 +92,12 @@ export interface KpiCard {
 
 export interface ChatRequest {
   message: string;
-  history: { role: string; content: string }[];
+  history: Array<{
+    role: string;
+    content: string;
+    analysisProposal?: AnalysisProposal;
+    dashboardReady?: DashboardReady;
+  }>;
   session_id?: number;
   db_connection_id?: number;
   multi_agents?: boolean;

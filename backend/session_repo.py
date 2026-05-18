@@ -56,20 +56,32 @@ def delete_session(session_id: int, user_id: int) -> None:
     )
 
 
-def list_messages_for_llm(session_id: int, max_messages: int = 20) -> List[Dict[str, str]]:
-    """Return recent turns as role/content pairs for LLM (text only, chronological)."""
+def list_messages_for_llm(session_id: int, max_messages: int = 20) -> List[Dict[str, Any]]:
+    """Return recent turns for the agent, preserving structured follow-up payloads."""
     rows = app_fetch_all(
-        f"SELECT m.role, m.content FROM {CHAT_MESSAGE} m "
+        f"SELECT m.role, m.content, m.payload_json FROM {CHAT_MESSAGE} m "
         f"INNER JOIN (SELECT id FROM {CHAT_MESSAGE} WHERE session_id = %s "
         "ORDER BY id DESC LIMIT %s) t ON m.id = t.id ORDER BY m.id ASC",
         (session_id, max_messages),
     )
-    out: List[Dict[str, str]] = []
+    out: List[Dict[str, Any]] = []
     for row in rows:
         role = str(row["role"])
         if role not in ("user", "assistant"):
             continue
-        out.append({"role": role, "content": str(row["content"] or "")})
+        item: Dict[str, Any] = {"role": role, "content": str(row["content"] or "")}
+        payload = row.get("payload_json")
+        if isinstance(payload, str):
+            try:
+                payload = json.loads(payload)
+            except json.JSONDecodeError:
+                payload = None
+        if isinstance(payload, dict):
+            if isinstance(payload.get("analysisProposal"), dict):
+                item["analysisProposal"] = payload["analysisProposal"]
+            if isinstance(payload.get("dashboardReady"), dict):
+                item["dashboardReady"] = payload["dashboardReady"]
+        out.append(item)
     return out
 
 

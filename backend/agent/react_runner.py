@@ -25,7 +25,7 @@ from backend.agent.prompt_builder import (
 from backend.agent.prompt_subagent import build_react_system_prompt_for_subagent
 from backend.agent.query_decision import is_query_plus_decision_text
 from backend.agent.react_followup import run_decision_followup
-from backend.agent.upload_context import get_cached_file_data
+from backend.agent.upload_context import cache_file_data, get_cached_file_data, get_cached_rows
 from backend.config import settings
 from backend.trace import log_event
 
@@ -152,12 +152,23 @@ def _chart_recommendation_args(
     return [json.dumps(payload, ensure_ascii=False)]
 
 
+def _latest_analysis_proposal(messages: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    for message in reversed(messages):
+        if message.get("role") != "assistant":
+            continue
+        proposal = message.get("analysisProposal")
+        if isinstance(proposal, dict):
+            return proposal
+    return None
+
+
 def _auto_analysis_args(
     user_text: str,
     plan_args: List[str],
     last_result: Optional[Dict[str, Any]],
     cached_rows: Optional[List[Dict[str, Any]]] = None,
     column_labels: Optional[Dict[str, Any]] = None,
+    proposal: Optional[Dict[str, Any]] = None,
 ) -> List[str]:
     rows = _rows_for_followup_chart(last_result) or (cached_rows or [])
     if not rows:
@@ -165,6 +176,10 @@ def _auto_analysis_args(
     payload: Dict[str, Any] = {"question": user_text, "rows": rows}
     if column_labels:
         payload["column_labels"] = column_labels
+    if proposal:
+        metric_plans = proposal.get("proposed_metrics")
+        if isinstance(metric_plans, list) and metric_plans:
+            payload["metric_plans"] = [item for item in metric_plans if isinstance(item, dict)]
     if _is_confirmation_request(user_text):
         payload["mode"] = "execute"
     return ["--input-file", _write_auto_analysis_payload(payload)]
@@ -231,13 +246,17 @@ def _is_confirmation_request(text: str) -> bool:
 def _enforce_upload_skill(
     skill_name: str,
     user_text: str,
-    messages: List[Dict[str, str]],
+    messages: List[Dict[str, Any]],
     last_result: Optional[Dict[str, Any]],
 ) -> str:
     if not _has_upload_context(messages):
         return skill_name
     if skill_name == "chatbi-file-ingestion":
+        if _is_confirmation_request(user_text) and _latest_analysis_proposal(messages):
+            return "chatbi-auto-analysis"
         return skill_name
+    if _is_confirmation_request(user_text) and _latest_analysis_proposal(messages):
+        return "chatbi-auto-analysis"
     if _rows_for_followup_chart(last_result) and _is_auto_analysis_request(user_text):
         return "chatbi-auto-analysis"
     if skill_name != "chatbi-semantic-query":
@@ -264,7 +283,7 @@ def _skill_log_payload(
 
 
 async def stream_chat_react(
-    messages: List[Dict[str, str]],
+    messages: List[Dict[str, Any]],
     trace_id: str = "",
     skill_db_overrides: Optional[Dict[str, str]] = None,
     memory_block: Optional[str] = None,
@@ -297,6 +316,9 @@ async def stream_chat_react(
         (str(m.get("content", "")) for m in reversed(messages) if m.get("role") == "user"),
         "",
     )
+    upload_path = latest_user_upload_path(messages)
+    cached_upload_rows = get_cached_rows(upload_path) if upload_path else []
+    latest_proposal = _latest_analysis_proposal(messages)
     if should_skip_skill_for_message(user_text):
         log_event(trace_id, "agent.runner", "skip_skill_small_talk", payload={"mode": "react"})
         _sink_write(result_sink, None, None)
@@ -336,7 +358,7 @@ async def stream_chat_react(
     last_skill_name: Optional[str] = None
     last_result: Optional[Dict[str, Any]] = None
     called_skills: list[str] = []
-    last_ingestion_rows: List[Dict[str, Any]] = []
+    last_ingestion_rows: List[Dict[str, Any]] = list(cached_upload_rows)
     last_ingestion_column_labels: Optional[Dict[str, Any]] = None
 
     yield {"type": "thinking", "content": "正在分析您的问题（ReAct 多步推理）..."}
@@ -499,6 +521,7 @@ async def stream_chat_react(
                 last_result,
                 cached_rows=last_ingestion_rows or None,
                 column_labels=last_ingestion_column_labels,
+                proposal=latest_proposal,
             )
         if skill_name == "chatbi-chart-recommendation":
             args = _chart_recommendation_args(user_text, args, last_result)
@@ -547,6 +570,10 @@ async def stream_chat_react(
                 trace_id=trace_id,
                 skill_db_overrides=skill_db_overrides,
             )
+            if skill_name == "chatbi-file-ingestion":
+                cached_path = _file_ingestion_result_path(result)
+                if cached_path:
+                    cache_file_data(cached_path, result)
             log_event(
                 trace_id,
                 "agent.skill",
@@ -568,6 +595,53 @@ async def stream_chat_react(
                 cl = (result.get("data") or {}).get("column_labels")
                 if isinstance(cl, dict):
                     last_ingestion_column_labels = cl
+                if latest_proposal and _is_confirmation_request(user_text) and last_ingestion_rows:
+                    auto_doc = find_skill(skills, "chatbi-auto-analysis")
+                    if auto_doc:
+                        yield {
+                            "type": "thinking",
+                            "content": "已恢复上传文件数据，继续执行采纳指标分析...",
+                        }
+                        skill_name = "chatbi-auto-analysis"
+                        auto_args = _auto_analysis_args(
+                            user_text,
+                            [],
+                            result,
+                            cached_rows=last_ingestion_rows or None,
+                            column_labels=last_ingestion_column_labels,
+                            proposal=latest_proposal,
+                        )
+                        log_event(
+                            trace_id,
+                            "agent.skill",
+                            "started",
+                            payload=_skill_log_payload(
+                                skill_name,
+                                auto_doc,
+                                agent_id=specialist_agent_id,
+                                extra={"args": auto_args, "resumed_after_ingestion": True},
+                            ),
+                        )
+                        result = run_script(
+                            auto_doc,
+                            auto_args,
+                            trace_id=trace_id,
+                            skill_db_overrides=skill_db_overrides,
+                        )
+                        log_event(
+                            trace_id,
+                            "agent.skill",
+                            "completed",
+                            payload=_skill_log_payload(
+                                skill_name,
+                                auto_doc,
+                                agent_id=specialist_agent_id,
+                                extra=skill_result_log_payload(result),
+                            ),
+                        )
+                        last_skill_name = skill_name
+                        last_result = result
+                        called_skills.append(skill_name)
             if _is_terminal_auto_analysis_result(skill_name, result):
                 yield {
                     "type": "thinking",

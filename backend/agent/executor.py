@@ -1,15 +1,11 @@
 from __future__ import annotations
 
-import json
-import os
 import re
-import sys
-import tempfile
 from typing import Any, Dict, List, Optional
 
 from backend.agent.prompt_builder import SkillDoc
 from backend.agent.protocol import normalize_skill_result
-from backend.config import settings
+from backend.agent.skill_runtime import SkillContext, run_skill_api
 
 _UPLOAD_PATH_RE = re.compile(r"/tmp/chatbi-uploads/[A-Za-z0-9._-]+", re.IGNORECASE)
 _FILE_INGESTION_VALUE_OPTIONS = {"--table", "--sample-size", "--question"}
@@ -216,49 +212,20 @@ def run_script(
     if not scripts:
         raise RuntimeError(f"未找到 Python 脚本：{script_dir}")
 
-    cmd = [sys.executable, str(scripts[0]), *args, "--json"]
-
-    import subprocess as _subprocess
-
-    with (
-        tempfile.TemporaryFile(mode="w+t", encoding="utf-8") as stdout_file,
-        tempfile.TemporaryFile(mode="w+t", encoding="utf-8") as stderr_file,
-    ):
-        proc = _subprocess.Popen(
-            cmd,
-            cwd=str(skill.skill_dir),
-            stdout=stdout_file,
-            stderr=stderr_file,
-            text=True,
-            env={**os.environ, **skill_env(trace_id, skill_db_overrides)},
-        )
-
-        # Avoid PIPE deadlocks when a skill returns large JSON payloads.
-        while proc.poll() is None:
-            if is_aborted(trace_id):
-                proc.kill()
-                proc.wait()
-                raise RuntimeError("用户中止了查询")
-            import time
-
-            time.sleep(0.1)
-
-        stdout_file.seek(0)
-        stderr_file.seek(0)
-        stdout = stdout_file.read()
-        stderr = stderr_file.read()
-
-        if proc.returncode != 0:
-            raise RuntimeError(stderr.strip() or stdout.strip())
-
-        output = stdout.strip()
-        if not output:
-            return {"kind": "empty", "text": "脚本执行完毕，未返回数据。", "data": {}}
-
-        try:
-            return normalize_skill_result(json.loads(output), skill.name)
-        except json.JSONDecodeError:
-            return {"kind": "text", "text": output, "data": {}}
+    if is_aborted(trace_id):
+        raise RuntimeError("用户中止了查询")
+    result = run_skill_api(
+        skill.skill_dir,
+        [*args, "--json"],
+        SkillContext(
+            trace_id=trace_id,
+            db_overrides=skill_db_overrides,
+            cancelled=lambda: is_aborted(trace_id),
+        ),
+    )
+    if is_aborted(trace_id):
+        raise RuntimeError("用户中止了查询")
+    return normalize_skill_result(result, skill.name)
 
 
 def skill_result_log_payload(result: Dict[str, Any]) -> Dict[str, Any]:
@@ -297,23 +264,3 @@ def skill_result_log_payload(result: Dict[str, Any]) -> Dict[str, Any]:
     if isinstance(data.get("advices"), list):
         payload["advice_count"] = len(data["advices"])
     return payload
-
-
-def skill_env(
-    trace_id: str = "",
-    db_overrides: Optional[Dict[str, str]] = None,
-) -> Dict[str, str]:
-    venv_bin = str(settings.project_root / ".venv" / "Scripts")
-    base = {
-        "CHATBI_DB_HOST": settings.db_host,
-        "CHATBI_DB_PORT": settings.db_port,
-        "CHATBI_DB_USER": settings.db_user,
-        "CHATBI_DB_PASSWORD": settings.db_password,
-        "CHATBI_DB_NAME": settings.db_name,
-        "PATH": f"{venv_bin}{os.pathsep}{os.environ.get('PATH', '')}",
-        "PYTHONIOENCODING": "utf-8",
-        "CHATBI_TRACE_ID": trace_id,
-    }
-    if db_overrides:
-        base.update(db_overrides)
-    return base

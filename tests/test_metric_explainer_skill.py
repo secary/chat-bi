@@ -6,8 +6,8 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / "skills/chatbi-metric-explainer/scripts/explain_metric.py"
-SPEC = importlib.util.spec_from_file_location("metric_explainer", SCRIPT)
+CORE = ROOT / "skills/chatbi-metric-explainer/core.py"
+SPEC = importlib.util.spec_from_file_location("metric_explainer_core", CORE)
 MODULE = importlib.util.module_from_spec(SPEC)
 assert SPEC and SPEC.loader
 sys.modules[SPEC.name] = MODULE

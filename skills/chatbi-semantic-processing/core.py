@@ -1,0 +1,56 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+import sys
+from typing import Any
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from _shared.output import skill_response  # noqa: E402
+from _shared.runtime import ensure_active, load_local_module  # noqa: E402
+from _shared.trace import log_skill_event  # noqa: E402
+
+_ENGINE = load_local_module(__file__, "engine.py")
+parse_question = _ENGINE.parse_question
+render_summary = _ENGINE.render_summary
+
+
+@dataclass(frozen=True)
+class SemanticProcessingRequest:
+    question: str
+
+
+def run_semantic_processing(
+    request: SemanticProcessingRequest, context: Any = None
+) -> dict[str, Any]:
+    ensure_active(context)
+    question = request.question.strip()
+    if not question:
+        raise ValueError("question is required")
+    log_skill_event(
+        "skill.chatbi-semantic-processing",
+        "started",
+        "semantic processing started",
+        {"question": question[:160]},
+    )
+    query_intent = parse_question(question)
+    ensure_active(context)
+    payload = skill_response(
+        "semantic_intent",
+        render_summary(query_intent),
+        {"query_intent": query_intent},
+    )
+    log_skill_event(
+        "skill.chatbi-semantic-processing",
+        "completed",
+        "semantic processing completed",
+        {
+            "status": query_intent["status"],
+            "metric_ids": [item["metric_id"] for item in query_intent["metrics"]],
+            "dimension_ids": [item["dimension_id"] for item in query_intent["dimensions"]],
+            "missing_slots": query_intent["missing_slots"],
+        },
+    )
+    return payload

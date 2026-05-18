@@ -8,10 +8,13 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT_DIR = ROOT / "skills/chatbi-auto-analysis/scripts"
-SCRIPT = SCRIPT_DIR / "auto_analysis_core.py"
+SKILL_DIR = ROOT / "skills/chatbi-auto-analysis"
+SCRIPT_DIR = SKILL_DIR / "scripts"
+SCRIPT = SKILL_DIR / "engine.py"
+API = SKILL_DIR / "api.py"
+sys.path.insert(0, str(SKILL_DIR))
 sys.path.insert(0, str(SCRIPT_DIR))
-SPEC = importlib.util.spec_from_file_location("auto_analysis_core", SCRIPT)
+SPEC = importlib.util.spec_from_file_location("chatbi_auto_analysis_engine", SCRIPT)
 MODULE = importlib.util.module_from_spec(SPEC)
 assert SPEC and SPEC.loader
 sys.modules[SPEC.name] = MODULE
@@ -108,6 +111,7 @@ class AutoAnalysisSkillTest(unittest.TestCase):
         self.assertIn("dashboard_middleware", payload["data"])
 
     def test_build_chart_passes_chart_hint_to_recommendation(self):
+        sys.modules.pop("engine", None)
         chart = MODULE.build_chart(
             {
                 "name": "贷款类型结构分布",
@@ -121,6 +125,33 @@ class AutoAnalysisSkillTest(unittest.TestCase):
         )
 
         self.assertEqual(chart["series"][0]["type"], "pie")
+
+    def test_build_dashboard_middleware_loads_orchestration_module_without_global_import(self):
+        sys.modules.pop("engine", None)
+        dashboard = MODULE.build_dashboard_middleware(
+            "采纳全部指标",
+            {"row_count": 2, "domain_guess": "wealth_product", "domain_label": "理财产品"},
+            [
+                {
+                    "id": "investment_amount_trend",
+                    "name": "投资金额趋势",
+                    "rows": [
+                        {"月份": "2026-01", "投资金额趋势": 100.0},
+                        {"月份": "2026-02", "投资金额趋势": 120.0},
+                    ],
+                }
+            ],
+            [
+                {
+                    "xAxis": {"type": "category", "data": ["2026-01", "2026-02"]},
+                    "yAxis": {"type": "value"},
+                    "series": [{"type": "line", "data": [100, 120]}],
+                }
+            ],
+        )
+
+        self.assertEqual(dashboard["dashboard_kind"], "wealth_product_board")
+        self.assertTrue(dashboard["widgets"])
 
     def test_fallback_proposes_and_renders_funnel_for_conversion_table(self):
         PLANNER.propose_metrics_with_llm = lambda question, profile, **kwargs: []
@@ -192,6 +223,48 @@ class AutoAnalysisSkillTest(unittest.TestCase):
             from auto_analysis import main
 
             self.assertEqual(main(["--input-file", handle.name, "--json"]), 0)
+
+    def test_api_run_executes_confirmation_flow_from_input_file(self):
+        spec = importlib.util.spec_from_file_location("auto_analysis_api", API)
+        api_module = importlib.util.module_from_spec(spec)
+        assert spec and spec.loader
+        sys.modules[spec.name] = api_module
+        spec.loader.exec_module(api_module)
+
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json") as handle:
+            json.dump(
+                {
+                    "question": "采纳全部指标",
+                    "mode": "execute",
+                    "metric_plans": PLANNER.propose_metrics_with_llm("", {}),
+                    "rows": [
+                        {
+                            "start_date": "2026-01-03",
+                            "principal": "1000",
+                            "loan_status": "正常",
+                        },
+                        {
+                            "start_date": "2026-01-19",
+                            "principal": "3000",
+                            "loan_status": "逾期",
+                        },
+                        {
+                            "start_date": "2026-02-01",
+                            "principal": "2000",
+                            "loan_status": "正常",
+                        },
+                    ],
+                },
+                handle,
+                ensure_ascii=False,
+            )
+            handle.flush()
+
+            payload = api_module.run(["--input-file", handle.name])
+
+        self.assertEqual(payload["data"]["status"], "ready")
+        self.assertEqual(payload["charts"][0]["series"][0]["type"], "line")
+        self.assertIn("dashboard_middleware", payload["data"])
 
     def test_executes_formula_tree_without_metric_specific_branches(self):
         roi_like_plan = {
@@ -399,6 +472,112 @@ class AutoAnalysisSkillTest(unittest.TestCase):
         self.assertIn("财富客户投资", proposal["markdown"])
         self.assertEqual(proposals[0]["name"], "投资金额趋势")
         self.assertEqual(proposals[1]["name"], "投资金额按客户分层分布")
+
+    def test_retention_cohort_table_gets_structured_metric_proposals(self):
+        PLANNER.propose_metrics_with_llm = lambda question, profile, **kwargs: []
+        payload = MODULE.execute_analysis(
+            "帮我分析这张留存 cohort 表",
+            [
+                {
+                    "cohort_month": "2026-01",
+                    "follow_month_offset": "0",
+                    "customer_type": "新客",
+                    "cohort_size": "100",
+                    "retained_count": "100",
+                    "retention_rate_pct": "100",
+                },
+                {
+                    "cohort_month": "2026-01",
+                    "follow_month_offset": "1",
+                    "customer_type": "新客",
+                    "cohort_size": "100",
+                    "retained_count": "72",
+                    "retention_rate_pct": "72",
+                },
+                {
+                    "cohort_month": "2026-02",
+                    "follow_month_offset": "1",
+                    "customer_type": "老客",
+                    "cohort_size": "80",
+                    "retained_count": "66",
+                    "retention_rate_pct": "82.5",
+                },
+            ],
+            "propose",
+            [],
+        )
+
+        proposals = payload["data"]["analysis_proposal"]["proposed_metrics"]
+        names = [item["name"] for item in proposals]
+        self.assertIn("整体留存率趋势", names)
+        self.assertIn("各 cohort 留存率热力矩阵", names)
+        self.assertIn("各 cohort 留存人数", names)
+        self.assertIn("按客户类型留存率对比", names)
+
+    def test_retention_cohort_table_executes_selected_templates(self):
+        retention_rows = [
+            {
+                "cohort_month": "2026-01",
+                "follow_month_offset": "0",
+                "customer_type": "新客",
+                "cohort_size": "100",
+                "retained_count": "100",
+                "retention_rate_pct": "100",
+            },
+            {
+                "cohort_month": "2026-01",
+                "follow_month_offset": "1",
+                "customer_type": "新客",
+                "cohort_size": "100",
+                "retained_count": "72",
+                "retention_rate_pct": "72",
+            },
+            {
+                "cohort_month": "2026-02",
+                "follow_month_offset": "0",
+                "customer_type": "老客",
+                "cohort_size": "80",
+                "retained_count": "80",
+                "retention_rate_pct": "100",
+            },
+            {
+                "cohort_month": "2026-02",
+                "follow_month_offset": "1",
+                "customer_type": "老客",
+                "cohort_size": "80",
+                "retained_count": "66",
+                "retention_rate_pct": "82.5",
+            },
+        ]
+        PLANNER.propose_metrics_with_llm = lambda question, profile, **kwargs: []
+        proposal_payload = MODULE.execute_analysis(
+            "帮我分析这张留存 cohort 表",
+            retention_rows,
+            "propose",
+            [],
+        )
+        metric_plans = proposal_payload["data"]["analysis_proposal"]["proposed_metrics"]
+        selected_ids = [
+            "overall_retention_rate_by_offset",
+            "retention_rate_heatmap",
+            "retention_rate_by_segment",
+        ]
+
+        payload = MODULE.execute_analysis(
+            "采纳全部指标",
+            retention_rows,
+            "execute",
+            selected_ids,
+            metric_plans=metric_plans,
+        )
+
+        self.assertEqual(payload["data"]["status"], "ready")
+        metric_names = [item["name"] for item in payload["data"]["metrics"]]
+        self.assertIn("整体留存率趋势", metric_names)
+        self.assertIn("各 cohort 留存率热力矩阵", metric_names)
+        self.assertIn("按客户类型留存率对比", metric_names)
+        self.assertTrue(any(chart["series"][0]["type"] == "line" for chart in payload["charts"]))
+        self.assertTrue(any(chart["series"][0]["type"] == "heatmap" for chart in payload["charts"]))
 
 
 if __name__ == "__main__":

@@ -6,8 +6,8 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / "skills/chatbi-dashboard-orchestration/scripts/dashboard_orchestration_core.py"
-SPEC = importlib.util.spec_from_file_location("dashboard_orchestration_core", SCRIPT)
+SCRIPT = ROOT / "skills/chatbi-dashboard-orchestration/engine.py"
+SPEC = importlib.util.spec_from_file_location("chatbi_dashboard_orchestration_engine", SCRIPT)
 MODULE = importlib.util.module_from_spec(SPEC)
 assert SPEC and SPEC.loader
 sys.modules[SPEC.name] = MODULE

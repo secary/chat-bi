@@ -5,10 +5,29 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
-from backend.session_repo import load_messages_ui
+from backend.session_repo import list_messages_for_llm, load_messages_ui
 
 
 class SessionRepoPayloadUiTest(unittest.TestCase):
+    def test_list_messages_for_llm_preserves_analysis_proposal(self) -> None:
+        fake_rows = [
+            {
+                "role": "assistant",
+                "content": "请确认指标。",
+                "payload_json": {
+                    "analysisProposal": {
+                        "markdown": "建议采纳",
+                        "proposed_metrics": [{"id": "gmv_trend"}],
+                    }
+                },
+            }
+        ]
+        with patch("backend.session_repo.app_fetch_all", return_value=fake_rows):
+            out = list_messages_for_llm(7)
+        self.assertEqual(out[0]["role"], "assistant")
+        self.assertIn("analysisProposal", out[0])
+        self.assertEqual(out[0]["analysisProposal"]["proposed_metrics"][0]["id"], "gmv_trend")
+
     def test_load_messages_ui_merges_dashboard_ready(self) -> None:
         fake_rows = [
             {

@@ -7,8 +7,8 @@ from datetime import date
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / "skills/chatbi-semantic-processing/scripts/semantic_processing_core.py"
-SPEC = importlib.util.spec_from_file_location("semantic_processing_core", SCRIPT)
+SCRIPT = ROOT / "skills/chatbi-semantic-processing/engine.py"
+SPEC = importlib.util.spec_from_file_location("chatbi_semantic_processing_engine", SCRIPT)
 MODULE = importlib.util.module_from_spec(SPEC)
 assert SPEC and SPEC.loader
 sys.modules[SPEC.name] = MODULE

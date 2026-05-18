@@ -52,7 +52,7 @@
   "kind": "table",
   "row_count": 12,
   "columns": ["区域", "销售额"],
-  "sample_rows": [{"区域": "华东", "销售额": "100"}],
+  "sample_rows": [{ "区域": "华东", "销售额": "100" }],
   "error": null
 }
 ```
@@ -66,11 +66,11 @@
 
 ### SSE 事件扩展
 
-| 阶段 | 当前 `type` | 可选扩展 |
-|------|------------|---------|
-| 每步开始 | `thinking` | 保持现状 |
-| 每步结束 | `thinking` | 可引入 `tool_result` 类型供前端展示工具轨迹 |
-| 最终呈现 | `text` / `chart` / `kpi_cards` / `error` | 不变 |
+| 阶段     | 当前 `type`                              | 可选扩展                                    |
+| -------- | ---------------------------------------- | ------------------------------------------- |
+| 每步开始 | `thinking`                               | 保持现状                                    |
+| 每步结束 | `thinking`                               | 可引入 `tool_result` 类型供前端展示工具轨迹 |
+| 最终呈现 | `text` / `chart` / `kpi_cards` / `error` | 不变                                        |
 
 若引入 `tool_result`，需同步 [`frontend/src/types/message.ts`](../../frontend/src/types/message.ts)。
 

@@ -174,12 +174,18 @@ def plan_to_option(
         metric = metric_fields[0] if metric_fields else ""
         if dimension_field and y_dimension and metric:
             matrix = _heatmap_matrix(data, dimension_field, y_dimension, metric)
+            option["tooltip"]["trigger"] = "item"
+            if "axisPointer" in option["tooltip"]:
+                del option["tooltip"]["axisPointer"]
+            option["legend"] = {"show": False}
+            option.pop("dataZoom", None)
             option["xAxis"] = {"type": "category", "data": matrix["x"]}
             option["yAxis"] = {"type": "category", "data": matrix["y"]}
             option["visualMap"] = {
                 "min": matrix["min"],
                 "max": matrix["max"],
-                "calculable": True,
+                "show": False,
+                "calculable": False,
                 "orient": "horizontal",
                 "left": "center",
                 "bottom": 0,

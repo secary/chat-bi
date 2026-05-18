@@ -10,18 +10,16 @@ package is required.
 
 from __future__ import annotations
 
-import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Any, Dict, Optional, Sequence
+from typing import Dict, Optional, Sequence
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from _shared.db import MysqlCli, default_db, quote_literal
-from _shared.output import skill_response
-
-DEFAULT_DB = default_db()
+from _shared.runtime import load_local_module
+from _shared.db import MysqlCli, quote_literal
 
 
 def load_standard_names(db: MysqlCli) -> Dict[str, str]:
@@ -80,67 +78,21 @@ def init_sql_line(alias_name: str, standard_name: str, object_type: str, descrip
     return f"('{alias_name}', '{standard_name}', '{object_type}', " f"'{description}')"
 
 
-def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Add ChatBI alias_mapping entries")
-    parser.add_argument("--alias", required=True, help="New synonym, such as 成交方式")
-    parser.add_argument("--standard", required=True, help="Existing standard metric/dimension name")
-    parser.add_argument("--type", choices=["指标", "维度"], help="Optional object type")
-    parser.add_argument("--description", help="Optional business description")
-    parser.add_argument(
-        "--print-init-sql",
-        action="store_true",
-        help="Print VALUES tuple for database/init.sql",
-    )
-    parser.add_argument("--json", action="store_true", help="print structured SkillResult JSON")
-    parser.add_argument("--host", default=DEFAULT_DB["host"])
-    parser.add_argument("--port", default=DEFAULT_DB["port"])
-    parser.add_argument("--user", default=DEFAULT_DB["user"])
-    parser.add_argument("--password", default=DEFAULT_DB["password"])
-    parser.add_argument("--database", default=DEFAULT_DB["database"])
-    return parser.parse_args(argv)
-
-
-def run_from_api(argv: Optional[Sequence[str]] = None, context: Any = None) -> dict[str, Any]:
-    args = parse_args(argv)
-    config = {
-        "host": args.host,
-        "port": str(args.port),
-        "user": args.user,
-        "password": args.password,
-        "database": args.database,
-    }
-    db = MysqlCli(config)
-    object_type = infer_object_type(db, args.standard, args.type)
-    description = args.description or f"{args.alias}统一映射到{args.standard}{object_type}"
-    inserted = insert_alias(db, args.alias, args.standard, object_type, description)
-    status = "inserted" if inserted else "exists"
-    text = f"{status}: {args.alias} -> {args.standard} ({object_type})"
-    return skill_response(
-        kind="alias",
-        text=text,
-        data={
-            "status": status,
-            "alias": args.alias,
-            "standard": args.standard,
-            "object_type": object_type,
-            "init_sql": init_sql_line(args.alias, args.standard, object_type, description),
-        },
-    )
-
-
 def main(argv: Optional[Sequence[str]] = None) -> int:
-    args = parse_args(argv)
+    tokens = list(sys.argv[1:] if argv is None else argv)
+    api_module = load_local_module(__file__, "../api.py")
     try:
-        payload = run_from_api(argv)
+        request = api_module.parse_request_args(tokens)
+        payload = api_module.run_alias_manager(request)
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
-    if args.json:
+    if "--json" in tokens:
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 0
 
     print(payload["text"])
-    if args.print_init_sql:
+    if "--print-init-sql" in tokens:
         print(payload["data"]["init_sql"])
     return 0
 

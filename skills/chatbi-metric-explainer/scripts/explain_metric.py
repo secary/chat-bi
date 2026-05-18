@@ -1,20 +1,19 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import argparse
 import json
 import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from _shared.db import MysqlCli, default_db, quote_literal
+from _shared.runtime import load_local_module
+from _shared.db import MysqlCli, quote_literal
 from _shared.output import skill_response
-
-DEFAULT_DB = default_db()
 
 
 @dataclass(frozen=True)
@@ -163,44 +162,20 @@ def explain_metric(question: str, db: MysqlCli) -> Dict[str, object]:
     )
 
 
-def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Explain a governed ChatBI metric.")
-    parser.add_argument("question", nargs="+", help="Chinese metric explanation question")
-    parser.add_argument("--json", action="store_true")
-    parser.add_argument("--host", default=DEFAULT_DB["host"])
-    parser.add_argument("--port", default=DEFAULT_DB["port"])
-    parser.add_argument("--user", default=DEFAULT_DB["user"])
-    parser.add_argument("--password", default=DEFAULT_DB["password"])
-    parser.add_argument("--database", default=DEFAULT_DB["database"])
-    return parser.parse_args(argv)
-
-
-def run_from_api(argv: Optional[Sequence[str]] = None, context: Any = None) -> Dict[str, object]:
-    args = parse_args(argv)
-    db = MysqlCli(
-        {
-            "host": args.host,
-            "port": str(args.port),
-            "user": args.user,
-            "password": args.password,
-            "database": args.database,
-        }
-    )
-    return explain_metric(" ".join(args.question), db)
-
-
 def main(argv: Optional[Sequence[str]] = None) -> int:
-    args = parse_args(argv)
+    tokens = list(sys.argv[1:] if argv is None else argv)
+    api_module = load_local_module(__file__, "../api.py")
     try:
-        result = run_from_api(argv)
+        request = api_module.parse_request_args(tokens)
+        result = api_module.run_metric_explainer(request)
     except Exception as exc:
-        if args.json:
+        if "--json" in tokens:
             print(json.dumps(skill_response("error", str(exc)), ensure_ascii=False))
             return 1
         print(f"错误：{exc}", file=sys.stderr)
         return 1
 
-    if args.json:
+    if "--json" in tokens:
         print(json.dumps(result, ensure_ascii=False, indent=2))
     else:
         print(result["text"])

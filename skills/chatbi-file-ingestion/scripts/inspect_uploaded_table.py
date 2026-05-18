@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import argparse
 import csv
 import json
 import sys
@@ -10,11 +9,13 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 SCRIPT_DIR = Path(__file__).resolve().parent
+SKILL_DIR = SCRIPT_DIR.parent
 SKILLS_DIR = SCRIPT_DIR.parents[1]
+sys.path.insert(0, str(SKILL_DIR))
 sys.path.insert(0, str(SKILLS_DIR))
 
 from _shared.output import skill_response  # noqa: E402
-from _shared.runtime import ensure_active  # noqa: E402
+from _shared.runtime import ensure_active, load_local_module  # noqa: E402
 from table_profile import build_table_profile  # noqa: E402
 
 Schema = Dict[str, Dict[str, str]]
@@ -276,41 +277,20 @@ def inspect_file(
     )
 
 
-def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Inspect an uploaded ChatBI CSV/XLSX file.")
-    parser.add_argument("file_path")
-    parser.add_argument("--table", choices=sorted(SCHEMAS.keys()))
-    parser.add_argument("--sample-size", type=int, default=5)
-    parser.add_argument("--include-rows", action="store_true")
-    parser.add_argument("--question", default="")
-    parser.add_argument("--json", action="store_true")
-    return parser.parse_args(argv)
-
-
-def run_from_api(argv: Optional[Sequence[str]] = None, context: Any = None) -> Dict[str, Any]:
-    args = parse_args(argv)
-    return inspect_file(
-        Path(args.file_path),
-        args.table,
-        args.sample_size,
-        args.include_rows,
-        question=str(args.question or ""),
-        context=context,
-    )
-
-
-def main() -> int:
-    args = parse_args()
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    api_module = load_local_module(__file__, "../api.py")
+    tokens = list(sys.argv[1:] if argv is None else argv)
     try:
-        result = run_from_api()
+        request = api_module.parse_request_args(tokens)
+        result = api_module.run_file_ingestion(request)
     except Exception as exc:
-        if args.json:
+        if "--json" in tokens:
             print(json.dumps(skill_response("error", str(exc)), ensure_ascii=False))
             return 1
         print(f"错误：{exc}", file=sys.stderr)
         return 1
 
-    if args.json:
+    if "--json" in tokens:
         print(json.dumps(result, ensure_ascii=False, indent=2))
     else:
         print(result["text"])

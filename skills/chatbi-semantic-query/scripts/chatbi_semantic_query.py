@@ -9,77 +9,40 @@ No Python MySQL package is required; the script uses the local `mysql` CLI.
 
 from __future__ import annotations
 
-import argparse
 import json
 from pathlib import Path
 import sys
-from typing import Any, Optional, Sequence
+from typing import Optional, Sequence
 
 CURRENT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(CURRENT_DIR))
+sys.path.insert(0, str(CURRENT_DIR.parent))
 sys.path.insert(0, str(CURRENT_DIR.parents[1]))
 
-from _shared.db import MysqlCli, default_db  # noqa: E402
-from semantic_query import (  # noqa: E402
-    build_json_payload,
-    make_plan,
-    print_table,
-    write_chart_html,
-)
+from _shared.runtime import load_local_module  # noqa: E402
+from semantic_query import print_table  # noqa: E402
 
-DEFAULT_DB = default_db()
-
-
-def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="ChatBI natural-language semantic query")
-    parser.add_argument("question", nargs="+", help="Chinese natural-language question")
-    parser.add_argument("--show-sql", action="store_true", help="print generated SQL")
-    parser.add_argument("--json", action="store_true", help="print rows as JSON")
-    parser.add_argument("--chart-html", help="write a standalone HTML chart to this path")
-    parser.add_argument("--host", default=DEFAULT_DB["host"])
-    parser.add_argument("--port", default=DEFAULT_DB["port"])
-    parser.add_argument("--user", default=DEFAULT_DB["user"])
-    parser.add_argument("--password", default=DEFAULT_DB["password"])
-    parser.add_argument("--database", default=DEFAULT_DB["database"])
-    return parser.parse_args(argv)
-
-
-def run_from_api(argv: Optional[Sequence[str]] = None, context: Any = None) -> dict[str, Any]:
-    args = parse_args(argv)
-    db = MysqlCli(
-        {
-            "host": args.host,
-            "port": str(args.port),
-            "user": args.user,
-            "password": args.password,
-            "database": args.database,
-        }
-    )
-    question = " ".join(args.question)
-    plan = make_plan(question, db)
-    rows = db.query(plan.sql)
-    if args.chart_html:
-        write_chart_html(args.chart_html, question, plan, rows)
-    return build_json_payload(question, plan.sql, rows, plan=plan)
+_API = load_local_module(__file__, "../api.py")
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
-    args = parse_args(argv)
+    tokens = list(sys.argv[1:] if argv is None else argv)
     try:
-        payload = run_from_api(argv)
+        request = _API.parse_request_args(tokens)
+        payload = _API.run_query(request)
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
-    if args.show_sql:
+    if "--show-sql" in tokens:
         print(payload["data"].get("sql", ""))
         print()
-    if args.json:
+    if "--json" in tokens:
         print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
         print_table(payload["data"].get("rows", []))
-    if args.chart_html:
-        print(f"\nchart: {args.chart_html}")
+    if request.chart_html:
+        print(f"\nchart: {request.chart_html}")
     return 0
 
 

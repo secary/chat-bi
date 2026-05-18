@@ -514,13 +514,17 @@ def run_from_api(argv: Optional[Sequence[str]] = None, context: Any = None) -> D
 
 
 def main(argv: Optional[Sequence[str]] = None) -> None:
-    args = parse_args(argv)
+    tokens = list(sys.argv[1:] if argv is None else argv)
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from api import parse_request_args, run_comparison  # noqa: E402
+
     try:
-        out = run_from_api(argv)
+        request = parse_request_args(tokens)
+        out = run_comparison(request)
     except RuntimeError as exc:
         out = skill_response("error", f"查询失败：{exc}")
 
-    print(json.dumps(out, ensure_ascii=False, indent=2 if args.json_out else None))
+    print(json.dumps(out, ensure_ascii=False, indent=2 if "--json" in tokens else None))
 
 
 if __name__ == "__main__":

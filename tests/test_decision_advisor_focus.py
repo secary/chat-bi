@@ -13,8 +13,12 @@ assert SPEC and SPEC.loader
 sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
 
-sys.path.insert(0, str(ROOT / "skills/chatbi-decision-advisor"))
-import decision_advisor_core as decision_core  # noqa: E402
+ENGINE = ROOT / "skills/chatbi-decision-advisor" / "engine.py"
+ENGINE_SPEC = importlib.util.spec_from_file_location("chatbi_decision_advisor_engine", ENGINE)
+decision_core = importlib.util.module_from_spec(ENGINE_SPEC)
+assert ENGINE_SPEC and ENGINE_SPEC.loader
+sys.modules[ENGINE_SPEC.name] = decision_core
+ENGINE_SPEC.loader.exec_module(decision_core)
 
 
 class DecisionAdvisorFocusTest(unittest.TestCase):

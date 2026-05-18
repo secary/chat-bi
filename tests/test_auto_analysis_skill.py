@@ -10,11 +10,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SKILL_DIR = ROOT / "skills/chatbi-auto-analysis"
 SCRIPT_DIR = SKILL_DIR / "scripts"
-SCRIPT = SKILL_DIR / "auto_analysis_core.py"
+SCRIPT = SKILL_DIR / "engine.py"
 API = SKILL_DIR / "api.py"
 sys.path.insert(0, str(SKILL_DIR))
 sys.path.insert(0, str(SCRIPT_DIR))
-SPEC = importlib.util.spec_from_file_location("auto_analysis_core", SCRIPT)
+SPEC = importlib.util.spec_from_file_location("chatbi_auto_analysis_engine", SCRIPT)
 MODULE = importlib.util.module_from_spec(SPEC)
 assert SPEC and SPEC.loader
 sys.modules[SPEC.name] = MODULE
@@ -111,6 +111,7 @@ class AutoAnalysisSkillTest(unittest.TestCase):
         self.assertIn("dashboard_middleware", payload["data"])
 
     def test_build_chart_passes_chart_hint_to_recommendation(self):
+        sys.modules.pop("engine", None)
         chart = MODULE.build_chart(
             {
                 "name": "贷款类型结构分布",
@@ -124,6 +125,33 @@ class AutoAnalysisSkillTest(unittest.TestCase):
         )
 
         self.assertEqual(chart["series"][0]["type"], "pie")
+
+    def test_build_dashboard_middleware_loads_orchestration_module_without_global_import(self):
+        sys.modules.pop("engine", None)
+        dashboard = MODULE.build_dashboard_middleware(
+            "采纳全部指标",
+            {"row_count": 2, "domain_guess": "wealth_product", "domain_label": "理财产品"},
+            [
+                {
+                    "id": "investment_amount_trend",
+                    "name": "投资金额趋势",
+                    "rows": [
+                        {"月份": "2026-01", "投资金额趋势": 100.0},
+                        {"月份": "2026-02", "投资金额趋势": 120.0},
+                    ],
+                }
+            ],
+            [
+                {
+                    "xAxis": {"type": "category", "data": ["2026-01", "2026-02"]},
+                    "yAxis": {"type": "value"},
+                    "series": [{"type": "line", "data": [100, 120]}],
+                }
+            ],
+        )
+
+        self.assertEqual(dashboard["dashboard_kind"], "wealth_product_board")
+        self.assertTrue(dashboard["widgets"])
 
     def test_fallback_proposes_and_renders_funnel_for_conversion_table(self):
         PLANNER.propose_metrics_with_llm = lambda question, profile, **kwargs: []

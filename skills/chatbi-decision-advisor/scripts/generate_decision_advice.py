@@ -10,16 +10,12 @@ import sys
 from typing import Optional, Sequence
 
 CURRENT_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(CURRENT_DIR))
 sys.path.insert(0, str(CURRENT_DIR.parent))
 sys.path.insert(0, str(CURRENT_DIR.parents[1]))
 
 import decision_advisor_core as advisor_core  # noqa: E402
 from _shared.runtime import load_local_module  # noqa: E402
 
-build_advices = advisor_core.build_advices
-parse_focus_dimensions = advisor_core.parse_focus_dimensions
-parse_focus_metrics = advisor_core.parse_focus_metrics
 _API = load_local_module(__file__, "../api.py")
 
 

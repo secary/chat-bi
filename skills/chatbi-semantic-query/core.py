@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-sys.path.insert(0, str((Path(__file__).resolve().parent / "scripts").resolve()))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _shared.db import MysqlCli, default_db  # noqa: E402
 from _shared.runtime import ensure_active, resolve_db_config  # noqa: E402

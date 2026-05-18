@@ -15,7 +15,6 @@ import sys
 from typing import Optional, Sequence
 
 CURRENT_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(CURRENT_DIR))
 sys.path.insert(0, str(CURRENT_DIR.parent))
 sys.path.insert(0, str(CURRENT_DIR.parents[1]))
 

@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from _shared.runtime import ensure_active, load_local_module  # noqa: E402
 
-_SCRIPT = load_local_module(__file__, "scripts/inspect_uploaded_table.py")
+_SCRIPT = load_local_module(__file__, "inspect_uploaded_table.py")
 
 
 @dataclass(frozen=True)

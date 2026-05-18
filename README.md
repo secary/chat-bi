@@ -13,8 +13,9 @@ cp .env.example .env
 # 2. 启动所有服务
 docker compose up -d --build
 
-# 3. 浏览器访问
+# 3. 浏览器访问（macOS/Linux）
 open http://localhost:5173
+# Windows：start http://localhost:5173
 ```
 
 前端通过 **同源路径 `/api`** 访问后端（nginx 反代到容器 `backend`），避免浏览器跨端口 CORS。`docker-compose.yml` 构建参数已**固定为 `/api`**，不再读取根目录 `.env` 里的 `FRONTEND_API_BASE_URL`，避免旧配置写成 `http://localhost:8000` 导致打包后仍直连 8000。单独构建前端镜像时可用 `--build-arg VITE_API_BASE_URL=...` 覆盖。
@@ -72,8 +73,9 @@ bash scripts/bootstrap_dev.sh --sync
 ```bash
 docker compose --env-file .env.dev -f docker-compose.dev.yml up -d --build
 
-# 浏览器访问
+# 浏览器访问（macOS/Linux）
 open http://localhost:5174
+# Windows：start http://localhost:5174
 ```
 
 开发环境端口：
@@ -117,94 +119,66 @@ docker compose up -d demo-mysql
 | 后端 | FastAPI + Python 3.11+ + LiteLLM |
 | 数据库 | MySQL 8.0（Docker） |
 | 流式 | Server-Sent Events（SSE） |
-| 质量 | black + ruff；ESLint + Prettier |
+| 质量 | ruff + ESLint（`scripts/format_code.py` 另含 black） |
 
 ## 项目结构
 
 ```
 chat-bi/
-├── AGENTS.md                        # AI Agent 项目地图（规则事实源）
-├── CLAUDE.md                        # 指向 AGENTS.md 的入口
-├── .env.example                     # 环境变量模板
-├── docker-compose.yml               # 生产式本地：MySQL + Backend + Frontend
-├── docker-compose.dev.yml           # 开发热更新编排
-├── data/
-│   └── chatbi_sales.csv             # 示例销售数据（文件导入演示用）
-├── database/
-│   └── init.sql                     # 表结构、演示数据、语义层元数据
+├── AGENTS.md、CLAUDE.md             # Agent 规则入口
+├── .env.example、docker-compose*.yml
+├── scripts/
+│   ├── bootstrap_dev.sh             # 进场 / --sync / --format
+│   ├── run_tests.py                 # 分套件 pytest（foundation、agent、skills…）
+│   ├── format_code.py、 e2e_smoke.py
+├── database/init.sql、migrations/
 ├── backend/
-│   ├── main.py                      # FastAPI 入口，POST /chat SSE + POST /upload
-│   ├── config.py                    # 环境变量读取（业务库 + 日志库）
-│   ├── trace.py                     # Trace-ID 链路日志写入（best-effort）
-│   ├── routes/                      # auth / sessions / dashboard / admin 等 HTTP 路由
-│   ├── agent/
-│   │   ├── protocol.py              # SkillResult 统一协议定义
-│   │   ├── prompt_builder.py        # 读取 SKILL.md，构造 System Prompt
-│   │   ├── planner.py               # LiteLLM 调用，生成 Skill 执行计划
-│   │   ├── executor.py              # 定位并执行 Skill 脚本，归一化结果
-│   │   ├── formatter.py             # SkillResult → SSE 消息
-│   │   ├── react_runner.py          # ReAct 多轮推理循环
-│   │   ├── multi_agent_runner.py    # 多 Agent 路由与执行
-│   │   └── runner.py                # plan → execute → format 主循环
-│   ├── report/                      # PDF 报告生成与降级导出
-│   ├── vision/                      # 图像 / 表格抽取门禁与 LLM 调用
-│   └── renderers/
-│       ├── chart.py                 # 构造 ECharts option
-│       └── kpi.py                   # 构造 KPI 卡片数据
-├── frontend/
-│   └── src/
-│       ├── types/message.ts         # 消息类型定义
-│       ├── api/client.ts            # SSE 流式客户端（透传 X-Trace-Id）
-│       ├── hooks/useChat.ts         # 对话状态管理
-│       ├── pages/                   # 对话、仪表盘、数据源、LLM、用户、Skill、Multi-Agent 管理页
-│       └── components/
-│           ├── MessageBubble.tsx    # 消息分发渲染
-│           ├── ThinkingBubble.tsx   # 思考步骤（可折叠）
-│           ├── ChartRenderer.tsx    # ECharts 图表
-│           ├── KPICards.tsx         # KPI 卡片
-│           └── ChatInput.tsx        # 输入框（支持文件拖拽/选择）
+│   ├── main.py                      # FastAPI：/chat SSE、/upload、/abort
+│   ├── routes/                      # auth、sessions、chat、dashboard、admin/*
+│   ├── agent/                       # runner、react_runner、multi_agent_*、
+│   │                                # prompt_builder、context_window、abort_*、…
+│   ├── memory_*、session_repo、vision/、report/、renderers/
+├── frontend/src/                     # pages（Chat、Dashboard、Admin…）、
+│                                    # api/client.ts、hooks/useChat.ts、components/
 ├── skills/
-│   ├── _shared/                     # 脚本共用的数据库连接与协议输出工具
-│   ├── chatbi-semantic-query/       # 自然语言问数
-│   ├── chatbi-semantic-processing/  # 语义预处理与意图辅助
-│   ├── chatbi-alias-manager/        # 语义别名管理
-│   ├── chatbi-decision-advisor/     # 经营决策建议
-│   ├── chatbi-metric-explainer/     # 指标解释
-│   ├── chatbi-comparison/           # 环比分析（月对、全年、季度）
-│   ├── chatbi-chart-recommendation/ # 图表推荐
-│   ├── chatbi-dashboard-orchestration/ # 仪表盘编排
-│   ├── chatbi-database-overview/    # 数据库概览
-│   └── chatbi-file-ingestion/       # CSV/XLSX 文件导入校验
-└── tests/
-    ├── test_agent_skill_protocol.py # SkillResult 协议单测
-    ├── test_file_ingestion_skill.py # 文件导入 Skill 单测
-    ├── test_trace.py                # 链路日志单测
-    └── test_run_tests_script.py     # 测试套件清单校验
+│   ├── _agents/registry.yaml        # 多专线 registry
+│   ├── _shared/、chatbi-*/SKILL.md + scripts/
+└── tests/                           # 见 scripts/run_tests.py MODULE_SUITES
 ```
+
+## 测试
+
+```bash
+# macOS/Linux
+PYTHONPATH=. .venv/bin/python scripts/run_tests.py foundation -- -q
+
+# Windows
+PYTHONPATH=. .venv\Scripts\python.exe scripts/run_tests.py foundation -- -q
+```
+
+在线冒烟（需 DB + 后端 + LLM）：`python scripts/e2e_smoke.py --cases S1,S4,E1`
 
 ## 架构流程
 
 ```
 用户输入（文字 / 文件）
-  → React 前端（透传 X-Trace-Id、session_id）
-  ┌─ POST /upload → 文件校验 → 返回预览 JSON（chatbi-file-ingestion Skill）
+  → React（X-Trace-Id、session_id；生成中可 POST /abort）
+  ┌─ POST /upload → /tmp/chatbi-uploads/…
   └─ POST /chat（SSE）
-       → FastAPI → AgentRunner
-           → prompt_builder 读取 skills/*/SKILL.md（仅已启用 Skill）
-           ┌─ ReAct 模式（CHATBI_AGENT_REACT=true）
-           │    → react_runner 多步推理：plan → call_skill → observation → finish
-           └─ Legacy 模式（默认）
-                → planner 生成 Skill 执行计划（LiteLLM）
-                → 复合意图识别：自动组合 query → decision-advisor 双步链
-           → executor 执行 Skill 脚本 → MySQL chatbi_demo
-           → 统一 SkillResult 协议（kind / text / data / charts / kpis）
-           → formatter 转换为 SSE 消息
-           → renderers 构造 ECharts option / KPI 卡片
-       → SSE 流式返回
-  → 前端渲染（thinking / text / chart / kpi_cards / error）
-  → 会话消息落库（chat_session / chat_message）
-  → trace.py 将各节点日志写入 MySQL chatbi_local_logs.chatbi_logs_trace_log（best-effort）
+       → chat_route → stream_chat
+           ├─ multi_agents → Manager 多轮规划 → 各专线 stream_specialist
+           ├─ CHATBI_AGENT_REACT 开启 → react_runner（context_window + 多轮 call_skill）
+           └─ 否则 Legacy 单次 plan（可选 query → decision-advisor 双步链）
+           → prompt_builder（Skill 元数据 + 记忆 + 专线 role）
+           → executor 子进程 skills/*/scripts → SkillResult
+           → formatter / renderers → SSE（thinking / text / chart / kpi_cards /
+              analysis_proposal / dashboard_ready / error）
+       → 消息落库；BackgroundTasks 刷新记忆
+       → trace → chatbi_local_logs（compose 下与 chatbi_demo 同 MySQL 实例）
+  → 前端 MessageBubble（Markdown/KaTeX、提案卡片、采纳看板）
 ```
+
+上传路径优先 **file-ingestion → auto-analysis**（指标提案 / 采纳看板），勿用 semantic-query 查演示库代替用户文件。
 
 ## Skills
 
@@ -220,8 +194,9 @@ chat-bi/
 | `chatbi-dashboard-orchestration` | 编排仪表盘视图所需的指标、图表与摘要 |
 | `chatbi-database-overview` | 输出数据库表、字段和样例数据概览 |
 | `chatbi-file-ingestion` | 读取 CSV/XLSX，识别表头、校验类型并返回预览 JSON |
+| `chatbi-auto-analysis` | 上传表指标提案、用户采纳后确定性计算与看板中间件 |
 
-每个 Skill 的触发条件、工作流和安全边界见 `skills/<skill-name>/SKILL.md`。
+每个 Skill 的触发条件、工作流和安全边界见 `skills/<skill-name>/SKILL.md`。选用依赖 Prompt 元数据与各专线边界，**无执行前硬校验**。
 
 ## 环境变量
 
@@ -243,13 +218,20 @@ chat-bi/
 | `CHATBI_LOG_DB_PORT` | 日志库端口 |
 | `CHATBI_LOG_DB_USER` | 日志库用户 |
 | `CHATBI_LOG_DB_PASSWORD` | 日志库密码 |
-| `CHATBI_LOG_DB_NAME` | 日志库库名；未配置时回退到 `CHATBI_DB_NAME`，本地示例使用 `chatbi_local_logs` |
-| `FRONTEND_API_BASE_URL` | 可选；本地备忘用。生产 compose **不再**用该变量参与前端构建（已固定 `/api`）。分域部署请对 `frontend` 镜像使用 `--build-arg VITE_API_BASE_URL=...` |
+| `CHATBI_LOG_DB_NAME` | 日志库库名（默认 `chatbi_local_logs`） |
+| `CHATBI_AGENT_REACT` | `1` 开启 ReAct（默认）；`0`/`false` 走 Legacy |
+| `CHATBI_AGENT_MAX_STEPS` | ReAct 每轮用户消息最大 LLM 步数（默认 `8`） |
+| `CHATBI_AUTH_ENABLED` | 用户登录；dev compose 默认 `false` |
+| `CHATBI_MEMORY_DISABLED` | `1` 关闭记忆读写与 prompt 注入 |
+| `CHATBI_JWT_SECRET` | JWT 密钥（生产务必修改） |
+| `FRONTEND_API_BASE_URL` | 可选备忘。生产 compose 前端构建已固定 `/api` |
 
 默认数据库职责：
 
-- `chatbi_demo`：演示业务数据、语义层元数据、应用表 `chatbi_app_*`、管理表 `chatbi_admin_*`
-- `chatbi_local_logs`：链路日志表 `chatbi_logs_trace_log`
+- `chatbi_demo`：演示业务数据、语义层、应用表 `chatbi_app_*`、管理表 `chatbi_admin_*`
+- `chatbi_local_logs`：链路日志 `chatbi_logs_trace_log`
+
+**Docker compose** 中 `demo-mysql` 同时承载上述两个 database（`CHATBI_LOG_DB_HOST=demo-mysql`）。宿主机 `.env` 若设 `CHATBI_LOG_DB_PORT=33067` 表示连接独立日志实例，非 compose 默认。
 
 如需主动拆分应用库或管理库，可显式设置 `CHATBI_APP_DB_*` / `CHATBI_ADMIN_DB_*`。
 
@@ -265,11 +247,10 @@ chat-bi/
 | 主题 | 路径 |
 |------|------|
 | Agent 规则与工作方式 | [AGENTS.md](AGENTS.md) |
-| 技术与使用指南（功能与页面） | [docs/user-guide.md](docs/user-guide.md) |
-| 技术实现指南（Agent / Prompt / 记忆 / Skill） | [docs/tech-guide.md](docs/tech-guide.md) |
+| 技术与使用指南（功能与页面） | [docs/guide/user-guide.md](docs/guide/user-guide.md) |
+| 技术实现指南（Agent / Prompt / 记忆 / Skill） | [docs/guide/tech-guide.md](docs/guide/tech-guide.md) |
 | 系统架构与模块边界 | [docs/architecture/README.md](docs/architecture/README.md) |
 | 编码规范 | [docs/conventions/README.md](docs/conventions/README.md) |
 | 测试与 CI | [docs/testing/README.md](docs/testing/README.md)、[docs/ci-cd/README.md](docs/ci-cd/README.md) |
 | 当前迭代任务 | [docs/plans/current-sprint.md](docs/plans/current-sprint.md) |
-| 项目目标与验收标准 | [docs/goal.md](docs/goal.md) |
 | Skill 能力说明 | `skills/<skill-name>/SKILL.md` |

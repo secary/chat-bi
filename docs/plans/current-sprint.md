@@ -49,11 +49,11 @@
 
 | 编号 | Gap                                                                                                    | 下一步                                                                                             |
 | ---- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
-| G1   | 日志库连接已改回 dev 主 MySQL 实例双库模式，README 与专题文档仍可能残留旧的外部 33067 或独立日志库表述 | 调整日志库相关文档，明确 dev 环境默认由 `demo-mysql` 同时承载 `chatbi_demo` 与 `chatbi_local_logs` |
+| G1   | `.env.example` 仍示例 `CHATBI_LOG_DB_PORT=33067`（独立日志实例），与 compose 双库同实例默认不一致 | 可选：改 `.env.example` 注释或默认值；README / `docs/guide/tech-guide` 已说明 compose 与宿主机差异 |
 | G2   | Python 依赖存在 `pyproject.toml` 与 `requirements.txt` 双事实源                                        | 新增依赖时同步两处；长期可考虑 Docker/CI 也切到 `uv sync` 后移除双写                               |
 | G3   | 在线 E2E 不进默认 CI，依赖 LLM / DB / 后端运行状态                                                     | 后端和 LLM 可用时跑 `python scripts/e2e_smoke.py --cases S1,S4,E1` 或按需全量                      |
 | G4   | 上传文件复杂跨字段分析 / 风控建议仍偏轻量规则                                                          | 如要增强，新增上传数据分析或风控建议 Skill，不复用演示库 decision-advisor                          |
-| G5   | 部分历史文档可能仍有旧环境或旧多库表述                                                                 | 改动相关模块时顺手同步 README、docs/architecture、docs/tech-guide                                  |
+| G5   | `docs/architecture/README.md` 等专题文档可能仍滞后于 guide / backend-architecture                          | 改动相关模块时顺手同步；主用户/技术文档在 `docs/guide/`，后端专题见 `docs/backend-architecture.md` |
 
 ## 最近变更
 

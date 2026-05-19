@@ -122,6 +122,44 @@ class ReactRunnerTest(unittest.TestCase):
 
         asyncio.run(run())
 
+    def test_harness_rejects_invalid_action_then_allows_finish(self):
+        invalid = {
+            "action": "launch_missile",
+            "text": "bad action",
+        }
+        finish = {
+            "action": "finish",
+            "text": "已改为正常收尾。",
+            "chart_plan": None,
+            "kpi_cards": [],
+        }
+
+        async def run():
+            cfg = replace(settings, agent_react=True, agent_max_steps=4)
+            with patch("backend.agent.react_runner.settings", cfg):
+                with patch(
+                    "backend.agent.react_runner.call_llm_for_react_step",
+                    new_callable=AsyncMock,
+                ) as mock_llm:
+                    mock_llm.side_effect = [invalid, finish]
+                    with patch("backend.agent.react_runner.run_script") as mock_run:
+                        events = await _collect(
+                            stream_chat_react(
+                                [{"role": "user", "content": "请总结一下"}], trace_id="t2b"
+                            )
+                        )
+                        self.assertEqual(mock_llm.await_count, 2)
+                        mock_run.assert_not_called()
+                        thinking = [
+                            str(e.get("content")) for e in events if e.get("type") == "thinking"
+                        ]
+                        self.assertTrue(any("调整处理方式" in item for item in thinking))
+                        self.assertTrue(
+                            any("已改为正常收尾" in str(e.get("content")) for e in events)
+                        )
+
+        asyncio.run(run())
+
     def test_visual_first_skill_suppresses_finish_text_and_keeps_chart(self):
         first = {
             "action": "call_skill",

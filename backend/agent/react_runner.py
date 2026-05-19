@@ -13,6 +13,14 @@ from backend.agent.executor import (
     skill_args_for_execution,
 )
 from backend.agent.formatter import stream_result_events
+from backend.agent.harness_events import (
+    log_harness_authorized,
+    log_harness_executing,
+    log_harness_finish,
+    log_harness_observation,
+    log_harness_rejected,
+    log_harness_validated,
+)
 from backend.agent.harness_policy import authorize_action
 from backend.agent.harness_runner import rejection_observation
 from backend.agent.harness_schema import validate_harness_action
@@ -411,13 +419,11 @@ async def stream_chat_react(
         validation = validate_harness_action(plan)
         if not validation.ok:
             harness_state.record_rejection(validation.reason)
-            log_event(
+            log_harness_rejected(
                 trace_id,
-                "agent.harness",
-                "schema_rejected",
-                message=validation.reason,
-                payload={"step": step + 1},
-                level="WARN",
+                harness_state,
+                category="schema_rejected",
+                reason=validation.reason,
             )
             working.append(
                 {
@@ -432,6 +438,7 @@ async def stream_chat_react(
 
         action_model = validation.action
         assert action_model is not None
+        log_harness_validated(trace_id, harness_state, action_model)
         if action_model.thought:
             yield {"type": "thinking", "content": action_model.thought}
 
@@ -443,13 +450,12 @@ async def stream_chat_react(
         )
         if not policy.ok:
             harness_state.record_rejection(policy.reason)
-            log_event(
+            log_harness_rejected(
                 trace_id,
-                "agent.harness",
-                "policy_rejected",
-                message=policy.reason,
-                payload={"step": step + 1, "skill": action_model.skill},
-                level="WARN",
+                harness_state,
+                category="policy_rejected",
+                reason=policy.reason,
+                action=action_model,
             )
             working.append(
                 {
@@ -469,8 +475,10 @@ async def stream_chat_react(
             continue
 
         harness_state.record_accept()
+        log_harness_authorized(trace_id, harness_state, action_model)
         action = action_model.action
         if action == "finish":
+            log_harness_finish(trace_id, harness_state, action_model)
             yield {"type": "thinking", "content": "正在整理回答..."}
             merged = _finish_merged(
                 result_sink, plan, last_skill_name, last_result, local_executions
@@ -598,6 +606,7 @@ async def stream_chat_react(
             {"action": "call_skill", "skill": skill_name, "skill_args": args},
             ensure_ascii=False,
         )
+        log_harness_executing(trace_id, harness_state, action_model, args)
         try:
             log_event(
                 trace_id,
@@ -715,6 +724,13 @@ async def stream_chat_react(
                         else:
                             local_executions = get_skill_executions(result_sink)
             if _is_terminal_auto_analysis_result(skill_name, result):
+                log_harness_observation(
+                    trace_id,
+                    harness_state,
+                    skill_name=skill_name,
+                    ok=True,
+                    result_kind=str(result.get("kind") or ""),
+                )
                 yield {
                     "type": "thinking",
                     "content": "自动分析已生成结构化结果，正在展示...",
@@ -734,6 +750,13 @@ async def stream_chat_react(
                 yield {"type": "done", "content": None}
                 return
             obs = summarize_observation(skill_name, result)
+            log_harness_observation(
+                trace_id,
+                harness_state,
+                skill_name=skill_name,
+                ok=True,
+                result_kind=str(result.get("kind") or ""),
+            )
         except Exception as exc:
             log_event(
                 trace_id,
@@ -746,6 +769,13 @@ async def stream_chat_react(
             obs = json.dumps(
                 {"skill": skill_name, "ok": False, "error": str(exc)},
                 ensure_ascii=False,
+            )
+            log_harness_observation(
+                trace_id,
+                harness_state,
+                skill_name=skill_name,
+                ok=False,
+                error=str(exc),
             )
 
         working.append({"role": "assistant", "content": assistant_note})

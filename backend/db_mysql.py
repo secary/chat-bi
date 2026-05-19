@@ -14,6 +14,8 @@ from backend.config import settings
 def target_db_config(target: str) -> Dict[str, str]:
     if target == "admin":
         return settings.admin_db_config
+    if target == "log":
+        return settings.log_db_config
     return settings.app_db_config
 
 
@@ -45,6 +47,12 @@ def app_connection() -> Iterator[pymysql.connections.Connection]:
 @contextmanager
 def admin_connection() -> Iterator[pymysql.connections.Connection]:
     with _connection_for("admin") as conn:
+        yield conn
+
+
+@contextmanager
+def log_connection() -> Iterator[pymysql.connections.Connection]:
+    with _connection_for("log") as conn:
         yield conn
 
 
@@ -86,6 +94,20 @@ def admin_execute(sql: str, args: Optional[tuple[Any, ...]] = None) -> int:
     with admin_connection() as conn:
         with conn.cursor() as cur:
             return cur.execute(sql, args or ())
+
+
+def log_fetch_one(sql: str, args: Optional[tuple[Any, ...]] = None) -> Optional[Dict[str, Any]]:
+    with log_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, args or ())
+            return cur.fetchone()
+
+
+def log_fetch_all(sql: str, args: Optional[tuple[Any, ...]] = None) -> List[Dict[str, Any]]:
+    with log_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, args or ())
+            return list(cur.fetchall())
 
 
 def admin_execute_lastrowid(sql: str, args: Optional[tuple[Any, ...]] = None) -> int:

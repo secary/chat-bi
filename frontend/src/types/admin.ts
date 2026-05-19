@@ -82,3 +82,36 @@ export interface LlmSettingsView {
   effective_api_key_set?: boolean;
   effective_source?: 'saved_settings' | 'env';
 }
+
+export interface HarnessAuditIssue {
+  code: string;
+  level: string;
+  message: string;
+}
+
+export interface HarnessAuditEvent {
+  id: number;
+  trace_id: string;
+  span_name: string;
+  event_name: string;
+  level: string;
+  message: string;
+  payload: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface HarnessAuditReport {
+  trace_id: string;
+  status: string;
+  score: number;
+  summary: string;
+  issues: HarnessAuditIssue[];
+  events: HarnessAuditEvent[];
+  event_count: number;
+}
+
+export interface HarnessAuditCandidate {
+  trace_id: string;
+  last_seen: string;
+  event_count: number;
+}

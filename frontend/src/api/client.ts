@@ -5,6 +5,8 @@ import type {
   DbConnectionRow,
   LlmProfilePublic,
   LlmSettingsView,
+  HarnessAuditReport,
+  HarnessAuditCandidate,
   MultiAgentsRegistryPayload,
   SessionListApi,
 } from '../types/admin';
@@ -289,6 +291,14 @@ export async function listAdminSkills(): Promise<AdminSkillRow[]> {
 
 export async function getMultiAgentsRegistry(): Promise<MultiAgentsRegistryPayload> {
   return requestJson<MultiAgentsRegistryPayload>('/admin/multi-agents');
+}
+
+export async function listHarnessAuditCandidates(): Promise<{ items: HarnessAuditCandidate[] }> {
+  return requestJson<{ items: HarnessAuditCandidate[] }>('/admin/harness-audits');
+}
+
+export async function getHarnessAudit(traceId: string): Promise<HarnessAuditReport> {
+  return requestJson<HarnessAuditReport>(`/admin/harness-audits/${encodeURIComponent(traceId)}`);
 }
 
 export async function putMultiAgentsRegistry(

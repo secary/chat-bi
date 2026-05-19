@@ -53,6 +53,18 @@ export function useChat(
   }, [messages]);
 
   useEffect(() => {
+    return () => {
+      const tid = currentTraceIdRef.current;
+      if (tid) {
+        void abortChat(tid);
+      }
+      streamAbortRef.current?.abort();
+      streamAbortRef.current = null;
+      streamingRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
     if (sessionId == null) {
       setMessages([]);
       return;

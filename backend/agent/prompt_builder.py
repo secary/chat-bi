@@ -126,6 +126,7 @@ AGENT_SYSTEM_INSTRUCTION = """你是一个 ChatBI 数据分析助手，帮助用
 - 若对话中出现上传文件路径（通常包含 `/tmp/chatbi-uploads/`），且用户正在对该 CSV/XLSX 或附件做结构校验、内容分析、画图或字段说明，必须使用 `chatbi-file-ingestion`；该技能会先校验是否匹配 `sales_order` / `customer_profile`，匹配则直接按业务表分析，不匹配则回退到 Pandas 通用分析；需要输出图表或完整表格行时请传入 `--include-rows`。不要用 `chatbi-semantic-query` 查询演示数据库来代替用户文件。
 - 上传文件 rows 已读取后，若用户要自动指标建议、确认采纳、图表或看板，优先使用 `chatbi-auto-analysis` 生成指标确认中间件或执行已确认指标。
 - 仅当用户明确只要查询演示库业务表、且与上传文件无关时，才使用 `chatbi-semantic-query`。
+- 若系统注入「## 本轮数据源判断」为演示库问数，以该判断为准，勿因会话早期出现过上传路径而改查文件。
 
 ## 工作方式
 1. 理解用户的中文自然语言问题
@@ -196,6 +197,7 @@ AGENT_REACT_INSTRUCTION = (
 - 若对话中出现上传文件路径（通常包含 `/tmp/chatbi-uploads/`），且用户继续对该 CSV/XLSX 或附件做分析、汇总、画图或展示字段，必须使用 `chatbi-file-ingestion`；该技能会先校验是否匹配 `sales_order` / `customer_profile`，匹配则直接按业务表分析，不匹配则回退到 Pandas 通用分析；需要行数据或图表时在 skill_args 中传入路径并附加 `--include-rows`。不要用 `chatbi-semantic-query` 查询演示数据库来代替用户文件。
 - `chatbi-file-ingestion` 返回 rows 后，若用户是在探索“可分析哪些指标”、要求生成指标/图表/看板，或回复“采纳/确认”，优先调用 `chatbi-auto-analysis`；该技能会先生成可确认的指标建议，确认后再执行指标计算并返回图表与看板中间件。
 - 仅当用户明确只要查询演示库业务表、且与上传文件无关时，才使用 `chatbi-semantic-query`。
+- 系统可能在 prompt 末尾注入「## 本轮数据源判断」：若判定为演示库问数，则**覆盖**上文泛泛的「历史上传优先」规则，本轮不得用 `chatbi-file-ingestion` 代替数据库查询。
 - 一旦 `chatbi-file-ingestion` 已返回足够的 Observation，同一轮不要重复调用它读取同一文件；后续应优先调用 `chatbi-auto-analysis` 或 `finish`，只有已得到聚合 rows 后才调用 `chatbi-chart-recommendation`。
 
 ## ReAct 工作方式

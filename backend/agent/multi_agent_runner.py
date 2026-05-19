@@ -16,8 +16,14 @@ from backend.agent.multi_agent_registry import (
 )
 from backend.agent.multi_agent_summarize import call_summarize_llm
 from backend.agent.observation import summarize_observation
+from backend.agent.skill_history import (
+    build_combined_observation,
+    get_skill_executions,
+    merge_results_for_finish,
+)
 from backend.agent.formatter import stream_result_events
 from backend.agent.runner import stream_specialist
+from backend.agent.data_source_intent import resolve_data_source
 from backend.trace import log_event
 
 
@@ -65,6 +71,7 @@ async def stream_chat_multi_agent(
     progress_lines: List[str] = []
     last_result: Optional[Dict[str, Any]] = None
     last_skill_name: Optional[str] = None
+    all_skill_executions: List[Dict[str, Any]] = []
 
     for rnd in range(1, n_rounds + 1):
         if _is_aborted(trace_id):
@@ -156,6 +163,8 @@ async def stream_chat_multi_agent(
             return
 
         obs_by_idx: Dict[int, str] = {}
+        skill_failure_this_batch = False
+        batch_data_intent = resolve_data_source(messages)
         for orig_idx, task in ordered:
             agent_id = str(task["agent_id"])
             label = agent_label(agent_id)
@@ -171,6 +180,7 @@ async def stream_chat_multi_agent(
                 messages,
                 str(task["handoff_instruction"]),
                 prior,
+                data_source_intent=batch_data_intent,
             )
             sink: Dict[str, Any] = {}
             acc_text = ""
@@ -208,7 +218,8 @@ async def stream_chat_multi_agent(
                         "content": f"[{label}] 错误：{err_content}",
                     }
                     # Track skill-not-found errors for Manager re-planning
-                    if "未找到技能" in err_content:
+                    if "未找到技能" in err_content or "skill_not_in_line" in err_content:
+                        skill_failure_this_batch = True
                         missing = err_content.split("未找到技能：")[-1].strip()
                         progress_lines.append(
                             f"[技能缺失提示] {label} 无法执行 skill「{missing}」，"
@@ -221,22 +232,39 @@ async def stream_chat_multi_agent(
                 last_result = lr
             if isinstance(lsn, str) and lsn:
                 last_skill_name = lsn
+            executions = get_skill_executions(sink)
+            if executions:
+                all_skill_executions.extend(executions)
             obs = (
-                summarize_observation(str(lsn or "skill"), lr)
-                if isinstance(lr, dict)
-                else (acc_text[:1200] if acc_text else "（无工具结果）")
+                build_combined_observation(executions)
+                if executions
+                else (
+                    summarize_observation(str(lsn or "skill"), lr)
+                    if isinstance(lr, dict)
+                    else (acc_text[:1200] if acc_text else "（无工具结果）")
+                )
             )
             # Detect skill-not-found from accumulated text (silent failure case)
-            if "未找到技能" in acc_text and not any(
-                "未找到技能" in line for line in progress_lines
+            if ("未找到技能" in acc_text or "skill_not_in_line" in acc_text) and not any(
+                "技能缺失提示" in line for line in progress_lines
             ):
-                missing_match = [s for s in acc_text.split("\n") if "未找到技能" in s]
+                skill_failure_this_batch = True
+                missing_match = [
+                    s for s in acc_text.split("\n") if "未找到技能" in s or "skill_not_in_line" in s
+                ]
                 if missing_match:
-                    missing = missing_match[0].split("未找到技能：")[-1].strip()
+                    line0 = missing_match[0]
+                    missing = (
+                        line0.split("未找到技能：")[-1].strip()
+                        if "未找到技能" in line0
+                        else "（见 Observation）"
+                    )
                     progress_lines.append(
                         f"[技能缺失提示] {label} 无法执行 skill「{missing}」，"
                         f"该专线不具备此技能。Manager 应在下一轮重新指派到拥有「{missing}」的专线。"
                     )
+            if "skill_not_in_line" in obs:
+                skill_failure_this_batch = True
             obs_by_idx[orig_idx] = obs
             hi = str(task["handoff_instruction"])
             progress_lines.append(
@@ -257,8 +285,15 @@ async def stream_chat_multi_agent(
                     "type": "thinking",
                     "content": "[Manager-汇总] 已生成结构化分析中间件，直接输出。",
                 }
+                merged_auto = merge_results_for_finish(
+                    all_skill_executions or get_skill_executions(sink),
+                    {},
+                    last_skill_name,
+                )
                 async for event in stream_result_events(
-                    last_skill_name or "chatbi-auto-analysis", {}, last_result or {}
+                    last_skill_name or "chatbi-auto-analysis",
+                    {},
+                    merged_auto if merged_auto else (last_result or {}),
                 ):
                     yield event
                 log_event(
@@ -278,6 +313,12 @@ async def stream_chat_multi_agent(
             break
         fin = plan.get("finalize_after_this_batch")
         stop_planning = fin is None or bool(fin)
+        if skill_failure_this_batch and rnd < n_rounds:
+            stop_planning = False
+            yield {
+                "type": "thinking",
+                "content": "[Manager-规划] 子专线技能调用失败，将进行下一轮重新指派。",
+            }
         if stop_planning:
             yield {
                 "type": "thinking",
@@ -322,9 +363,15 @@ async def stream_chat_multi_agent(
         return
 
     skill_label = last_skill_name or "chatbi-semantic-query"
-    merged: Dict[str, Any] = dict(last_result) if last_result else {}
-    if synth.get("text"):
-        merged["text"] = synth["text"]
+    merged = merge_results_for_finish(
+        all_skill_executions,
+        synth,
+        last_skill_name,
+    )
+    if not all_skill_executions and isinstance(last_result, dict):
+        merged = dict(last_result)
+        if synth.get("text"):
+            merged["text"] = synth["text"]
 
     yield {"type": "thinking", "content": "[Manager-汇总] 正在输出最终结论..."}
 

@@ -6,6 +6,8 @@ import re
 from copy import deepcopy
 from typing import Any, Dict, List, Optional
 
+from backend.agent.data_source_intent import DataSourceIntent, resolve_data_source
+
 # Server-side uploads from POST /upload (see backend/main.py UPLOAD_DIR).
 _UPLOAD_PATH_RE = re.compile(
     r"/tmp/chatbi-uploads/[A-Za-z0-9._-]+",
@@ -69,6 +71,9 @@ def augment_messages_for_upload_followup(
     when the user clearly continues work on an uploaded CSV/XLSX.
     """
     if not messages:
+        return messages
+
+    if resolve_data_source(messages) == DataSourceIntent.DEMO_DATABASE:
         return messages
 
     primary = _primary_upload_path(messages)

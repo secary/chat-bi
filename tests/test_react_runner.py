@@ -785,6 +785,122 @@ class ReactRunnerTest(unittest.TestCase):
 
         asyncio.run(run())
 
+    def test_demo_db_opt_out_uses_semantic_query_after_upload_history(self):
+        first = {
+            "action": "call_skill",
+            "skill": "chatbi-semantic-query",
+            "skill_args": ["各区域销售额排行"],
+            "thought": "查演示库",
+        }
+        second = {
+            "action": "finish",
+            "text": "完成。",
+            "chart_plan": None,
+            "kpi_cards": [],
+        }
+        script_result = {
+            "kind": "table",
+            "text": "查询完成",
+            "data": {"rows": [{"区域": "华东", "销售额": "613000"}]},
+        }
+        all_skills = scan_skills_enabled(settings.skills_dir)
+        demo_skills = [d for d in all_skills if d.skill_dir.name == "chatbi-semantic-query"]
+        messages = [
+            {"role": "user", "content": "请分析 /tmp/chatbi-uploads/prior.csv"},
+            {
+                "role": "user",
+                "content": "不考虑上传的文件，从数据库中查询各区域 2026 年 1-4 月销售额排行",
+            },
+        ]
+
+        async def run():
+            cfg = replace(settings, agent_react=True, agent_max_steps=6)
+            with patch("backend.agent.react_runner.settings", cfg):
+                with patch(
+                    "backend.agent.react_runner.call_llm_for_react_step",
+                    new_callable=AsyncMock,
+                ) as mock_llm:
+                    mock_llm.side_effect = [first, second]
+                    seen = []
+
+                    def _run_script(skill_doc, args, **kwargs):
+                        seen.append(skill_doc.name)
+                        return script_result
+
+                    with patch("backend.agent.react_runner.run_script", side_effect=_run_script):
+                        events = await _collect(
+                            stream_chat_react(
+                                messages,
+                                trace_id="t_demo_opt",
+                                skill_docs=demo_skills,
+                                subagent_react=True,
+                            )
+                        )
+                        self.assertEqual(seen, ["chatbi-semantic-query"])
+                        self.assertFalse([e for e in events if e.get("type") == "error"])
+
+        asyncio.run(run())
+
+    def test_skill_not_in_line_observation_allows_retry(self):
+        wrong = {
+            "action": "call_skill",
+            "skill": "chatbi-auto-analysis",
+            "skill_args": ["分析"],
+            "thought": "误选",
+        }
+        right = {
+            "action": "call_skill",
+            "skill": "chatbi-semantic-query",
+            "skill_args": ["各区域销售额排行"],
+            "thought": "改查库",
+        }
+        finish = {
+            "action": "finish",
+            "text": "完成。",
+            "chart_plan": None,
+            "kpi_cards": [],
+        }
+        script_result = {
+            "kind": "table",
+            "text": "ok",
+            "data": {"rows": [{"区域": "华东", "销售额": "1"}]},
+        }
+        all_skills = scan_skills_enabled(settings.skills_dir)
+        demo_skills = [d for d in all_skills if d.skill_dir.name == "chatbi-semantic-query"]
+
+        async def run():
+            cfg = replace(settings, agent_react=True, agent_max_steps=6)
+            with patch("backend.agent.react_runner.settings", cfg):
+                with patch(
+                    "backend.agent.react_runner.call_llm_for_react_step",
+                    new_callable=AsyncMock,
+                ) as mock_llm:
+                    mock_llm.side_effect = [wrong, right, finish]
+                    seen = []
+
+                    def _run_script(skill_doc, args, **kwargs):
+                        seen.append(skill_doc.name)
+                        return script_result
+
+                    with patch("backend.agent.react_runner.run_script", side_effect=_run_script):
+                        events = await _collect(
+                            stream_chat_react(
+                                [
+                                    {
+                                        "role": "user",
+                                        "content": "不考虑上传，从数据库查各区域销售额排行",
+                                    }
+                                ],
+                                trace_id="t_retry",
+                                skill_docs=demo_skills,
+                                subagent_react=True,
+                            )
+                        )
+                        self.assertEqual(seen, ["chatbi-semantic-query"])
+                        self.assertFalse([e for e in events if e.get("type") == "error"])
+
+        asyncio.run(run())
+
 
 if __name__ == "__main__":
     unittest.main()

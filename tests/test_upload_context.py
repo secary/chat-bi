@@ -44,6 +44,16 @@ def test_skips_pure_db_question_without_file_markers():
     assert out[-1]["content"] == "2026年1-4月各区域销售额排行"
 
 
+def test_skips_hint_when_user_explicit_demo_db():
+    path = "/tmp/chatbi-uploads/abc_test.csv"
+    msgs = [
+        {"role": "user", "content": f"请分析 {path}"},
+        {"role": "user", "content": "不考虑上传的文件，从数据库中查询各区域销售额排行"},
+    ]
+    out = augment_messages_for_upload_followup(msgs)
+    assert out[-1]["content"] == msgs[-1]["content"]
+
+
 def test_prefers_latest_user_path_not_assistant_error_path():
     old_path = "/tmp/chatbi-uploads/old_chatbi_file_parse_test.csv"
     new_path = "/tmp/chatbi-uploads/new_chatbi_file_parse_test.csv"

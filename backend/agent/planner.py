@@ -54,6 +54,11 @@ async def call_llm_for_react_step(
 """
 
 
+"""
+用于stream_chat_legacy中，默认不使用。
+"""
+
+
 async def call_llm_for_plan(
     system_prompt: str,
     messages: List[Dict[str, str]],
@@ -86,6 +91,11 @@ async def call_llm_for_plan(
         return parse_json_object(content)
     except (json.JSONDecodeError, ValueError):
         return None
+
+
+"""
+
+"""
 
 
 def parse_json_object(content: str) -> Dict[str, Any]:

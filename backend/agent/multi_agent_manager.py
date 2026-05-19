@@ -15,6 +15,7 @@ from backend.agent.multi_agent_registry import (
 )
 from backend.agent.planner import parse_json_object
 from backend.agent.abort_async import ChatAbortedError, await_with_abort
+from backend.agent.data_source_intent import DataSourceIntent, resolve_data_source
 from backend.agent.upload_path_detect import has_upload_file_reference
 from backend.llm_runtime import chatbi_acompletion
 from backend.trace import log_event
@@ -81,14 +82,28 @@ def _manager_context_hints(messages: List[Dict[str, str]]) -> str:
     """
     blob = _dialogue_text_for_scan(messages, 32)
     latest_user = _latest_user_content(messages)
+    intent = resolve_data_source(messages)
     lines: List[str] = []
-    if has_upload_file_reference(blob):
+
+    if intent == DataSourceIntent.DEMO_DATABASE:
         lines.append(
-            "- 对话中曾出现**本地上传/临时文件路径**（如含 `chatbi-uploads`、`/tmp/` 与 csv/xlsx）。"
-            "凡需在该数据上**计算指标、执行「采纳」、按提案出图/看板**，必须派 **upload_analyst**"
-            "（`chatbi-file-ingestion`、`chatbi-auto-analysis`）。"
-            "**禁止**派 **demo_query** 处理上传文件上的指标（该专线无 `chatbi-file-ingestion`，会报未找到技能）。"
+            "- **本轮用户明确要求查演示业务库**（如「从数据库」「不考虑上传」或典型问数句式）。"
+            "应派 **demo_query**，子任务 handoff 中写明使用 `chatbi-semantic-query`；"
+            "**勿**派 **upload_analyst** 处理本轮问数。"
         )
+    elif intent == DataSourceIntent.UPLOAD_FILE:
+        lines.append(
+            "- **本轮用户针对上传文件或延续分析**（含路径、`采纳`、附件等）。"
+            "应派 **upload_analyst**（`chatbi-file-ingestion`、`chatbi-auto-analysis`）；"
+            "**勿**派 **demo_query** 在上传数据上代算（该专线无 file-ingestion）。"
+        )
+    elif has_upload_file_reference(blob):
+        lines.append(
+            "- 会话中曾出现上传路径，但**本轮措辞未明确**；请结合用户原话判断："
+            "若仍在说上传表/采纳/附件 → **upload_analyst**；"
+            "若在问区域/销售额/趋势等业务库指标且未指向文件 → **demo_query** + `chatbi-semantic-query`。"
+        )
+
     if _has_upload_analysis_proposal_cue(blob):
         lines.append(
             "- 对话中曾出现**上传表/文件分析提案**类回复；用户后续的「采纳某指标」应在 **upload_analyst** 上执行，"

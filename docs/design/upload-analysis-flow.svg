@@ -1,0 +1,132 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="1560" viewBox="0 0 980 1560" role="img" aria-labelledby="title desc">
+  <title id="title">ChatBI 上传文件分析到看板聚合竖版链路</title>
+  <desc id="desc">用竖向时序展示上传文件、分析建议、确认执行和看板输出的完整简化流程。</desc>
+  <defs>
+    <style>
+      .bg { fill: #f8fafc; }
+      .frame { fill: #ffffff; stroke: #dbe4f0; stroke-width: 1.5; rx: 26; ry: 26; }
+      .phaseA { fill: #eff6ff; stroke: #bfdbfe; stroke-width: 1; rx: 20; ry: 20; }
+      .phaseB { fill: #fefce8; stroke: #fde68a; stroke-width: 1; rx: 20; ry: 20; }
+      .phaseC { fill: #f0fdf4; stroke: #bbf7d0; stroke-width: 1; rx: 20; ry: 20; }
+      .box { fill: #ffffff; stroke-width: 1.5; rx: 18; ry: 18; }
+      .blue { fill: #eff6ff; stroke: #93c5fd; }
+      .slate { fill: #f8fafc; stroke: #cbd5e1; }
+      .green { fill: #f0fdf4; stroke: #86efac; }
+      .amber { fill: #fffbeb; stroke: #fcd34d; }
+      .title { font: 700 32px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; fill: #0f172a; }
+      .subtitle { font: 500 15px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; fill: #475569; }
+      .phaseTitle { font: 700 18px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; fill: #0f172a; }
+      .phaseSub { font: 600 11px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; fill: #64748b; letter-spacing: 1.1px; text-transform: uppercase; }
+      .boxTitle { font: 700 17px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; fill: #0f172a; }
+      .body { font: 500 13px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; fill: #334155; }
+      .small { font: 500 12px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; fill: #475569; }
+      .tiny { font: 500 11px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; fill: #64748b; }
+      .code { font: 700 13px ui-monospace,SFMono-Regular,Menlo,monospace; fill: #1d4ed8; }
+      .arrow { fill: none; stroke-width: 2.6; marker-end: url(#arrowHead); }
+      .main { stroke: #64748b; }
+      .proposal { stroke: #0ea5e9; }
+      .confirm { stroke: #f59e0b; stroke-dasharray: 8 6; }
+      .dashboard { stroke: #22c55e; }
+      .label { font: 600 12px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; fill: #92400e; }
+    </style>
+    <marker id="arrowHead" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="980" height="1560"/>
+  <text x="56" y="66" class="title">上传文件分析到看板聚合链路</text>
+  <text x="56" y="96" class="subtitle">ChatBI 上传文件分析出看板的竖版简化链路</text>
+
+  <rect class="frame" x="40" y="126" width="900" height="1380"/>
+
+  <rect class="phaseA" x="66" y="156" width="848" height="330"/>
+  <text x="92" y="188" class="phaseTitle">阶段一：上传上下文与首轮分析</text>
+  <text x="92" y="210" class="phaseSub">前端 → 后端 → Agent → 文件解析 / 自动分析</text>
+
+  <rect class="box blue" x="100" y="240" width="250" height="92"/>
+  <text x="122" y="270" class="boxTitle">1. 上传文件并提问</text>
+  <text x="122" y="294" class="body">前端发起 `/chat` SSE</text>
+  <text x="122" y="314" class="small">消息里包含上传文件路径</text>
+
+  <rect class="box slate" x="370" y="240" width="250" height="98"/>
+  <text x="392" y="270" class="boxTitle">2. 组装上下文</text>
+  <text x="392" y="294" class="body">读取 history / session / memory</text>
+  <text x="392" y="314" class="small">识别上传 follow-up 上下文</text>
+
+  <rect class="box green" x="640" y="240" width="238" height="112"/>
+  <text x="662" y="270" class="boxTitle">3. 路由到上传分析专线</text>
+  <text x="662" y="294" class="code">_enforce_upload_skill(...)</text>
+  <text x="662" y="316" class="small">首轮优先 `chatbi-file-ingestion`</text>
+  <text x="662" y="336" class="small">确认/采纳优先 `chatbi-auto-analysis`</text>
+
+  <rect class="box amber" x="514" y="378" width="306" height="90"/>
+  <text x="536" y="408" class="boxTitle">4. `chatbi-auto-analysis` 指标分析</text>
+  <text x="536" y="432" class="body">识别领域与指标</text>
+  <text x="536" y="452" class="small">非 execute 模式先产出 proposal</text>
+
+  <rect class="box amber" x="160" y="378" width="306" height="86"/>
+  <text x="182" y="408" class="boxTitle">5. `chatbi-file-ingestion` 文件解析</text>
+  <text x="182" y="432" class="body">识别字段、profile、rows</text>
+  <text x="182" y="452" class="small">命中 schema 或走单表 fallback</text>
+
+  <path class="arrow main" d="M350 286 H370"/>
+  <path class="arrow main" d="M620 290 H640"/>
+  <path class="arrow main" d="M759 352 V378"/>
+  <path class="arrow main" d="M514 421 H466"/>
+
+  <rect class="phaseB" x="66" y="520" width="848" height="440"/>
+  <text x="92" y="552" class="phaseTitle">阶段二：分析建议输出</text>
+  <text x="92" y="574" class="phaseSub">自动分析建议 → SSE 与持久化 → 建议卡片</text>
+
+  <rect class="box amber" x="338" y="610" width="304" height="92"/>
+  <text x="360" y="640" class="boxTitle">5A. 分析建议输出</text>
+  <text x="360" y="664" class="body">`analysis_proposal`</text>
+  <text x="360" y="684" class="small">来自 `auto-analysis` 的非 execute 模式</text>
+
+  <rect class="box slate" x="338" y="742" width="304" height="98"/>
+  <text x="360" y="772" class="boxTitle">6B. SSE 与持久化</text>
+  <text x="360" y="796" class="body">保存 `analysisProposal`</text>
+  <text x="360" y="816" class="small">供下一轮确认执行复用</text>
+
+  <rect class="box blue" x="338" y="860" width="304" height="80"/>
+  <text x="360" y="890" class="boxTitle">6A. 分析建议卡片</text>
+  <text x="360" y="914" class="body">显示建议指标和采纳提示</text>
+
+  <path class="arrow proposal" d="M490 468 V610"/>
+  <path class="arrow proposal" d="M490 702 V742"/>
+  <path class="arrow proposal" d="M490 840 V860"/>
+  <text x="514" y="592" class="label">建议 payload</text>
+
+  <rect class="phaseC" x="66" y="1000" width="848" height="480"/>
+  <text x="92" y="1032" class="phaseTitle">阶段三：确认执行与看板输出</text>
+  <text x="92" y="1054" class="phaseSub">用户确认 → 执行 → 聚合 → 看板输出</text>
+
+  <rect class="box green" x="338" y="1100" width="304" height="108"/>
+  <text x="360" y="1130" class="boxTitle">6C. 确认执行分支</text>
+  <text x="360" y="1154" class="body">用户回复“采纳全部指标”</text>
+  <text x="360" y="1174" class="small">复用 `proposed_metrics + rows`</text>
+  <text x="360" y="1194" class="small">强制改写为 `mode=execute`</text>
+
+  <rect class="box amber" x="438" y="1244" width="304" height="104"/>
+  <text x="460" y="1274" class="boxTitle">6D. 内部继续聚合</text>
+  <text x="460" y="1298" class="body">图表推荐 + 看板聚合</text>
+  <text x="460" y="1318" class="small">都在 `auto-analysis` 内部完成</text>
+
+  <rect class="box slate" x="120" y="1248" width="280" height="96"/>
+  <text x="142" y="1278" class="boxTitle">7. `dashboard_ready` 输出</text>
+  <text x="142" y="1302" class="body">SSE + 持久化 `dashboardReady`</text>
+  <text x="142" y="1322" class="small">前端据此进入看板渲染</text>
+
+  <rect class="box blue" x="120" y="1380" width="220" height="88"/>
+  <text x="142" y="1410" class="boxTitle">8. 看板卡片</text>
+  <text x="142" y="1434" class="body">渲染 KPI / chart / table</text>
+
+  <path class="arrow confirm" d="M490 940 V1000 V1100"/>
+  <text x="514" y="1030" class="label">用户确认后进入执行态</text>
+
+  <path class="arrow dashboard" d="M490 1208 V1244"/>
+  <path class="arrow dashboard" d="M438 1292 H400"/>
+  <path class="arrow dashboard" d="M260 1344 V1380"/>
+
+</svg>

@@ -28,4 +28,4 @@ def small_talk_reply(user_text: str) -> str:
     text = (user_text or "").strip()
     if "谢谢" in text or "感谢" in text:
         return "不客气。我在，您可以继续问业务数据问题，比如“各区域销售额排行”或“4月毛利率环比”。"
-    return "您好，我在。您可以直接说一个数据分析问题，我会按需调用技能并尽量减少不必要计算。"
+    return "您好，我在。您可以直接告诉我想看什么数据，或想分析什么业务问题。"

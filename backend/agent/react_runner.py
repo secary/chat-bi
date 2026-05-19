@@ -13,6 +13,10 @@ from backend.agent.executor import (
     skill_args_for_execution,
 )
 from backend.agent.formatter import stream_result_events
+from backend.agent.harness_policy import authorize_action
+from backend.agent.harness_runner import rejection_observation
+from backend.agent.harness_schema import validate_harness_action
+from backend.agent.harness_state import HarnessState
 from backend.agent.intent_guard import small_talk_reply, should_skip_skill_for_message
 from backend.agent.observation import summarize_observation
 from backend.agent.skill_history import (
@@ -289,7 +293,7 @@ async def stream_chat_react(
     if should_skip_skill_for_message(user_text):
         log_event(trace_id, "agent.runner", "skip_skill_small_talk", payload={"mode": "react"})
         clear_skill_sink(result_sink)
-        yield {"type": "thinking", "content": "识别为简单话语，直接回复。"}
+        yield {"type": "thinking", "content": "正在准备回复..."}
         yield {"type": "text", "content": small_talk_reply(user_text)}
         yield {"type": "done", "content": None}
         return
@@ -322,6 +326,13 @@ async def stream_chat_react(
     working: 一个消息列表，用于存储对话历史和obs(observation的内容)
     """
     working = [dict(m) for m in messages]
+    harness_state = HarnessState(
+        trace_id=trace_id,
+        user_text=user_text,
+        max_steps=settings.agent_max_steps,
+        session_id=session_id,
+        mode="subagent" if subagent_react else "single",
+    )
     last_skill_name: Optional[str] = None
     last_result: Optional[Dict[str, Any]] = None
     local_executions: List[Dict[str, Any]] = []
@@ -329,7 +340,7 @@ async def stream_chat_react(
     last_ingestion_rows: List[Dict[str, Any]] = list(cached_upload_rows)
     last_ingestion_column_labels: Optional[Dict[str, Any]] = None
 
-    yield {"type": "thinking", "content": "正在分析您的问题（ReAct 多步推理）..."}
+    yield {"type": "thinking", "content": "正在分析您的问题..."}
 
     """
     ReAct loop:
@@ -339,6 +350,7 @@ async def stream_chat_react(
     from backend.agent.abort_state import is_aborted as _is_aborted
 
     for step in range(settings.agent_max_steps):
+        harness_state.begin_step(step + 1)
         if _is_aborted(trace_id):
             log_event(trace_id, "agent.runner", "aborted", level="INFO")
             yield {"type": "thinking", "content": "用户中止了查询。"}
@@ -396,12 +408,69 @@ async def stream_chat_react(
             yield {"type": "done", "content": None}
             return
 
-        thought = plan.get("thought")
-        if isinstance(thought, str) and thought.strip():
-            yield {"type": "thinking", "content": thought.strip()}
+        validation = validate_harness_action(plan)
+        if not validation.ok:
+            harness_state.record_rejection(validation.reason)
+            log_event(
+                trace_id,
+                "agent.harness",
+                "schema_rejected",
+                message=validation.reason,
+                payload={"step": step + 1},
+                level="WARN",
+            )
+            working.append(
+                {
+                    "role": "user",
+                    "content": OBS_HEADER + rejection_observation(validation, None),
+                }
+            )
+            if harness_state.should_stop_after_rejection():
+                break
+            yield {"type": "thinking", "content": "正在调整处理方式..."}
+            continue
 
-        action = str(plan.get("action") or "finish").strip().lower()
-        if action in ("finish", "done", "answer"):
+        action_model = validation.action
+        assert action_model is not None
+        if action_model.thought:
+            yield {"type": "thinking", "content": action_model.thought}
+
+        policy = authorize_action(
+            action_model,
+            harness_state,
+            sorted(allowed_slugs),
+            messages=messages,
+        )
+        if not policy.ok:
+            harness_state.record_rejection(policy.reason)
+            log_event(
+                trace_id,
+                "agent.harness",
+                "policy_rejected",
+                message=policy.reason,
+                payload={"step": step + 1, "skill": action_model.skill},
+                level="WARN",
+            )
+            working.append(
+                {
+                    "role": "assistant",
+                    "content": json.dumps(action_model.raw_plan or plan, ensure_ascii=False),
+                }
+            )
+            working.append(
+                {
+                    "role": "user",
+                    "content": OBS_HEADER + rejection_observation(validation, policy),
+                }
+            )
+            if harness_state.should_stop_after_rejection():
+                break
+            yield {"type": "thinking", "content": "正在重新选择更合适的处理方式..."}
+            continue
+
+        harness_state.record_accept()
+        action = action_model.action
+        if action == "finish":
             yield {"type": "thinking", "content": "正在整理回答..."}
             merged = _finish_merged(
                 result_sink, plan, last_skill_name, last_result, local_executions
@@ -419,8 +488,8 @@ async def stream_chat_react(
             yield {"type": "done", "content": None}
             return
 
-        if action == "ask":
-            ask_text = plan.get("text", "请问还有什么需要帮助的？")
+        if action == "ask_clarification":
+            ask_text = action_model.text or "请问还有什么需要帮助的？"
             yield {"type": "thinking", "content": "正在询问补充信息..."}
             yield {"type": "text", "content": ask_text}
             log_event(
@@ -433,24 +502,10 @@ async def stream_chat_react(
             yield {"type": "done", "content": None}
             return
 
-        if action != "call_skill":
-            sync_skill_sink(result_sink, last_result, last_skill_name)
-            yield {
-                "type": "error",
-                "content": f"无法识别的 action：{plan.get('action')}",
-            }
-            yield {"type": "done", "content": None}
-            return
-
         """
         Execute the skill by given the skill name.
         """
-        skill_name = plan.get("skill")
-        if not skill_name or not isinstance(skill_name, str):
-            sync_skill_sink(result_sink, last_result, last_skill_name)
-            yield {"type": "error", "content": "call_skill 缺少有效的 skill 名称。"}
-            yield {"type": "done", "content": None}
-            return
+        skill_name = action_model.skill or ""
         skill_name = _enforce_upload_skill(skill_name, user_text, messages, last_result)
         # When auto-analysis is called without any row data but a file was uploaded,
         # redirect to file-ingestion first so rows are available on the next step.
@@ -466,7 +521,7 @@ async def stream_chat_react(
             {
                 "action": "call_skill",
                 "skill": skill_name,
-                "skill_args": plan.get("skill_args") or [],
+                "skill_args": action_model.skill_args or [],
             },
             ensure_ascii=False,
         )
@@ -501,7 +556,7 @@ async def stream_chat_react(
             return ["/tmp/chatbi-uploads/xxx.csv", "--sheet", "Sheet1"]
             assistant_note: {"action": "call_skill", "skill": "chatbi-file-ingestion", "skill_args": ["/tmp/chatbi-uploads/xxx.csv", "--sheet", "Sheet1"]}
         """
-        raw_args = plan.get("skill_args") or []
+        raw_args = action_model.skill_args or []
         args = skill_args_for_execution(skill_name, raw_args, messages)
         if skill_name == "chatbi-auto-analysis":
             args = _auto_analysis_args(
@@ -578,6 +633,7 @@ async def stream_chat_react(
             )
             last_skill_name = skill_name
             last_result = result
+            harness_state.record_skill(skill_name, result)
             called_skills.append(skill_name)
             record_skill_execution(result_sink, skill_name, result, step + 1)
             if result_sink is None:
@@ -644,6 +700,7 @@ async def stream_chat_react(
                         )
                         last_skill_name = skill_name
                         last_result = result
+                        harness_state.record_skill(skill_name, result)
                         called_skills.append(skill_name)
                         record_skill_execution(result_sink, skill_name, result, step + 1)
                         if result_sink is None:
@@ -714,6 +771,7 @@ async def stream_chat_react(
                         yield event
                     last_skill_name = "chatbi-decision-advisor"
                     last_result = advice_result
+                    harness_state.record_skill("chatbi-decision-advisor", advice_result)
                     called_skills.append("chatbi-decision-advisor")
                     record_skill_execution(
                         result_sink,

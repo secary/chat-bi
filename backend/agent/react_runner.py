@@ -23,6 +23,7 @@ from backend.agent.skill_history import (
     sync_skill_sink,
 )
 from backend.agent.abort_async import ChatAbortedError
+from backend.agent.data_source_intent import DataSourceIntent, resolve_data_source
 from backend.agent.planner import call_llm_for_react_step
 from backend.agent.prompt_builder import (
     SkillDoc,
@@ -224,6 +225,8 @@ def _enforce_upload_skill(
     if _rows_for_followup_chart(last_result) and _is_auto_analysis_request(user_text):
         return "chatbi-auto-analysis"
     if skill_name != "chatbi-semantic-query":
+        return skill_name
+    if resolve_data_source(messages) == DataSourceIntent.DEMO_DATABASE:
         return skill_name
     if _rows_for_followup_chart(last_result) and _is_visual_request(user_text):
         return "chatbi-chart-recommendation"
@@ -459,16 +462,33 @@ async def stream_chat_react(
         ):
             skill_name = "chatbi-file-ingestion"
 
+        assistant_note = json.dumps(
+            {
+                "action": "call_skill",
+                "skill": skill_name,
+                "skill_args": plan.get("skill_args") or [],
+            },
+            ensure_ascii=False,
+        )
         skill_doc = find_skill(skills, skill_name)
-        if not skill_doc:
+        if not skill_doc or (subagent_react and skill_name not in allowed_slugs):
             available = ", ".join(sorted(allowed_slugs)) if allowed_slugs else "（无）"
-            sync_skill_sink(result_sink, last_result, last_skill_name)
+            obs = json.dumps(
+                {
+                    "skill_not_in_line": True,
+                    "requested": skill_name,
+                    "available": sorted(allowed_slugs),
+                    "hint": f"请从本专线可用技能中选择：{available}",
+                },
+                ensure_ascii=False,
+            )
+            working.append({"role": "assistant", "content": assistant_note})
+            working.append({"role": "user", "content": OBS_HEADER + obs})
             yield {
-                "type": "error",
-                "content": f"未找到技能：{skill_name}。本专线可用技能：{available}",
+                "type": "thinking",
+                "content": f"技能「{skill_name}」不在本专线，请从可用列表重选...",
             }
-            yield {"type": "done", "content": None}
-            return
+            continue
 
         yield {"type": "thinking", "content": f"正在执行 Skill「{skill_name}」..."}
 
@@ -625,6 +645,18 @@ async def stream_chat_react(
                         last_skill_name = skill_name
                         last_result = result
                         called_skills.append(skill_name)
+                        record_skill_execution(result_sink, skill_name, result, step + 1)
+                        if result_sink is None:
+                            local_executions.append(
+                                {
+                                    "skill": skill_name,
+                                    "result": result,
+                                    "observation": summarize_observation(skill_name, result),
+                                    "step": step + 1,
+                                }
+                            )
+                        else:
+                            local_executions = get_skill_executions(result_sink)
             if _is_terminal_auto_analysis_result(skill_name, result):
                 yield {
                     "type": "thinking",

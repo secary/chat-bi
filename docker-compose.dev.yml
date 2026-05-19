@@ -38,7 +38,7 @@ services:
       CHATBI_MYSQL_CMD: mysql
       WATCHFILES_FORCE_POLLING: "true"
       # 开发默认关闭登录；设为 1/true 可启用与生产一致的 JWT 流程
-      CHATBI_AUTH_ENABLED: "false"
+      CHATBI_AUTH_ENABLED: "true"
     ports:
       - "8001:8000"
     volumes:
@@ -69,7 +69,7 @@ services:
       CHOKIDAR_USEPOLLING: "true"
       VITE_PROXY_TARGET: http://backend:8000
       # 与后端一致；设为 true 时需同步开启 backend CHATBI_AUTH_ENABLED
-      VITE_AUTH_ENABLED: "false"
+      VITE_AUTH_ENABLED: "true"
     ports:
       - "5174:5173"
     volumes:

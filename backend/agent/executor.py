@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import re
 from typing import Any, Dict, List, Optional
 
@@ -226,6 +227,22 @@ def run_script(
     if is_aborted(trace_id):
         raise RuntimeError("用户中止了查询")
     return normalize_skill_result(result, skill.name)
+
+
+async def run_script_async(
+    skill: SkillDoc,
+    args: List[str],
+    trace_id: str = "",
+    skill_db_overrides: Optional[Dict[str, str]] = None,
+) -> Dict[str, Any]:
+    """Run a skill without blocking the asyncio event loop."""
+    return await asyncio.to_thread(
+        run_script,
+        skill,
+        args,
+        trace_id,
+        skill_db_overrides,
+    )
 
 
 def skill_result_log_payload(result: Dict[str, Any]) -> Dict[str, Any]:

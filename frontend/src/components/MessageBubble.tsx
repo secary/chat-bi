@@ -296,8 +296,11 @@ function AnalysisProposalCard({
     <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-3">
       <FormattedMarkdown content={proposal.markdown} />
       <div className="mt-3 grid gap-2 md:grid-cols-2">
-        {proposal.proposed_metrics.map((metric) => (
-          <div key={metric.id} className="rounded-lg border border-emerald-200 bg-white px-3 py-2">
+        {proposal.proposed_metrics.map((metric, index) => (
+          <div
+            key={`${metric.id}-${index}`}
+            className="rounded-lg border border-emerald-200 bg-white px-3 py-2"
+          >
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold text-gray-950">{metric.name}</div>

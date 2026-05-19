@@ -11,6 +11,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/chat': proxyTarget,
+      '/abort': proxyTarget,
       '/health': proxyTarget,
       '/upload': proxyTarget,
       '/sessions': proxyTarget,

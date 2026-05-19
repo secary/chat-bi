@@ -39,12 +39,15 @@ class ReactRunnerTest(unittest.TestCase):
                     "backend.agent.react_runner.call_llm_for_react_step",
                     new_callable=AsyncMock,
                 ) as mock_llm:
-                    with patch("backend.agent.react_runner.run_script") as mock_run:
+                    with patch(
+                        "backend.agent.react_runner.run_script_async",
+                        new_callable=AsyncMock,
+                    ) as mock_run:
                         events = await _collect(
                             stream_chat_react([{"role": "user", "content": "你好"}], trace_id="t0")
                         )
                         mock_llm.assert_not_awaited()
-                        mock_run.assert_not_called()
+                        mock_run.assert_not_awaited()
                         texts = [e for e in events if e.get("type") == "text"]
                         self.assertTrue(any("您好" in str(e.get("content")) for e in texts))
 
@@ -77,7 +80,10 @@ class ReactRunnerTest(unittest.TestCase):
                     new_callable=AsyncMock,
                 ) as mock_llm:
                     mock_llm.side_effect = [first, second]
-                    with patch("backend.agent.react_runner.run_script") as mock_run:
+                    with patch(
+                        "backend.agent.react_runner.run_script_async",
+                        new_callable=AsyncMock,
+                    ) as mock_run:
                         mock_run.return_value = script_result
                         events = await _collect(
                             stream_chat_react(
@@ -86,7 +92,7 @@ class ReactRunnerTest(unittest.TestCase):
                             )
                         )
                         self.assertEqual(mock_llm.await_count, 2)
-                        mock_run.assert_called_once()
+                        mock_run.assert_awaited_once()
                         types = [e.get("type") for e in events]
                         self.assertIn("done", types)
                         self.assertIn("text", types)
@@ -109,14 +115,17 @@ class ReactRunnerTest(unittest.TestCase):
                     new_callable=AsyncMock,
                 ) as mock_llm:
                     mock_llm.return_value = plan
-                    with patch("backend.agent.react_runner.run_script") as mock_run:
+                    with patch(
+                        "backend.agent.react_runner.run_script_async",
+                        new_callable=AsyncMock,
+                    ) as mock_run:
                         events = await _collect(
                             stream_chat_react(
                                 [{"role": "user", "content": "请总结一下"}], trace_id="t2"
                             )
                         )
                         mock_llm.assert_awaited_once()
-                        mock_run.assert_not_called()
+                        mock_run.assert_not_awaited()
                         texts = [e for e in events if e.get("type") == "text"]
                         self.assertTrue(any("助手" in str(e.get("content")) for e in texts))
 
@@ -157,7 +166,10 @@ class ReactRunnerTest(unittest.TestCase):
                     new_callable=AsyncMock,
                 ) as mock_llm:
                     mock_llm.side_effect = [first, second]
-                    with patch("backend.agent.react_runner.run_script") as mock_run:
+                    with patch(
+                        "backend.agent.react_runner.run_script_async",
+                        new_callable=AsyncMock,
+                    ) as mock_run:
                         mock_run.return_value = script_result
                         events = await _collect(
                             stream_chat_react(
@@ -208,10 +220,25 @@ class ReactRunnerTest(unittest.TestCase):
                     new_callable=AsyncMock,
                 ) as mock_llm:
                     mock_llm.side_effect = [first, second]
-                    with patch("backend.agent.react_runner.run_script") as mock_run:
-                        with patch("backend.agent.react_followup.run_script") as mock_followup:
+                    with patch(
+                        "backend.agent.react_runner.run_script_async",
+                        new_callable=AsyncMock,
+                    ) as mock_run:
+                        with patch(
+                            "backend.agent.react_runner.run_decision_followup_async",
+                            new_callable=AsyncMock,
+                        ) as mock_followup:
                             mock_run.return_value = query_result
-                            mock_followup.return_value = advice_result
+                            mock_followup.return_value = (
+                                [
+                                    {
+                                        "type": "thinking",
+                                        "content": "检测到查询后还需要经营建议，继续执行 Skill「chatbi-decision-advisor」。",
+                                    }
+                                ],
+                                advice_result,
+                                [],
+                            )
                             events = await _collect(
                                 stream_chat_react(
                                     [
@@ -223,8 +250,8 @@ class ReactRunnerTest(unittest.TestCase):
                                     trace_id="t4",
                                 )
                             )
-                            self.assertEqual(mock_run.call_count, 1)
-                            self.assertEqual(mock_followup.call_count, 1)
+                            self.assertEqual(mock_run.await_count, 1)
+                            mock_followup.assert_awaited_once()
                             thinking = "\n".join(
                                 str(e.get("content")) for e in events if e.get("type") == "thinking"
                             )
@@ -257,7 +284,10 @@ class ReactRunnerTest(unittest.TestCase):
                     new_callable=AsyncMock,
                 ) as mock_llm:
                     mock_llm.side_effect = [first, ValueError("bad json")]
-                    with patch("backend.agent.react_runner.run_script") as mock_run:
+                    with patch(
+                        "backend.agent.react_runner.run_script_async",
+                        new_callable=AsyncMock,
+                    ) as mock_run:
                         mock_run.return_value = script_result
                         events = await _collect(
                             stream_chat_react(
@@ -323,7 +353,7 @@ class ReactRunnerTest(unittest.TestCase):
                     mock_llm.side_effect = [first, second, third]
                     seen_args = []
 
-                    def _run_script(skill_doc, args, **kwargs):
+                    async def _run_script(skill_doc, args, **kwargs):
                         seen_args.append((skill_doc.name, args))
                         if skill_doc.name == "chatbi-file-ingestion":
                             return file_result
@@ -331,7 +361,7 @@ class ReactRunnerTest(unittest.TestCase):
                             return chart_result
                         raise AssertionError(f"unexpected skill {skill_doc.name}")
 
-                    with patch("backend.agent.react_runner.run_script", side_effect=_run_script):
+                    with patch("backend.agent.react_runner.run_script_async", side_effect=_run_script):
                         events = await _collect(
                             stream_chat_react(
                                 [
@@ -410,7 +440,7 @@ class ReactRunnerTest(unittest.TestCase):
                     mock_llm.side_effect = [first, second, third]
                     seen = []
 
-                    def _run_script(skill_doc, args, **kwargs):
+                    async def _run_script(skill_doc, args, **kwargs):
                         seen.append(skill_doc.name)
                         if skill_doc.name == "chatbi-file-ingestion":
                             return file_result
@@ -418,7 +448,7 @@ class ReactRunnerTest(unittest.TestCase):
                             return chart_result
                         raise AssertionError(f"unexpected skill {skill_doc.name}")
 
-                    with patch("backend.agent.react_runner.run_script", side_effect=_run_script):
+                    with patch("backend.agent.react_runner.run_script_async", side_effect=_run_script):
                         events = await _collect(
                             stream_chat_react(
                                 [
@@ -471,11 +501,11 @@ class ReactRunnerTest(unittest.TestCase):
                     mock_llm.side_effect = [first, second]
                     seen = []
 
-                    def _run_script(skill_doc, args, **kwargs):
+                    async def _run_script(skill_doc, args, **kwargs):
                         seen.append((skill_doc.name, args))
                         return file_result
 
-                    with patch("backend.agent.react_runner.run_script", side_effect=_run_script):
+                    with patch("backend.agent.react_runner.run_script_async", side_effect=_run_script):
                         events = await _collect(
                             stream_chat_react(
                                 [
@@ -557,7 +587,7 @@ class ReactRunnerTest(unittest.TestCase):
                 ) as mock_llm:
                     mock_llm.side_effect = [first, first]
 
-                    def _run_script(skill_doc, args, **kwargs):
+                    async def _run_script(skill_doc, args, **kwargs):
                         if skill_doc.name == "chatbi-file-ingestion":
                             return file_result
                         if skill_doc.name == "chatbi-auto-analysis":
@@ -565,7 +595,7 @@ class ReactRunnerTest(unittest.TestCase):
                         raise AssertionError(skill_doc.name)
 
                     with patch(
-                        "backend.agent.react_runner.run_script",
+                        "backend.agent.react_runner.run_script_async",
                         side_effect=_run_script,
                     ):
                         events = await _collect(
@@ -640,7 +670,7 @@ class ReactRunnerTest(unittest.TestCase):
                         return_value=rows,
                     ):
 
-                        def _run_script(skill_doc, args, **kwargs):
+                        async def _run_script(skill_doc, args, **kwargs):
                             self.assertEqual(skill_doc.name, "chatbi-auto-analysis")
                             self.assertEqual(args[0], "--input-file")
                             with open(args[1], encoding="utf-8") as handle:
@@ -654,7 +684,7 @@ class ReactRunnerTest(unittest.TestCase):
                             return auto_result
 
                         with patch(
-                            "backend.agent.react_runner.run_script",
+                            "backend.agent.react_runner.run_script_async",
                             side_effect=_run_script,
                         ) as mock_run:
                             events = await _collect(
@@ -677,7 +707,7 @@ class ReactRunnerTest(unittest.TestCase):
                                 )
                             )
                             mock_llm.assert_awaited_once()
-                            mock_run.assert_called_once()
+                            mock_run.assert_awaited_once()
                             self.assertTrue(any(e.get("type") == "dashboard_ready" for e in events))
                             self.assertEqual(events[-1].get("type"), "done")
 
@@ -741,7 +771,7 @@ class ReactRunnerTest(unittest.TestCase):
                     with patch("backend.agent.react_runner.get_cached_rows", return_value=[]):
                         calls: list[str] = []
 
-                        def _run_script(skill_doc, args, **kwargs):
+                        async def _run_script(skill_doc, args, **kwargs):
                             calls.append(skill_doc.name)
                             if skill_doc.name == "chatbi-file-ingestion":
                                 return file_result
@@ -755,7 +785,7 @@ class ReactRunnerTest(unittest.TestCase):
                             return auto_result
 
                         with patch(
-                            "backend.agent.react_runner.run_script",
+                            "backend.agent.react_runner.run_script_async",
                             side_effect=_run_script,
                         ):
                             events = await _collect(
@@ -823,11 +853,11 @@ class ReactRunnerTest(unittest.TestCase):
                     mock_llm.side_effect = [first, second]
                     seen = []
 
-                    def _run_script(skill_doc, args, **kwargs):
+                    async def _run_script(skill_doc, args, **kwargs):
                         seen.append(skill_doc.name)
                         return script_result
 
-                    with patch("backend.agent.react_runner.run_script", side_effect=_run_script):
+                    with patch("backend.agent.react_runner.run_script_async", side_effect=_run_script):
                         events = await _collect(
                             stream_chat_react(
                                 messages,
@@ -878,11 +908,11 @@ class ReactRunnerTest(unittest.TestCase):
                     mock_llm.side_effect = [wrong, right, finish]
                     seen = []
 
-                    def _run_script(skill_doc, args, **kwargs):
+                    async def _run_script(skill_doc, args, **kwargs):
                         seen.append(skill_doc.name)
                         return script_result
 
-                    with patch("backend.agent.react_runner.run_script", side_effect=_run_script):
+                    with patch("backend.agent.react_runner.run_script_async", side_effect=_run_script):
                         events = await _collect(
                             stream_chat_react(
                                 [

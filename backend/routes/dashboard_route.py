@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from fastapi import APIRouter, Request
 
 from backend.dashboard_overview import build_dashboard_overview
@@ -12,8 +14,8 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 
 @router.get("/overview")
-def get_dashboard_overview(request: Request) -> dict:
-    data = build_dashboard_overview()
+async def get_dashboard_overview(request: Request) -> dict:
+    data = await asyncio.to_thread(build_dashboard_overview)
     log_event(
         request_trace_id(request),
         "dashboard.overview",

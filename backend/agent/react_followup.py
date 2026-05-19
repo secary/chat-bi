@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any, Dict, List, Optional
 
@@ -60,3 +61,20 @@ def run_decision_followup(
     ]
     events.append({"type": "thinking", "content": "已收到决策建议 Observation，继续整理回答..."})
     return events, result, working_messages
+
+
+async def run_decision_followup_async(
+    skill_doc: SkillDoc,
+    messages: List[Dict[str, str]],
+    user_text: str,
+    trace_id: str,
+    skill_db_overrides: Optional[Dict[str, str]] = None,
+) -> tuple[list[dict], Dict[str, Any], list[Dict[str, str]]]:
+    return await asyncio.to_thread(
+        run_decision_followup,
+        skill_doc,
+        messages,
+        user_text,
+        trace_id,
+        skill_db_overrides,
+    )

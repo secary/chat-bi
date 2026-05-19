@@ -8,7 +8,7 @@ from backend.agent.context_window import build_react_context
 from backend.agent.executor import (
     find_skill,
     latest_user_upload_path,
-    run_script,
+    run_script_async,
     skill_result_log_payload,
     skill_args_for_execution,
 )
@@ -32,7 +32,7 @@ from backend.agent.prompt_builder import (
 )
 from backend.agent.prompt_subagent import build_react_system_prompt_for_subagent
 from backend.agent.query_decision import is_query_plus_decision_text
-from backend.agent.react_followup import run_decision_followup
+from backend.agent.react_followup import run_decision_followup_async
 from backend.agent.upload_context import cache_file_data, get_cached_file_data, get_cached_rows
 from backend.config import settings
 from backend.trace import log_event
@@ -555,7 +555,7 @@ async def stream_chat_react(
                     extra={"args": args},
                 ),
             )
-            result = run_script(
+            result = await run_script_async(
                 skill_doc,
                 args,
                 trace_id=trace_id,
@@ -625,7 +625,7 @@ async def stream_chat_react(
                                 extra={"args": auto_args, "resumed_after_ingestion": True},
                             ),
                         )
-                        result = run_script(
+                        result = await run_script_async(
                             auto_doc,
                             auto_args,
                             trace_id=trace_id,
@@ -703,7 +703,11 @@ async def stream_chat_react(
             advice_doc = find_skill(skills, "chatbi-decision-advisor")
             if advice_doc:
                 try:
-                    followup_events, advice_result, followup_messages = run_decision_followup(
+                    (
+                        followup_events,
+                        advice_result,
+                        followup_messages,
+                    ) = await run_decision_followup_async(
                         advice_doc,
                         messages,
                         user_text,

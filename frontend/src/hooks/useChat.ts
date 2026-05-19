@@ -241,11 +241,25 @@ export function useChat(
   );
 
   const abort = useCallback(() => {
+    streamAbortRef.current?.abort();
     const tid = currentTraceIdRef.current;
     if (tid) {
-      void abortChat(tid);
+      void abortChat(tid).catch((err: unknown) => {
+        logger.error('abort chat', err);
+      });
     }
-    streamAbortRef.current?.abort();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      streamAbortRef.current?.abort();
+      const tid = currentTraceIdRef.current;
+      if (tid) {
+        void abortChat(tid).catch(() => {
+          /* best-effort cleanup when leaving the page */
+        });
+      }
+    };
   }, []);
 
   return { messages, loading, assistantPending, sendMessage, abort };

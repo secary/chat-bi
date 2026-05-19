@@ -5,7 +5,7 @@ from typing import Any, AsyncGenerator, Dict, List, Optional
 from backend.agent.executor import (
     find_skill,
     latest_user_content,
-    run_script,
+    run_script_async,
     skill_result_log_payload,
     skill_args_for_execution,
 )
@@ -251,7 +251,7 @@ async def _stream_chat_legacy(
                     "agent_id": specialist_agent_id or "single",
                 },
             )
-            result = run_script(
+            result = await run_script_async(
                 skill_doc,
                 args,
                 trace_id=trace_id,

@@ -35,13 +35,16 @@ class AgentRunnerContractTest(unittest.TestCase):
                     "backend.agent.runner.call_llm_for_plan", new_callable=AsyncMock
                 ) as mock_llm:
                     mock_llm.return_value = plan
-                    with patch("backend.agent.runner.run_script") as mock_run:
+                    with patch(
+                        "backend.agent.runner.run_script_async",
+                        new_callable=AsyncMock,
+                    ) as mock_run:
                         mock_run.return_value = script_result
                         events = await _collect_events(
                             [{"role": "user", "content": "1-4月销售额排行"}]
                         )
                         mock_llm.assert_awaited_once()
-                        mock_run.assert_called_once()
+                        mock_run.assert_awaited_once()
                         types = [e.get("type") for e in events]
                         self.assertIn("done", types)
 
@@ -54,10 +57,13 @@ class AgentRunnerContractTest(unittest.TestCase):
                 with patch(
                     "backend.agent.runner.call_llm_for_plan", new_callable=AsyncMock
                 ) as mock_llm:
-                    with patch("backend.agent.runner.run_script") as mock_run:
+                    with patch(
+                        "backend.agent.runner.run_script_async",
+                        new_callable=AsyncMock,
+                    ) as mock_run:
                         events = await _collect_events([{"role": "user", "content": "谢谢"}])
                         mock_llm.assert_not_awaited()
-                        mock_run.assert_not_called()
+                        mock_run.assert_not_awaited()
                         texts = [e for e in events if e.get("type") == "text"]
                         self.assertTrue(any("不客气" in str(e.get("content")) for e in texts))
 

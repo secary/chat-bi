@@ -37,7 +37,7 @@ export function AppLayout() {
                 审计
               </NavLink>
               <NavLink to="/skills" className={linkCls}>
-                技能管理
+                技能接入
               </NavLink>
               <NavLink to="/data-sources" className={linkCls}>
                 数据源管理

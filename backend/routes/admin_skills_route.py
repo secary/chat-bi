@@ -11,6 +11,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from backend.agent.prompt_builder import scan_skills
+from backend.agent.skill_audit import list_skill_audits
 from backend.config import settings
 from backend.http_utils import request_trace_id
 from backend.skill_registry_repo import disabled_slugs, set_enabled
@@ -81,6 +82,32 @@ def admin_list_skills(request: Request) -> List[dict]:
         payload={"count": len(rows), "disabled_count": len(blocked)},
     )
     return rows
+
+
+@router.get("/skills/audit")
+def admin_list_skill_audits(request: Request) -> dict:
+    blocked = disabled_slugs()
+    enabled = {
+        doc.skill_dir.name
+        for doc in scan_skills(settings.skills_dir)
+        if doc.skill_dir.name not in blocked
+    }
+    items = list_skill_audits(
+        settings.skills_dir,
+        tests_dir=settings.project_root / "tests",
+        enabled_slugs=enabled,
+    )
+    log_event(
+        request_trace_id(request),
+        "admin.skills",
+        "audit_listed",
+        payload={
+            "count": len(items),
+            "warning_count": sum(1 for item in items if item["status"] == "warning"),
+            "error_count": sum(1 for item in items if item["status"] == "error"),
+        },
+    )
+    return {"items": items}
 
 
 @router.post("/skills")

@@ -17,6 +17,29 @@ export interface AdminSkillRow {
   enabled: boolean;
 }
 
+export interface SkillAuditIssue {
+  code: string;
+  level: string;
+  message: string;
+}
+
+export interface SkillAuditRow {
+  slug: string;
+  name: string;
+  description: string;
+  enabled: boolean;
+  status: string;
+  issue_count: number;
+  issues: SkillAuditIssue[];
+  script_count: number;
+  test_count: number;
+  has_skill_md: boolean;
+  has_workflow: boolean;
+  has_safety: boolean;
+  trigger_count: number;
+  required_context_count: number;
+}
+
 export interface DbConnectionRow {
   id: number;
   name: string;

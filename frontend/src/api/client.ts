@@ -3,6 +3,7 @@ import type {
   AdminSkillRow,
   CurrentDbConnectionView,
   DbConnectionRow,
+  SkillAuditRow,
   LlmProfilePublic,
   LlmSettingsView,
   HarnessAuditReport,
@@ -288,6 +289,10 @@ export async function downloadSessionReportPdf(sessionId: number): Promise<Blob>
 
 export async function listAdminSkills(): Promise<AdminSkillRow[]> {
   return requestJson<AdminSkillRow[]>('/admin/skills');
+}
+
+export async function listSkillAudits(): Promise<{ items: SkillAuditRow[] }> {
+  return requestJson<{ items: SkillAuditRow[] }>('/admin/skills/audit');
 }
 
 export async function getMultiAgentsRegistry(): Promise<MultiAgentsRegistryView> {

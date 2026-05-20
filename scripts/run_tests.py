@@ -73,6 +73,7 @@ MODULE_SUITES: dict[str, list[str]] = {
         "tests/test_upload_context.py",
     ],
     "admin": [
+        "tests/test_admin_skills_audit_route.py",
         "tests/test_admin_harness_audit_route.py",
         "tests/test_admin_multi_agents.py",
         "tests/test_app_llm_saved.py",

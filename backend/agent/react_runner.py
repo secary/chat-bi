@@ -23,7 +23,7 @@ from backend.agent.harness_events import (
 )
 from backend.agent.harness_policy import authorize_action
 from backend.agent.harness_runner import rejection_observation
-from backend.agent.harness_schema import validate_harness_action
+from backend.agent.harness_schema import HarnessAction, validate_harness_action
 from backend.agent.harness_state import HarnessState
 from backend.agent.intent_guard import small_talk_reply, should_skip_skill_for_message
 from backend.agent.observation import summarize_observation
@@ -261,12 +261,41 @@ def _skill_log_payload(
     return payload
 
 
+def _force_subagent_converge_on_policy_reject(
+    policy: Any,
+    *,
+    trace_id: str,
+    specialist_agent_id: Optional[str],
+    result_sink: Optional[Dict[str, Any]],
+    last_result: Optional[Dict[str, Any]],
+    last_skill_name: Optional[str],
+) -> Optional[str]:
+    if not specialist_agent_id or not getattr(policy, "suggested_text", ""):
+        return None
+    suggestion = str(policy.suggested_text).strip()
+    if not suggestion:
+        return None
+    log_event(
+        trace_id,
+        "agent.runner",
+        "completed",
+        payload={
+            "mode": "react_subagent",
+            "action": "forced_converge",
+            "agent_id": specialist_agent_id,
+        },
+    )
+    sync_skill_sink(result_sink, last_result, last_skill_name)
+    return f"本专线停止继续试错。{suggestion}"
+
+
 async def stream_chat_react(
     messages: List[Dict[str, Any]],
     trace_id: str = "",
     skill_db_overrides: Optional[Dict[str, str]] = None,
     memory_block: Optional[str] = None,
     skill_docs: Optional[List[SkillDoc]] = None,
+    preferred_skill_slugs: Optional[List[str]] = None,
     role_prompt: Optional[str] = None,
     result_sink: Optional[Dict[str, Any]] = None,
     subagent_react: bool = False,
@@ -442,41 +471,42 @@ async def stream_chat_react(
         if action_model.thought:
             yield {"type": "thinking", "content": action_model.thought}
 
-        policy = authorize_action(
-            action_model,
-            harness_state,
-            sorted(allowed_slugs),
-            messages=messages,
-        )
-        if not policy.ok:
-            harness_state.record_rejection(policy.reason)
-            log_harness_rejected(
-                trace_id,
-                harness_state,
-                category="policy_rejected",
-                reason=policy.reason,
-                action=action_model,
-            )
-            working.append(
-                {
-                    "role": "assistant",
-                    "content": json.dumps(action_model.raw_plan or plan, ensure_ascii=False),
-                }
-            )
-            working.append(
-                {
-                    "role": "user",
-                    "content": OBS_HEADER + rejection_observation(validation, policy),
-                }
-            )
-            if harness_state.should_stop_after_rejection():
-                break
-            yield {"type": "thinking", "content": "正在重新选择更合适的处理方式..."}
-            continue
-
-        harness_state.record_accept()
-        log_harness_authorized(trace_id, harness_state, action_model)
         action = action_model.action
+        if action != "call_skill":
+            policy = authorize_action(
+                action_model,
+                harness_state,
+                sorted(allowed_slugs),
+                messages=messages,
+            )
+            if not policy.ok:
+                harness_state.record_rejection(policy.reason)
+                log_harness_rejected(
+                    trace_id,
+                    harness_state,
+                    category="policy_rejected",
+                    reason=policy.reason,
+                    action=action_model,
+                )
+                working.append(
+                    {
+                        "role": "assistant",
+                        "content": json.dumps(action_model.raw_plan or plan, ensure_ascii=False),
+                    }
+                )
+                working.append(
+                    {
+                        "role": "user",
+                        "content": OBS_HEADER + rejection_observation(validation, policy),
+                    }
+                )
+                if harness_state.should_stop_after_rejection():
+                    break
+                yield {"type": "thinking", "content": "正在重新选择更合适的处理方式..."}
+                continue
+
+            harness_state.record_accept()
+            log_harness_authorized(trace_id, harness_state, action_model)
         if action == "finish":
             log_harness_finish(trace_id, harness_state, action_model)
             yield {"type": "thinking", "content": "正在整理回答..."}
@@ -533,37 +563,6 @@ async def stream_chat_react(
             },
             ensure_ascii=False,
         )
-        skill_doc = find_skill(skills, skill_name)
-        if not skill_doc or (subagent_react and skill_name not in allowed_slugs):
-            available = ", ".join(sorted(allowed_slugs)) if allowed_slugs else "（无）"
-            obs = json.dumps(
-                {
-                    "skill_not_in_line": True,
-                    "requested": skill_name,
-                    "available": sorted(allowed_slugs),
-                    "hint": f"请从本专线可用技能中选择：{available}",
-                },
-                ensure_ascii=False,
-            )
-            working.append({"role": "assistant", "content": assistant_note})
-            working.append({"role": "user", "content": OBS_HEADER + obs})
-            yield {
-                "type": "thinking",
-                "content": f"技能「{skill_name}」不在本专线，请从可用列表重选...",
-            }
-            continue
-
-        yield {"type": "thinking", "content": f"正在执行 Skill「{skill_name}」..."}
-
-        """
-        transfer llm raw args into real args for the skill.
-        for example:
-            LLM plan: {"skill": "chatbi-file-ingestion", "skill_args": ["帮我分析"]}
-            skill_args_for_execution("chatbi-file-ingestion", ["帮我分析"], messages)
-            find the real address of a file by the user's upload path, mathch /tmp/chatbi-uploads/xxx.csv
-            return ["/tmp/chatbi-uploads/xxx.csv", "--sheet", "Sheet1"]
-            assistant_note: {"action": "call_skill", "skill": "chatbi-file-ingestion", "skill_args": ["/tmp/chatbi-uploads/xxx.csv", "--sheet", "Sheet1"]}
-        """
         raw_args = action_model.skill_args or []
         args = skill_args_for_execution(skill_name, raw_args, messages)
         if skill_name == "chatbi-auto-analysis":
@@ -602,11 +601,82 @@ async def stream_chat_react(
             sync_skill_sink(result_sink, last_result, last_skill_name)
             yield {"type": "done", "content": None}
             return
+        execution_action = HarnessAction(
+            action="call_skill",
+            skill=skill_name,
+            skill_args=args,
+            text=action_model.text,
+            thought=action_model.thought,
+            raw_plan=action_model.raw_plan,
+        )
+        policy = authorize_action(
+            execution_action,
+            harness_state,
+            sorted(allowed_slugs),
+            messages=messages,
+            specialist_agent_id=specialist_agent_id if subagent_react else None,
+            preferred_skills=preferred_skill_slugs,
+        )
+        if not policy.ok:
+            harness_state.record_rejection(policy.reason)
+            log_harness_rejected(
+                trace_id,
+                harness_state,
+                category="policy_rejected",
+                reason=policy.reason,
+                action=execution_action,
+            )
+            working.append({"role": "assistant", "content": assistant_note})
+            working.append(
+                {
+                    "role": "user",
+                    "content": OBS_HEADER + rejection_observation(validation, policy),
+                }
+            )
+            forced_text = _force_subagent_converge_on_policy_reject(
+                policy,
+                trace_id=trace_id,
+                specialist_agent_id=specialist_agent_id if subagent_react else None,
+                result_sink=result_sink,
+                last_result=last_result,
+                last_skill_name=last_skill_name,
+            )
+            if forced_text:
+                yield {"type": "thinking", "content": "前置审计未通过，已收敛为改派建议。"}
+                yield {"type": "text", "content": forced_text}
+                return
+            if harness_state.should_stop_after_rejection():
+                break
+            yield {"type": "thinking", "content": "正在重新选择更合适的处理方式..."}
+            continue
+        harness_state.record_accept()
+        log_harness_authorized(trace_id, harness_state, execution_action)
+        skill_doc = find_skill(skills, skill_name)
+        if not skill_doc or (subagent_react and skill_name not in allowed_slugs):
+            available = ", ".join(sorted(allowed_slugs)) if allowed_slugs else "（无）"
+            obs = json.dumps(
+                {
+                    "skill_not_in_line": True,
+                    "requested": skill_name,
+                    "available": sorted(allowed_slugs),
+                    "hint": f"请从本专线可用技能中选择：{available}",
+                },
+                ensure_ascii=False,
+            )
+            working.append({"role": "assistant", "content": assistant_note})
+            working.append({"role": "user", "content": OBS_HEADER + obs})
+            yield {
+                "type": "thinking",
+                "content": f"技能「{skill_name}」不在本专线，请从可用列表重选...",
+            }
+            continue
+
+        yield {"type": "thinking", "content": f"正在执行 Skill「{skill_name}」..."}
         assistant_note = json.dumps(
             {"action": "call_skill", "skill": skill_name, "skill_args": args},
             ensure_ascii=False,
         )
-        log_harness_executing(trace_id, harness_state, action_model, args)
+        log_harness_executing(trace_id, harness_state, execution_action, args)
         try:
             log_event(
                 trace_id,

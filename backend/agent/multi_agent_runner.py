@@ -21,6 +21,7 @@ from backend.agent.multi_agent_registry import (
     agent_role_prompt,
     max_agents_per_round,
     max_manager_rounds,
+    preferred_skill_slugs_for_agent,
     skills_for_agent,
 )
 from backend.agent.multi_agent_summarize import call_summarize_llm
@@ -251,6 +252,7 @@ async def stream_chat_multi_agent(
             async for event in stream_specialist(
                 sub_messages,
                 docs,
+                preferred_skill_slugs=preferred_skill_slugs_for_agent(agent_id),
                 role_prompt=role,
                 trace_id=trace_id,
                 skill_db_overrides=skill_db_overrides,

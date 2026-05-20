@@ -32,7 +32,7 @@ class HarnessPolicyTest(unittest.TestCase):
         ).action
         decision = authorize_action(action, state, ["chatbi-decision-advisor"], messages=[])
         self.assertFalse(decision.ok)
-        self.assertIn("查询结果之后", decision.reason)
+        self.assertIn("查询结果或结构化 rows 之后", decision.reason)
 
     def test_chart_recommendation_accepts_rows_context(self):
         state = HarnessState(trace_id="t", user_text="画图", max_steps=4)
@@ -45,6 +45,23 @@ class HarnessPolicyTest(unittest.TestCase):
         ).action
         decision = authorize_action(action, state, ["chatbi-chart-recommendation"], messages=[])
         self.assertTrue(decision.ok)
+
+    def test_scoped_skill_rejection_contains_suggestion(self):
+        state = HarnessState(trace_id="t", user_text="分析", max_steps=4)
+        action = validate_harness_action(
+            {"action": "call_skill", "skill": "chatbi-auto-analysis", "skill_args": []}
+        ).action
+        decision = authorize_action(
+            action,
+            state,
+            ["chatbi-semantic-query"],
+            messages=[],
+            specialist_agent_id="demo_query",
+            preferred_skills=["chatbi-semantic-query"],
+        )
+        self.assertFalse(decision.ok)
+        self.assertIn("demo_query 当前不应调取 chatbi-auto-analysis", decision.reason)
+        self.assertIn("改派上传与文件分析专线执行 auto-analysis", decision.suggested_text)
 
 
 if __name__ == "__main__":

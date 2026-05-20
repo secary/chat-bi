@@ -292,6 +292,7 @@ async def _stream_chat_legacy(
 async def stream_specialist(
     messages: List[Dict[str, str]],
     skill_docs: List[SkillDoc],
+    preferred_skill_slugs: Optional[List[str]] = None,
     role_prompt: Optional[str] = None,
     trace_id: str = "",
     skill_db_overrides: Optional[Dict[str, str]] = None,
@@ -312,6 +313,7 @@ async def stream_specialist(
             skill_db_overrides=skill_db_overrides,
             memory_block=memory_block,
             skill_docs=skill_docs,
+            preferred_skill_slugs=preferred_skill_slugs,
             role_prompt=role_prompt,
             result_sink=result_sink,
             subagent_react=subagent_mode,

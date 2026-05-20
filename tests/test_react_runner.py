@@ -939,6 +939,92 @@ class ReactRunnerTest(unittest.TestCase):
 
         asyncio.run(run())
 
+    def test_subagent_pre_audit_rejects_strongly_scoped_skill_before_execution(self):
+        wrong = {
+            "action": "call_skill",
+            "skill": "chatbi-auto-analysis",
+            "skill_args": ["分析"],
+            "thought": "误选上传分析技能",
+        }
+        right = {
+            "action": "call_skill",
+            "skill": "chatbi-semantic-query",
+            "skill_args": ["各区域销售额排行"],
+            "thought": "改查库",
+        }
+        finish = {
+            "action": "finish",
+            "text": "完成。",
+            "chart_plan": None,
+            "kpi_cards": [],
+        }
+        script_result = {
+            "kind": "table",
+            "text": "ok",
+            "data": {"rows": [{"区域": "华东", "销售额": "1"}]},
+        }
+        all_skills = scan_skills_enabled(settings.skills_dir)
+        demo_skills = [d for d in all_skills if d.skill_dir.name == "chatbi-semantic-query"]
+
+        async def run():
+            cfg = replace(settings, agent_react=True, agent_max_steps=6)
+            with patch("backend.agent.react_runner.settings", cfg):
+                with patch(
+                    "backend.agent.react_runner.call_llm_for_react_step",
+                    new_callable=AsyncMock,
+                ) as mock_llm:
+                    mock_llm.side_effect = [wrong, right, finish]
+                    seen = []
+                    rejected = []
+
+                    def _run_script(skill_doc, args, **kwargs):
+                        seen.append(skill_doc.name)
+                        return script_result
+
+                    with (
+                        patch("backend.agent.react_runner.run_script", side_effect=_run_script),
+                        patch(
+                            "backend.agent.react_runner.log_harness_rejected",
+                            side_effect=lambda trace_id, state, **kwargs: rejected.append(kwargs),
+                        ),
+                    ):
+                        events = await _collect(
+                            stream_chat_react(
+                                [
+                                    {
+                                        "role": "user",
+                                        "content": "不考虑上传，从数据库查各区域销售额排行",
+                                    }
+                                ],
+                                trace_id="t_pre_audit",
+                                skill_docs=demo_skills,
+                                preferred_skill_slugs=["chatbi-semantic-query"],
+                                subagent_react=True,
+                                specialist_agent_id="demo_query",
+                            )
+                        )
+                        self.assertEqual(seen, [])
+                        self.assertTrue(rejected)
+                        self.assertIn(
+                            "demo_query 当前不应调取 chatbi-auto-analysis",
+                            rejected[0].get("reason", ""),
+                        )
+                        text = " ".join(
+                            event.get("content", "")
+                            for event in events
+                            if event.get("type") == "text"
+                        )
+                        self.assertIn("本专线停止继续试错", text)
+                        self.assertIn("改派上传与文件分析专线执行 auto-analysis", text)
+                        thinking = " ".join(
+                            event.get("content", "")
+                            for event in events
+                            if event.get("type") == "thinking"
+                        )
+                        self.assertIn("前置审计未通过，已收敛为改派建议", thinking)
+
+        asyncio.run(run())
+
 
 if __name__ == "__main__":
     unittest.main()

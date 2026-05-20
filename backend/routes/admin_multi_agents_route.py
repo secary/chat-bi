@@ -6,15 +6,13 @@ import re
 from typing import Any, Dict, List, Set
 
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from backend.agent.multi_agent_registry import (
     load_registry_dict,
     max_agents_per_round as clamp_max_agents,
     write_registry_dict,
 )
-from backend.agent.prompt_builder import scan_skills
-from backend.config import settings
 from backend.http_utils import request_trace_id
 from backend.trace import log_event
 
@@ -24,9 +22,7 @@ _SAFE_AGENT_ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_-]{0,126}$")
 
 
 class AgentEntryPayload(BaseModel):
-    label: str = ""
-    role_prompt: str = ""
-    skills: List[str] = Field(default_factory=list)
+    enabled: bool = True
 
 
 class MultiAgentsPayload(BaseModel):
@@ -35,15 +31,13 @@ class MultiAgentsPayload(BaseModel):
     agents: Dict[str, AgentEntryPayload]
 
 
-def _valid_skill_slugs() -> Set[str]:
-    return {d.skill_dir.name for d in scan_skills(settings.skills_dir)}
-
-
 def _normalize_payload(body: MultiAgentsPayload) -> Dict[str, Any]:
     if not body.agents:
         raise HTTPException(status_code=400, detail="至少需要配置一条专线")
-
-    valid_skills = _valid_skill_slugs()
+    current = load_registry_dict()
+    current_agents = current.get("agents") or {}
+    if not isinstance(current_agents, dict):
+        current_agents = {}
     agents_out: Dict[str, Any] = {}
 
     for agent_id, entry in body.agents.items():
@@ -55,26 +49,12 @@ def _normalize_payload(body: MultiAgentsPayload) -> Dict[str, Any]:
                 status_code=400,
                 detail=f"专线 id 不能以 _ 开头：{agent_id!r}",
             )
-
-        seen: Set[str] = set()
-        skill_list: List[str] = []
-        for s in entry.skills:
-            slug = str(s).strip()
-            if not slug or slug in seen:
-                continue
-            if slug not in valid_skills:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"专线「{aid}」包含不存在或未扫描到的技能：{slug!r}",
-                )
-            seen.add(slug)
-            skill_list.append(slug)
-
-        agents_out[aid] = {
-            "label": entry.label.strip(),
-            "role_prompt": entry.role_prompt.strip(),
-            "skills": skill_list,
-        }
+        meta = current_agents.get(aid)
+        if not isinstance(meta, dict):
+            raise HTTPException(status_code=400, detail=f"专线不存在或不可修改：{aid!r}")
+        next_meta = dict(meta)
+        next_meta["enabled"] = bool(entry.enabled)
+        agents_out[aid] = next_meta
 
     try:
         cap = int(body.max_agents_per_round)
@@ -119,10 +99,25 @@ def _response_dict() -> Dict[str, Any]:
                     if slug and slug not in seen:
                         seen.add(slug)
                         skills_list.append(slug)
+            blocked_raw = meta.get("blocked_skills") or []
+            blocked_list: List[str] = []
+            if isinstance(blocked_raw, list):
+                seen_blocked: Set[str] = set()
+                for s in blocked_raw:
+                    slug = str(s).strip()
+                    if slug and slug not in seen_blocked:
+                        seen_blocked.add(slug)
+                        blocked_list.append(slug)
+            skill_mode = str(meta.get("skill_mode") or "dynamic").strip().lower()
+            if skill_mode not in {"dynamic", "restricted"}:
+                skill_mode = "dynamic"
             agents_out[str(aid)] = {
+                "enabled": bool(meta.get("enabled", True)),
                 "label": str(meta.get("label") or "").strip(),
                 "role_prompt": str(meta.get("role_prompt") or "").strip(),
+                "skill_mode": skill_mode,
                 "skills": skills_list,
+                "blocked_skills": blocked_list,
             }
 
     return {"max_agents_per_round": cap_int, "max_manager_rounds": mr_int, "agents": agents_out}

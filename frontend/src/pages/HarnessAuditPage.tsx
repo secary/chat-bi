@@ -21,7 +21,7 @@ export function HarnessAuditPage() {
         const data = await listHarnessAuditCandidates();
         if (!cancelled) setRecent(data.items);
       } catch (e) {
-        logger.error('harness-audits load', e);
+        logger.error('audits load', e);
       }
     })();
     return () => {
@@ -61,7 +61,7 @@ export function HarnessAuditPage() {
   return (
     <div className="flex h-full flex-col gap-4 overflow-auto p-6 lg:p-8">
       <div>
-        <h2 className="text-lg font-semibold tracking-tight text-gray-900">Harness 审计</h2>
+        <h2 className="text-lg font-semibold tracking-tight text-gray-900">审计</h2>
         <p className="mt-1 text-xs text-gray-500">
           按 trace_id 查看全链路自检结果，快速判断是否存在动作漂移、约束拒绝、skill 失败或步数耗尽。
         </p>

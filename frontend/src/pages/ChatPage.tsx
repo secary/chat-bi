@@ -198,14 +198,14 @@ export function ChatPage() {
                 type="button"
                 className="max-w-[260px] truncate font-mono text-gray-800 transition-colors hover:text-accent"
                 title={inspectableTraceId}
-                onClick={() => navigate(`/harness-audits?trace_id=${encodeURIComponent(inspectableTraceId)}`)}
+                onClick={() => navigate(`/audits?trace_id=${encodeURIComponent(inspectableTraceId)}`)}
               >
                 {inspectableTraceId}
               </button>
               <button
                 type="button"
                 className="rounded-md border border-gray-200 bg-white px-2 py-0.5 text-[11px] text-gray-700 transition-colors hover:bg-gray-100"
-                onClick={() => navigate(`/harness-audits?trace_id=${encodeURIComponent(inspectableTraceId)}`)}
+                onClick={() => navigate(`/audits?trace_id=${encodeURIComponent(inspectableTraceId)}`)}
               >
                 去审计
               </button>

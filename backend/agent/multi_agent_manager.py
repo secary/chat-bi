@@ -9,8 +9,11 @@ from typing import Any, Dict, List, Optional, Tuple
 from backend.agent.context_window import build_manager_context
 from backend.agent.multi_agent_registry import (
     agent_label,
+    agent_skill_mode,
+    blocked_skill_slugs_for_agent,
     list_registry_agent_ids,
     max_agents_per_round,
+    preferred_skill_slugs_for_agent,
     skills_for_agent,
 )
 from backend.agent.planner import parse_json_object
@@ -120,12 +123,24 @@ def _manager_context_hints(messages: List[Dict[str, str]]) -> str:
 def _registry_capability_block() -> str:
     lines_out: List[str] = []
     for aid in list_registry_agent_ids():
+        preferred = preferred_skill_slugs_for_agent(aid)
         docs = skills_for_agent(aid)
-        if not docs:
+        if not preferred and not docs:
             continue
         lab = agent_label(aid)
-        names = ", ".join(f"`{d.skill_dir.name}`" for d in docs)
-        lines_out.append(f"- `{aid}`（{lab}）拥有：{names}")
+        mode = agent_skill_mode(aid)
+        blocked = blocked_skill_slugs_for_agent(aid)
+        if mode == "restricted":
+            names = ", ".join(f"`{slug}`" for slug in preferred) if preferred else "（未配置）"
+            lines_out.append(f"- `{aid}`（{lab}）限定可用：{names}")
+            continue
+        preferred_text = (
+            ", ".join(f"`{slug}`" for slug in preferred) if preferred else "（未指定优先技能）"
+        )
+        blocked_text = f"；禁用：{', '.join(f'`{slug}`' for slug in blocked)}" if blocked else ""
+        lines_out.append(
+            f"- `{aid}`（{lab}）优先技能：{preferred_text}；其余已启用技能可动态调用{blocked_text}"
+        )
     return (
         "\n".join(lines_out) if lines_out else "（当前无可用专线：请检查 registry 与技能启用状态）"
     )

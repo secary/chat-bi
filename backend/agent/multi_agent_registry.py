@@ -1,14 +1,16 @@
-"""Load multi-agent registry YAML and resolve enabled skills per agent."""
+"""Load multi-agent registry YAML and resolve preferred / available skills per agent."""
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, List, Set
+from typing import Any, Dict, List, Literal, Set
 
 import yaml
 
 from backend.agent.prompt_builder import SkillDoc, scan_skills_enabled
 from backend.config import settings
+
+SkillMode = Literal["dynamic", "restricted"]
 
 
 def _registry_path() -> Path:
@@ -64,8 +66,27 @@ def enabled_slugs() -> Set[str]:
     return {s.skill_dir.name for s in scan_skills_enabled(settings.skills_dir)}
 
 
-def skills_for_agent(agent_id: str) -> List[SkillDoc]:
-    """Intersect registry skills with globally enabled skills."""
+def agent_enabled(agent_id: str) -> bool:
+    raw = load_registry_dict()
+    agents = raw.get("agents") or {}
+    if agent_id not in agents or not isinstance(agents[agent_id], dict):
+        return False
+    value = agents[agent_id].get("enabled")
+    if isinstance(value, bool):
+        return value
+    return True
+
+
+def agent_skill_mode(agent_id: str) -> SkillMode:
+    raw = load_registry_dict()
+    agents = raw.get("agents") or {}
+    if agent_id not in agents or not isinstance(agents[agent_id], dict):
+        return "dynamic"
+    mode = str(agents[agent_id].get("skill_mode") or "dynamic").strip().lower()
+    return "restricted" if mode == "restricted" else "dynamic"
+
+
+def preferred_skill_slugs_for_agent(agent_id: str) -> List[str]:
     raw = load_registry_dict()
     agents = raw.get("agents") or {}
     if agent_id not in agents or not isinstance(agents[agent_id], dict):
@@ -74,10 +95,57 @@ def skills_for_agent(agent_id: str) -> List[SkillDoc]:
     if not isinstance(slugs, list):
         return []
     ok = enabled_slugs()
-    wanted = [str(s).strip() for s in slugs if str(s).strip() in ok]
+    seen: Set[str] = set()
+    out: List[str] = []
+    for slug in slugs:
+        name = str(slug).strip()
+        if name and name in ok and name not in seen:
+            seen.add(name)
+            out.append(name)
+    return out
+
+
+def blocked_skill_slugs_for_agent(agent_id: str) -> List[str]:
+    raw = load_registry_dict()
+    agents = raw.get("agents") or {}
+    if agent_id not in agents or not isinstance(agents[agent_id], dict):
+        return []
+    slugs = agents[agent_id].get("blocked_skills") or []
+    if not isinstance(slugs, list):
+        return []
+    ok = enabled_slugs()
+    seen: Set[str] = set()
+    out: List[str] = []
+    for slug in slugs:
+        name = str(slug).strip()
+        if name and name in ok and name not in seen:
+            seen.add(name)
+            out.append(name)
+    return out
+
+
+def skills_for_agent(agent_id: str) -> List[SkillDoc]:
+    """Resolve runtime skills. Dynamic mode may use any enabled skill except blocked ones."""
     all_docs = scan_skills_enabled(settings.skills_dir)
     by_name = {d.skill_dir.name: d for d in all_docs}
-    return [by_name[s] for s in wanted if s in by_name]
+    preferred = preferred_skill_slugs_for_agent(agent_id)
+    blocked = set(blocked_skill_slugs_for_agent(agent_id))
+    mode = agent_skill_mode(agent_id)
+
+    if mode == "restricted":
+        wanted = [slug for slug in preferred if slug not in blocked]
+        return [by_name[slug] for slug in wanted if slug in by_name]
+
+    preferred_docs = [
+        by_name[slug] for slug in preferred if slug in by_name and slug not in blocked
+    ]
+    preferred_names = {doc.skill_dir.name for doc in preferred_docs}
+    rest_docs = [
+        doc
+        for doc in all_docs
+        if doc.skill_dir.name not in blocked and doc.skill_dir.name not in preferred_names
+    ]
+    return preferred_docs + rest_docs
 
 
 def agent_label(agent_id: str) -> str:
@@ -107,4 +175,12 @@ def list_registry_agent_ids() -> List[str]:
     agents = raw.get("agents") or {}
     if not isinstance(agents, dict):
         return []
-    return list(agents.keys())
+    return [str(agent_id) for agent_id in agents.keys() if agent_enabled(str(agent_id))]
+
+
+def list_all_registry_agent_ids() -> List[str]:
+    raw = load_registry_dict()
+    agents = raw.get("agents") or {}
+    if not isinstance(agents, dict):
+        return []
+    return [str(agent_id) for agent_id in agents.keys()]

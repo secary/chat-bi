@@ -9,7 +9,6 @@ import { DataSourcesPage } from './pages/DataSourcesPage';
 import { LlmConfigPage } from './pages/LlmConfigPage';
 import { LoginPage } from './pages/LoginPage';
 import { UserAdminPage } from './pages/UserAdminPage';
-import { MultiAgentsAdminPage } from './pages/MultiAgentsAdminPage';
 import { HarnessAuditPage } from './pages/HarnessAuditPage';
 
 export default function App() {
@@ -22,8 +21,9 @@ export default function App() {
             <Route element={<AppLayout />}>
               <Route path="/" element={<ChatPage />} />
               <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/multi-agents" element={<MultiAgentsAdminPage />} />
-              <Route path="/harness-audits" element={<HarnessAuditPage />} />
+              <Route path="/audits" element={<HarnessAuditPage />} />
+              <Route path="/harness-audits" element={<Navigate to="/audits" replace />} />
+              <Route path="/multi-agents" element={<Navigate to="/audits" replace />} />
               <Route path="/skills" element={<SkillAdminPage />} />
               <Route path="/data-sources" element={<DataSourcesPage />} />
               <Route path="/llm" element={<LlmConfigPage />} />

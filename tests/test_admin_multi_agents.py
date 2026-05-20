@@ -53,15 +53,28 @@ def test_get_defaults_when_missing(admin_client):
 
 
 def test_put_roundtrip(admin_client):
-    slug = _first_skill_slug()
+    write_registry_dict(
+        {
+            "max_agents_per_round": 2,
+            "max_manager_rounds": 4,
+            "agents": {
+                "risk": {
+                    "enabled": True,
+                    "label": "风控",
+                    "role_prompt": "风险视角",
+                    "skill_mode": "restricted",
+                    "skills": [_first_skill_slug()],
+                    "blocked_skills": [],
+                }
+            },
+        }
+    )
     payload = {
         "max_agents_per_round": 3,
         "max_manager_rounds": 5,
         "agents": {
             "risk": {
-                "label": "风控",
-                "role_prompt": "风险视角",
-                "skills": [slug],
+                "enabled": False,
             }
         },
     }
@@ -70,40 +83,39 @@ def test_put_roundtrip(admin_client):
     out = r.json()
     assert out["max_agents_per_round"] == 3
     assert out["max_manager_rounds"] == 5
-    assert out["agents"]["risk"]["skills"] == [slug]
+    assert out["agents"]["risk"]["enabled"] is False
+    assert out["agents"]["risk"]["skill_mode"] == "restricted"
+    assert out["agents"]["risk"]["skills"] == [_first_skill_slug()]
+    assert out["agents"]["risk"]["blocked_skills"] == []
 
     raw = load_registry_dict()
     assert raw["max_agents_per_round"] == 3
     assert raw["max_manager_rounds"] == 5
-    assert raw["agents"]["risk"]["skills"] == [slug]
+    assert raw["agents"]["risk"]["enabled"] is False
+    assert raw["agents"]["risk"]["skill_mode"] == "restricted"
+    assert raw["agents"]["risk"]["skills"] == [_first_skill_slug()]
 
 
-def test_put_rejects_unknown_skill(admin_client):
-    slug = _first_skill_slug()
+def test_put_rejects_invalid_agent_id(admin_client):
     r = admin_client.put(
         "/admin/multi-agents",
         json={
             "max_agents_per_round": 2,
             "agents": {
-                "a1": {
-                    "label": "A",
-                    "role_prompt": "",
-                    "skills": [slug, "not-a-real-skill-slug-xyz"],
-                }
+                "_bad": {"enabled": True},
             },
         },
     )
     assert r.status_code == 400
 
 
-def test_put_rejects_invalid_agent_id(admin_client):
-    slug = _first_skill_slug()
+def test_put_rejects_unknown_agent(admin_client):
     r = admin_client.put(
         "/admin/multi-agents",
         json={
             "max_agents_per_round": 2,
             "agents": {
-                "_bad": {"label": "x", "role_prompt": "", "skills": [slug]},
+                "a1": {"enabled": True},
             },
         },
     )
@@ -131,7 +143,7 @@ def test_write_registry_dict_atomic(monkeypatch, tmp_path):
     write_registry_dict(
         {
             "max_agents_per_round": 2,
-            "agents": {"x": {"label": "L", "role_prompt": "R", "skills": []}},
+            "agents": {"x": {"enabled": True, "label": "L", "role_prompt": "R", "skills": []}},
         }
     )
     assert reg_file.is_file()

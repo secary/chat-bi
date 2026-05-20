@@ -33,11 +33,8 @@ export function AppLayout() {
           </NavLink>
           {user?.role === 'admin' ? (
             <>
-              <NavLink to="/multi-agents" className={linkCls}>
-                多Agents管理
-              </NavLink>
-              <NavLink to="/harness-audits" className={linkCls}>
-                Harness审计
+              <NavLink to="/audits" className={linkCls}>
+                审计
               </NavLink>
               <NavLink to="/skills" className={linkCls}>
                 技能管理

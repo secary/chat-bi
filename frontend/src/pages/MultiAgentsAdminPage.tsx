@@ -1,21 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { AdminSkillRow, MultiAgentsRegistryPayload } from '../types/admin';
+import type {
+  AdminSkillRow,
+  MultiAgentsRegistryView,
+  MultiAgentsRuntimePayload,
+} from '../types/admin';
 import {
   getMultiAgentsRegistry,
   listAdminSkills,
   putMultiAgentsRegistry,
 } from '../api/client';
-import { clampMaxAgentsRound, isValidAgentId } from '../lib/multiAgentsRegistryUi';
+import { clampMaxAgentsRound } from '../lib/multiAgentsRegistryUi';
 import { logger } from '../lib/logger';
-
-function emptyEntry() {
-  return { label: '', role_prompt: '', skills: [] as string[] };
-}
 
 export function MultiAgentsAdminPage() {
   const [skills, setSkills] = useState<AdminSkillRow[]>([]);
-  const [draft, setDraft] = useState<MultiAgentsRegistryPayload | null>(null);
-  const [newId, setNewId] = useState('');
+  const [draft, setDraft] = useState<MultiAgentsRegistryView | null>(null);
   const [busy, setBusy] = useState(false);
   const [savedHint, setSavedHint] = useState(false);
 
@@ -54,7 +53,14 @@ export function MultiAgentsAdminPage() {
     setBusy(true);
     setSavedHint(false);
     try {
-      const next = await putMultiAgentsRegistry(draft);
+      const payload: MultiAgentsRuntimePayload = {
+        max_agents_per_round: draft.max_agents_per_round,
+        max_manager_rounds: draft.max_manager_rounds,
+        agents: Object.fromEntries(
+          Object.entries(draft.agents).map(([agentId, meta]) => [agentId, { enabled: meta.enabled }]),
+        ),
+      };
+      const next = await putMultiAgentsRegistry(payload);
       setDraft(next);
       setSavedHint(true);
       window.setTimeout(() => setSavedHint(false), 2500);
@@ -65,64 +71,19 @@ export function MultiAgentsAdminPage() {
     }
   };
 
-  const updateAgent = (
-    agentId: string,
-    patch: Partial<{ label: string; role_prompt: string; skills: string[] }>,
-  ) => {
+  const updateAgentEnabled = (agentId: string, enabled: boolean) => {
     setDraft((prev) => {
       if (!prev) return prev;
-      const cur = prev.agents[agentId] ?? emptyEntry();
       return {
         ...prev,
         agents: {
           ...prev.agents,
           [agentId]: {
-            label: patch.label ?? cur.label,
-            role_prompt: patch.role_prompt ?? cur.role_prompt,
-            skills: patch.skills ?? cur.skills,
+            ...prev.agents[agentId],
+            enabled,
           },
         },
       };
-    });
-  };
-
-  const toggleSkill = (agentId: string, slug: string, checked: boolean) => {
-    setDraft((prev) => {
-      if (!prev) return prev;
-      const cur = prev.agents[agentId] ?? emptyEntry();
-      const set = new Set(cur.skills);
-      if (checked) set.add(slug);
-      else set.delete(slug);
-      return {
-        ...prev,
-        agents: {
-          ...prev.agents,
-          [agentId]: { ...cur, skills: [...set].sort((a, b) => a.localeCompare(b)) },
-        },
-      };
-    });
-  };
-
-  const addAgent = () => {
-    const id = newId.trim();
-    if (!id || !isValidAgentId(id)) return;
-    setDraft((prev) => {
-      if (!prev || prev.agents[id]) return prev;
-      return {
-        ...prev,
-        agents: { ...prev.agents, [id]: emptyEntry() },
-      };
-    });
-    setNewId('');
-  };
-
-  const removeAgent = (agentId: string) => {
-    if (!window.confirm(`删除专线「${agentId}」？`)) return;
-    setDraft((prev) => {
-      if (!prev) return prev;
-      const nextAgents = { ...prev.agents };
-      delete nextAgents[agentId];
-      return { ...prev, agents: nextAgents };
     });
   };
 
@@ -134,7 +95,8 @@ export function MultiAgentsAdminPage() {
         <div>
           <h2 className="text-lg font-semibold tracking-tight text-gray-900">多 Agents 管理</h2>
           <p className="mt-1 text-xs text-gray-500">
-            配置每条专线的展示名、角色提示与可用技能。全局禁用的技能仍可勾选；运行时仅与已启用技能求交集。
+            系统内部会自动决定多专线协作。这里仅保留安全运行时开关：专线启用状态、每轮最多子任务数、Manager 最大规划轮数。
+            技能清单、角色提示和策略边界改为只读观察，避免后台误操作直接影响路由与 Harness 决策。
           </p>
         </div>
         <button
@@ -192,90 +154,103 @@ export function MultiAgentsAdminPage() {
             </label>
           </div>
 
-          <div className="flex flex-wrap gap-2 rounded-xl border border-gray-200 bg-surface p-4 shadow-card">
-            <input
-              className="max-w-xs flex-1 rounded-lg border border-gray-200 px-3 py-1.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
-              placeholder="新专线 id（字母数字开头）"
-              value={newId}
-              onChange={(e) => setNewId(e.target.value)}
-            />
-            <button
-              type="button"
-              className="rounded-lg border border-gray-200 bg-white px-4 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
-              disabled={busy || !newId.trim()}
-              onClick={() => addAgent()}
-            >
-              添加专线
-            </button>
-          </div>
-
           <div className="flex flex-col gap-4">
             {agentIds.map((aid) => {
-              const meta = draft.agents[aid] ?? emptyEntry();
+              const meta = draft.agents[aid];
               return (
                 <section
                   key={aid}
                   className="rounded-xl border border-gray-200 bg-surface p-5 shadow-card"
                 >
                   <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                    <h3 className="font-mono text-sm font-semibold text-gray-900">{aid}</h3>
-                    <button
-                      type="button"
-                      className="text-xs text-red-600 transition-colors hover:text-red-700"
-                      onClick={() => removeAgent(aid)}
-                    >
-                      删除专线
-                    </button>
-                  </div>
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <label className="block text-xs text-gray-500">
-                      展示名
+                    <div>
+                      <h3 className="font-mono text-sm font-semibold text-gray-900">{aid}</h3>
+                      <p className="mt-1 text-xs text-gray-500">{meta.label || '未配置展示名'}</p>
+                    </div>
+                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                      <span>{meta.enabled ? '已启用' : '已停用'}</span>
                       <input
-                        className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
-                        value={meta.label}
-                        onChange={(e) => updateAgent(aid, { label: e.target.value })}
+                        type="checkbox"
+                        checked={meta.enabled}
+                        onChange={(e) => updateAgentEnabled(aid, e.target.checked)}
                       />
                     </label>
-                    <div className="md:col-span-2">
-                      <label className="block text-xs text-gray-500">
-                        角色提示（role_prompt）
-                        <textarea
-                          className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
-                          rows={3}
-                          value={meta.role_prompt}
-                          onChange={(e) => updateAgent(aid, { role_prompt: e.target.value })}
-                        />
-                      </label>
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="block text-xs text-gray-500">
+                      技能模式
+                      <div className="mt-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                        {meta.skill_mode === 'restricted' ? 'restricted：仅白名单' : 'dynamic：动态可调'}
+                      </div>
+                    </div>
+                    <div className="block text-xs text-gray-500">
+                      专线状态
+                      <div className="mt-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                        {meta.enabled ? '参与系统自动决策' : '已从运行时候选集中移除'}
+                      </div>
                     </div>
                   </div>
-                  <p className="mb-2 mt-3 text-xs font-medium tracking-wide text-gray-500">可用技能</p>
-                  <ul className="grid max-h-48 grid-cols-1 gap-1 overflow-y-auto text-sm sm:grid-cols-2 lg:grid-cols-3">
-                    {skillSlugsSorted.map((s) => (
-                      <li key={`${aid}-${s.slug}`}>
-                        <label className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 transition-colors hover:bg-gray-50">
-                          <input
-                            type="checkbox"
-                            checked={meta.skills.includes(s.slug)}
-                            onChange={(e) => toggleSkill(aid, s.slug, e.target.checked)}
-                          />
-                          <span className="truncate" title={s.slug}>
-                            {s.name || s.slug}
-                            {!s.enabled ? (
-                              <span className="ml-1 text-xs text-amber-600">（未启用）</span>
-                            ) : null}
-                          </span>
-                        </label>
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                    <div>
+                      <p className="mb-2 text-xs font-medium tracking-wide text-gray-500">
+                        {meta.skill_mode === 'restricted' ? '白名单技能' : '优先技能'}
+                      </p>
+                      <ul className="grid max-h-48 grid-cols-1 gap-1 overflow-y-auto text-sm sm:grid-cols-2">
+                        {meta.skills.map((slug) => {
+                          const matched = skillSlugsSorted.find((item) => item.slug === slug);
+                          return (
+                            <li
+                              key={`${aid}-${slug}`}
+                              className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-gray-700"
+                              title={slug}
+                            >
+                              {matched?.name || slug}
+                              {!matched?.enabled ? (
+                                <span className="ml-1 text-xs text-amber-600">（未启用）</span>
+                              ) : null}
+                            </li>
+                          );
+                        })}
+                        {meta.skills.length === 0 ? (
+                          <li className="text-xs text-gray-400">未配置优先技能</li>
+                        ) : null}
+                      </ul>
+                    </div>
+                    <div>
+                      <p className="mb-2 text-xs font-medium tracking-wide text-gray-500">
+                        禁用技能（blocked_skills）
+                      </p>
+                      <ul className="grid max-h-40 grid-cols-1 gap-1 overflow-y-auto text-sm sm:grid-cols-2">
+                        {meta.blocked_skills.map((slug) => {
+                          const matched = skillSlugsSorted.find((item) => item.slug === slug);
+                          return (
+                            <li
+                              key={`${aid}-blocked-${slug}`}
+                              className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-gray-700"
+                              title={slug}
+                            >
+                              {matched?.name || slug}
+                            </li>
+                          );
+                        })}
+                        {meta.blocked_skills.length === 0 ? (
+                          <li className="text-xs text-gray-400">未配置禁用技能</li>
+                        ) : null}
+                      </ul>
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <p className="mb-2 text-xs font-medium tracking-wide text-gray-500">
+                      角色提示（只读）
+                    </p>
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-sm leading-6 text-gray-700 whitespace-pre-wrap">
+                      {meta.role_prompt || '未配置角色提示'}
+                    </div>
+                  </div>
                 </section>
               );
             })}
           </div>
-
-          {agentIds.length === 0 ? (
-            <p className="text-sm text-amber-700">请至少添加一条专线后再保存。</p>
-          ) : null}
         </>
       )}
     </div>

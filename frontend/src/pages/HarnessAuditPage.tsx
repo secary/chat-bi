@@ -2,6 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { getHarnessAudit, listHarnessAuditCandidates } from '../api/client';
 import type { HarnessAuditCandidate, HarnessAuditReport } from '../types/admin';
+import {
+  auditEventTone,
+  filterAuditEvents,
+  formatAuditPayload,
+  keywordForIssue,
+  summarizeAuditEvent,
+} from '../lib/auditDebug';
 import { logger } from '../lib/logger';
 
 export function HarnessAuditPage() {
@@ -13,6 +20,8 @@ export function HarnessAuditPage() {
   const [report, setReport] = useState<HarnessAuditReport | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [showDebug, setShowDebug] = useState(false);
+  const [eventQuery, setEventQuery] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -57,6 +66,17 @@ export function HarnessAuditPage() {
       initialTraceIdRef.current = '';
     });
   }, [inspectTrace]);
+
+  const debugEvents = report ? filterAuditEvents(report.events, eventQuery) : [];
+
+  const jumpToIssueDebug = useCallback((code: string, keyword: string) => {
+    setShowDebug(true);
+    setEventQuery(keyword);
+    queueMicrotask(() => {
+      const el = document.getElementById(`issue-${code}`);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  }, []);
 
   return (
     <div className="flex h-full flex-col gap-4 overflow-auto p-6 lg:p-8">
@@ -122,6 +142,16 @@ export function HarnessAuditPage() {
                 <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700">
                   评分：{report.score}
                 </span>
+                <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700">
+                  events：{report.event_count}
+                </span>
+                <button
+                  type="button"
+                  className="rounded-full border border-gray-200 px-3 py-1 text-xs text-gray-700 hover:bg-gray-50"
+                  onClick={() => setShowDebug((value) => !value)}
+                >
+                  {showDebug ? '隐藏 Debug 事件' : '显示 Debug 事件'}
+                </button>
               </div>
               <p className="text-gray-600">{report.summary}</p>
               <div>
@@ -131,16 +161,131 @@ export function HarnessAuditPage() {
                 ) : (
                   <ul className="space-y-2">
                     {report.issues.map((issue) => (
-                      <li key={`${issue.code}-${issue.message}`} className="rounded-lg border border-gray-100 px-3 py-2">
+                      <li
+                        key={`${issue.code}-${issue.message}`}
+                        className="rounded-lg border border-gray-100 px-3 py-2"
+                      >
                         <div className="text-xs font-semibold text-gray-800">
                           {issue.code} · {issue.level}
                         </div>
                         <div className="mt-1 text-gray-600">{issue.message}</div>
+                        <button
+                          type="button"
+                          className="mt-2 rounded-full border border-gray-200 px-2 py-1 text-[11px] text-gray-600 hover:bg-gray-50"
+                          onClick={() => jumpToIssueDebug(issue.code, keywordForIssue(issue))}
+                        >
+                          查看相关 Debug 事件
+                        </button>
                       </li>
                     ))}
                   </ul>
                 )}
               </div>
+              {showDebug ? (
+                <div className="rounded-xl border border-gray-100 bg-gray-50/70 p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-xs font-semibold tracking-wide text-gray-500">
+                      Debug 时间线
+                    </p>
+                    <span className="rounded-full bg-white px-2 py-1 text-[11px] text-gray-500">
+                      当前显示 {debugEvents.length} / {report.events.length}
+                    </span>
+                  </div>
+                  <div className="mt-3">
+                    <input
+                      className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                      placeholder="按 event_name / agent / skill / reason / payload 搜索"
+                      value={eventQuery}
+                      onChange={(e) => setEventQuery(e.target.value)}
+                    />
+                  </div>
+                  {debugEvents.length === 0 ? (
+                    <p className="mt-3 text-sm text-gray-400">没有匹配的调试事件。</p>
+                  ) : (
+                    <ol className="mt-3 space-y-3">
+                      {debugEvents.map((event, index) => (
+                        <li
+                          id={`issue-${event.event_name}`}
+                          key={`${event.id}-${event.event_name}-${index}`}
+                          className={
+                            auditEventTone(event) === 'critical'
+                              ? 'rounded-lg border border-rose-200 bg-rose-50/70 p-3'
+                              : auditEventTone(event) === 'warning'
+                                ? 'rounded-lg border border-amber-200 bg-amber-50/70 p-3'
+                                : 'rounded-lg border border-gray-200 bg-white p-3'
+                          }
+                        >
+                          <div className="flex flex-wrap items-center gap-2 text-xs">
+                            <span className="rounded-full bg-gray-100 px-2 py-1 font-mono text-gray-700">
+                              #{index + 1}
+                            </span>
+                            <span className="rounded-full bg-gray-100 px-2 py-1 font-mono text-gray-700">
+                              {event.span_name}
+                            </span>
+                            <span className="rounded-full bg-gray-100 px-2 py-1 font-mono text-gray-700">
+                              {event.event_name}
+                            </span>
+                            <span
+                              className={
+                                auditEventTone(event) === 'critical'
+                                  ? 'rounded-full bg-rose-100 px-2 py-1 text-rose-700'
+                                  : auditEventTone(event) === 'warning'
+                                    ? 'rounded-full bg-amber-100 px-2 py-1 text-amber-700'
+                                    : 'rounded-full bg-gray-100 px-2 py-1 text-gray-500'
+                              }
+                            >
+                              {auditEventTone(event) === 'critical'
+                                ? '关键事件'
+                                : auditEventTone(event) === 'warning'
+                                  ? '关注事件'
+                                  : '普通事件'}
+                            </span>
+                            <span className="rounded-full bg-gray-100 px-2 py-1 text-gray-500">
+                              {event.created_at}
+                            </span>
+                          </div>
+                          <p className="mt-2 text-sm font-medium text-gray-800">
+                            {summarizeAuditEvent(event)}
+                          </p>
+                          {event.message ? (
+                            <p className="mt-1 text-sm text-gray-600">{event.message}</p>
+                          ) : null}
+                          <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-gray-500">
+                            {typeof event.payload.step === 'number' ? (
+                              <span className="rounded-full bg-gray-50 px-2 py-1">
+                                step={String(event.payload.step)}
+                              </span>
+                            ) : null}
+                            {typeof event.payload.round === 'number' ? (
+                              <span className="rounded-full bg-gray-50 px-2 py-1">
+                                round={String(event.payload.round)}
+                              </span>
+                            ) : null}
+                            {typeof event.payload.task_index === 'number' ? (
+                              <span className="rounded-full bg-gray-50 px-2 py-1">
+                                task={String(event.payload.task_index)}
+                              </span>
+                            ) : null}
+                            {typeof event.payload.ok === 'boolean' ? (
+                              <span className="rounded-full bg-gray-50 px-2 py-1">
+                                ok={String(event.payload.ok)}
+                              </span>
+                            ) : null}
+                          </div>
+                          <details className="mt-3">
+                            <summary className="cursor-pointer text-xs font-medium text-gray-500">
+                              查看原始 payload
+                            </summary>
+                            <pre className="mt-2 overflow-x-auto rounded-lg bg-gray-950 p-3 text-xs text-gray-100">
+                              {formatAuditPayload(event.payload)}
+                            </pre>
+                          </details>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </div>
+              ) : null}
             </div>
           )}
         </section>

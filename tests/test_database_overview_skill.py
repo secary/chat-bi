@@ -87,7 +87,7 @@ class FakeDb:
 
 class DatabaseOverviewSkillTest(unittest.TestCase):
     def test_separates_business_and_semantic_assets(self):
-        result = MODULE.database_overview(FakeDb(), "chatbi_bank_external")
+        result = MODULE.database_overview(FakeDb(), "chatbi_demo")
 
         self.assertEqual(result["kind"], "database_overview")
         self.assertEqual(len(result["data"]["business_assets"]), 2)
@@ -95,7 +95,7 @@ class DatabaseOverviewSkillTest(unittest.TestCase):
         self.assertIn("可直接查询的业务表/视图：2 张", result["text"])
 
     def test_enriches_columns_and_metrics(self):
-        result = MODULE.database_overview(FakeDb(), "chatbi_bank_external")
+        result = MODULE.database_overview(FakeDb(), "chatbi_demo")
         sales = next(
             asset for asset in result["data"]["business_assets"] if asset["name"] == "sales_order"
         )

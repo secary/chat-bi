@@ -54,7 +54,11 @@ docker compose down
 docker compose up -d
 ```
 
-重新拉起后，确认容器内 `chatbi_demo` 含 `chatbi_app_user`，且 `chatbi_local_logs` 含 `chatbi_logs_trace_log` 后再登录 `admin` / `admin123`。
+重新拉起后，确认容器内：
+- `chatbi_demo` 含 `chatbi_app_user` 与 `chatbi_admin_llm_settings`
+- `chatbi_local_logs` 含 `chatbi_logs_trace_log`
+
+再登录 `admin` / `admin123`。
 
 ## 本地开发启动
 
@@ -84,13 +88,14 @@ open http://localhost:5174
 |------|-----------|
 | frontend | 5174 |
 | backend | 8001 |
-| MySQL | 3308 |
+| MySQL（业务演示库） | 3308 |
+| MySQL（日志） | 33067 |
 
 - 修改 `backend/` 或 `skills/`：后端自动 reload，无需重建镜像。
 - 修改 `frontend/`：Vite 自动热更新，无需重建镜像。
 - 修改 `frontend/package.json` 或 `package-lock.json`：重启 frontend 容器即可（入口脚本会对比 lock 并自动 `npm ci`）；若仍缺包可执行 `docker compose --env-file .env.dev -f docker-compose.dev.yml down -v` 后重新 `up --build` 清空 `frontend-node-modules` 卷。
 - 修改 Dockerfile 或系统依赖：需要重新 `--build`。
-- 修改 `database/init.sql`：已有 `database/mysql-data-dev/` 不会自动重放，需重置开发数据目录后再启动。
+- 修改 `database/init.sql`：已有 `mysql-data-dev` named volume 不会自动重放，需 `docker compose --env-file .env.dev -f docker-compose.dev.yml down -v` 后再启动。
 - 容器名前缀为 `chatbi-dev-*`，可以和生产式本地运行并存。
 
 ### 方式 B：宿主机启动前后端
@@ -109,6 +114,7 @@ MySQL 仍需 Docker：
 
 ```bash
 docker compose up -d demo-mysql
+docker compose --env-file .env.dev -f docker-compose.dev.yml up -d demo-mysql log-mysql
 ```
 
 ## 技术栈
@@ -131,7 +137,7 @@ chat-bi/
 │   ├── bootstrap_dev.sh             # 进场 / --sync / --format
 │   ├── run_tests.py                 # 分套件 pytest（foundation、agent、skills…）
 │   ├── format_code.py、 e2e_smoke.py
-├── database/init.sql、migrations/
+├── database/init.sql、init_log.sql
 ├── backend/
 │   ├── main.py                      # FastAPI：/chat SSE、/upload、/abort
 │   ├── routes/                      # auth、sessions、chat、dashboard、admin/*
@@ -174,7 +180,7 @@ PYTHONPATH=. .venv\Scripts\python.exe scripts/run_tests.py foundation -- -q
            → formatter / renderers → SSE（thinking / text / chart / kpi_cards /
               analysis_proposal / dashboard_ready / error）
        → 消息落库；BackgroundTasks 刷新记忆
-       → trace → chatbi_local_logs（compose 下与 chatbi_demo 同 MySQL 实例）
+       → trace → chatbi_local_logs（dev compose 下走独立 `log-mysql`）
   → 前端 MessageBubble（Markdown/KaTeX、提案卡片、采纳看板）
 ```
 
@@ -212,8 +218,8 @@ PYTHONPATH=. .venv\Scripts\python.exe scripts/run_tests.py foundation -- -q
 | `CHATBI_DB_USER` | 业务库用户（默认 `demo_user`） |
 | `CHATBI_DB_PASSWORD` | 业务库密码（默认 `demo_pass`） |
 | `CHATBI_DB_NAME` | 业务库库名（默认 `chatbi_demo`） |
-| `CHATBI_APP_DB_HOST/PORT/USER/PASSWORD/NAME` | 可选；前端用户与会话表默认沿用 `CHATBI_DB_*` |
-| `CHATBI_ADMIN_DB_HOST/PORT/USER/PASSWORD/NAME` | 可选；配置与技能开关表默认沿用 `CHATBI_DB_*` |
+| `CHATBI_APP_DB_HOST/PORT/USER/PASSWORD/NAME` | 可选；默认沿用 `CHATBI_DB_*` |
+| `CHATBI_ADMIN_DB_HOST/PORT/USER/PASSWORD/NAME` | 可选；默认沿用 `CHATBI_DB_*` |
 | `CHATBI_LOG_DB_HOST` | 日志库主机（未配置时回退到业务库） |
 | `CHATBI_LOG_DB_PORT` | 日志库端口 |
 | `CHATBI_LOG_DB_USER` | 日志库用户 |
@@ -231,7 +237,9 @@ PYTHONPATH=. .venv\Scripts\python.exe scripts/run_tests.py foundation -- -q
 - `chatbi_demo`：演示业务数据、语义层、应用表 `chatbi_app_*`、管理表 `chatbi_admin_*`
 - `chatbi_local_logs`：链路日志 `chatbi_logs_trace_log`
 
-**Docker compose** 中 `demo-mysql` 同时承载上述两个 database（`CHATBI_LOG_DB_HOST=demo-mysql`）。宿主机 `.env` 若设 `CHATBI_LOG_DB_PORT=33067` 表示连接独立日志实例，非 compose 默认。
+**Compose 拓扑**：
+- `docker-compose.dev.yml`：`demo-mysql` 使用 named volume 承载 `chatbi_demo`，`log-mysql` 独立承载 `chatbi_local_logs`
+- `docker-compose.yml`：与开发态一致，业务库使用 named volume，日志库独立本地挂载
 
 如需主动拆分应用库或管理库，可显式设置 `CHATBI_APP_DB_*` / `CHATBI_ADMIN_DB_*`。
 

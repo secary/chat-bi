@@ -101,7 +101,6 @@ MODULE_SUITES: dict[str, list[str]] = {
         "tests/test_db_mysql_targets.py",
         "tests/test_executor_run_script.py",
         "tests/test_executor_file_ingestion_args.py",
-        "tests/test_external_bank_demo_sql.py",
         "tests/test_file_ingestion_skill.py",
     ],
     "upload-vision": [

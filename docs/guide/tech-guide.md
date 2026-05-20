@@ -153,9 +153,11 @@ ReAct / Manager 在送入 Planner 前还会经 **context_window** 压缩（§4.4
 | `chatbi_demo` | 业务事实表、语义层、`chatbi_app_*`、`chatbi_admin_*` |
 | `chatbi_local_logs` | `chatbi_logs_trace_log`（trace-id 串联） |
 
-**Compose 默认**：`docker-compose.yml` / `docker-compose.dev.yml` 均设置 `CHATBI_LOG_DB_HOST=demo-mysql`、`CHATBI_LOG_DB_PORT=3306`、`CHATBI_LOG_DB_NAME=chatbi_local_logs`，与业务库**同一 MySQL 实例、不同 database**。宿主机直连时端口分别为 **3307**（prod）与 **3308**（dev）。
+**Compose 默认**：
+- `docker-compose.dev.yml` 与 `docker-compose.yml` 都将 `chatbi_demo` 放到 `demo-mysql` named volume；日志库改走独立 `log-mysql`，宿主机端口 **33067**。
+- 宿主机直连主业务库端口分别为 **3308**（dev）和 **3307**（prod）。
 
-`.env.example` 中的 `CHATBI_LOG_DB_PORT=33067` 仅适用于**自行搭建的独立日志库**；非 compose 默认。
+宿主机本地运行后端时，默认直接沿用 `CHATBI_DB_*` 作为业务演示库，`CHATBI_LOG_DB_*` 指向独立日志库。
 
 ---
 

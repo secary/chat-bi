@@ -83,43 +83,6 @@ CHATBI_E2E_URL=http://localhost:8001 python scripts/e2e_smoke.py --cases S1,S4,E
 
 ---
 
-## 五、外部数据库接入（chatbi_bank_external）
-
-### 前置：导入外部银行库
-
-```bash
-# 在能连接目标 MySQL 的环境中执行（本机 3306 或容器内）
-mysql -h 127.0.0.1 -P 3306 -u root -p < database/external_bank_bootstrap.sql
-mysql -h 127.0.0.1 -P 3306 -u root -p < database/external_bank_demo.sql
-```
-
-数据库用户：`demo_user` / `demo_pass`，库名：`chatbi_bank_external`
-
-### 前置：在管理页添加数据源连接
-
-1. 进入「数据源」管理页 → 新增连接
-2. 填写：Host=`host.docker.internal`（或 `127.0.0.1`）、Port=`3306`、Database=`chatbi_bank_external`、User=`demo_user`、Password=`demo_pass`
-3. 点击「测试连接」确认成功
-4. 勾选「设为默认」并保存
-
-### 功能验证
-
-| # | 输入 | 预期触发 Skill | 验证点 |
-|---|------|--------------|-------|
-| X1 | `当前数据库有哪些表可以查` | `chatbi-database-overview` | 返回 `bank_branch`、`loan_contract`、`wealth_position` 等银行表；兼容视图 `sales_order`/`customer_profile` 也在列表中 |
-| X2 | `1-4月各支行业务余额排行` | `chatbi-semantic-query` | 按 `department`（网点/支行）维度出柱状图；数值单位为万元级别 |
-| X3 | `各业务类型收入贡献趋势` | `chatbi-semantic-query` | 折线图，维度为 `product_category`（存款业务/贷款业务/财富管理） |
-| X4 | `AUM是什么意思` | `chatbi-metric-explainer` | 返回语义层中 `business_amount`/`AUM` 的字段说明 |
-| X5 | `贷款余额经营建议` | semantic-query → decision-advisor | 先查 `loan_contract` 相关数据，建议聚焦贷款风险或余额维度 |
-| X6 | `各渠道AUM和上月对比` | `chatbi-comparison` | 按 `channel`（客户经理/财富顾问等）维度的环比分组柱状图 |
-
-### 切回演示库验证隔离
-
-1. 管理页将默认数据源切回 `chatbi_demo`
-2. 发送 `1-4月各区域销售额排行` → 应返回演示库数据（华东/华南/华北/西南区域），**不出现**银行相关字段
-
----
-
 ## 通用检查点
 
 - SSE `thinking` 步骤中的 skill 名称与预期一致

@@ -44,15 +44,15 @@
 | 前端 | React 19 + TypeScript + Vite + Tailwind CSS + ECharts 6 |
 | 后端 | FastAPI，对话接口使用 **SSE** 流式返回思考与结果 |
 | 模型调用 | LiteLLM；管理页可配置多条 **LLM Profile** 并激活其一 |
-| 数据 | MySQL 8.0：`chatbi_demo`（业务 + 应用 + 管理表）与 `chatbi_local_logs`（链路日志） |
+| 数据 | MySQL 8.0：`chatbi_demo`（业务 + 应用 + 管理）与 `chatbi_local_logs`（链路日志） |
 
 **启动方式**请优先参考 [README.md](../../README.md)：
 
 - **Docker 全栈（生产式本地）**：MySQL 宿主机 **3307**；前端 **5173**。
-- **Docker 开发热更新**：MySQL 宿主机 **3308**；前端 **5174**；后端 **8001**。`docker-compose.dev.yml` 中 **同一 `demo-mysql` 实例**同时初始化 `chatbi_demo` 与 `chatbi_local_logs`。
+- **Docker 开发热更新**：主 MySQL 宿主机 **3308**；日志 MySQL 宿主机 **33067**；前端 **5174**；后端 **8001**。`docker-compose.dev.yml` 中 `demo-mysql` 使用 Docker named volume 保存 `chatbi_demo`，`log-mysql` 单独持久化 `chatbi_local_logs`。
 - **宿主机开发**：本地运行后端与前端，MySQL 仍建议用 Docker。
 
-若在宿主机 `.env` 中单独配置 `CHATBI_LOG_DB_PORT=33067`，表示连接**可选的独立日志 MySQL 实例**；这与 compose 默认双库同实例不同，以你实际部署为准。
+若在宿主机 `.env` / `.env.dev` 中配置 `CHATBI_LOG_DB_PORT=33067`，则宿主机运行的后端也会沿用独立日志库拓扑。
 
 环境变量模板见 `.env.example`；本地开发常配合 `.env.dev`（Git 忽略），约定见 [AGENTS.md](../../AGENTS.md)。
 

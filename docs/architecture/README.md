@@ -32,7 +32,7 @@ flowchart TD
 - 数据库默认按表前缀区分职责：
   - `chatbi_demo`：业务事实表、语义层、应用表 `chatbi_app_*`、管理表 `chatbi_admin_*`
   - `chatbi_local_logs`：trace 日志表 `chatbi_logs_trace_log`
-  - 如需主动拆库，可通过 `CHATBI_APP_DB_*` / `CHATBI_ADMIN_DB_*` 覆盖应用库和管理库连接。
+  - 默认只保留业务演示库和独立日志库两套库；`CHATBI_APP_DB_*` / `CHATBI_ADMIN_DB_*` 仅作兼容扩展点。
 
 ## 模块边界
 - `main.py` 只负责 HTTP/SSE 协议层和路由注册。

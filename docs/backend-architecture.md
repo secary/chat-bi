@@ -26,7 +26,7 @@
            │                                             │ trace            │
   ┌────────┴────────┐                                    └──────────────────┘
   │   MySQL        │
-  │ chatbi_demo + chatbi_local_logs（compose 默认同实例）│
+  │ chatbi_demo + chatbi_local_logs │
   └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -34,12 +34,13 @@
 
 | 数据库 | 用途 | 主要表前缀 / 表 |
 |--------|------|-----------------|
-| `chatbi_demo` | BI 业务、应用、管理（默认同库） | 业务表、语义层、`chatbi_app_*`、`chatbi_admin_*` |
+| `chatbi_demo` | BI 业务、应用、管理 | 业务表、语义层、`chatbi_app_*`、`chatbi_admin_*` |
 | `chatbi_local_logs` | 链路日志 | `chatbi_logs_trace_log` |
 
-**Docker compose**（`docker-compose.yml` / `docker-compose.dev.yml`）中 `demo-mysql` 同时初始化上述两个 database：`CHATBI_LOG_DB_HOST=demo-mysql`、`CHATBI_LOG_DB_PORT=3306`。宿主机 `.env` 若配置 `CHATBI_LOG_DB_PORT=33067` 表示连接**独立**日志实例，非 compose 默认。
+**Docker compose**：
+- `docker-compose.dev.yml` 与 `docker-compose.yml` 默认都将 `chatbi_demo` 放在 `demo-mysql` named volume 中，并将 `chatbi_local_logs` 放到独立 `log-mysql` 实例的宿主机目录 `database/mysql-data-log/`，以减少 macOS Spotlight 对主业务库数据目录的索引干扰。
 
-`CHATBI_APP_DB_*` / `CHATBI_ADMIN_DB_*` 为主动拆库时的兼容扩展点。
+`CHATBI_APP_DB_*` / `CHATBI_ADMIN_DB_*` 为兼容扩展点；默认沿用 `chatbi_demo`。
 
 ---
 
@@ -345,7 +346,7 @@ Main Process                    Subprocess
 1. **Skill 子进程隔离**：主进程通过 env 注入 DB；问数/决策脚本仅 `SELECT`（别名 Skill 写受控表）。
 2. **ReAct 默认**：Observation 回灌 + `CHATBI_AGENT_MAX_STEPS` 上限；Legacy 与复合双步链仍可用。
 3. **三级记忆**：`chat_message` → `session_summary` → `long_term`；可 `CHATBI_MEMORY_DISABLED` 关闭。
-4. **同库前缀表 + 可选拆库**：`chatbi_app_*` / `chatbi_admin_*` 默认在 `chatbi_demo`；日志库 `chatbi_local_logs`。
+4. **双库结构**：`chatbi_demo` 承载业务、应用和管理前缀表，`chatbi_local_logs` 独立承载链路日志；演示环境默认首次初始化写入 `admin` / `admin123`。
 5. **SSE 类型扩展**：除 text/chart/kpi 外，支持上传分析的 `analysis_proposal`、`dashboard_ready` 与 `plan_summary`。
 6. **多 Agent**：Manager 多轮规划 + **顺序**执行专线子任务 + 汇总；上传路径/采纳线索约束路由。
 7. **可中止**：`abort_state` + `/abort` + 前端 `AbortSignal`。

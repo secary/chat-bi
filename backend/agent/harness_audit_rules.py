@@ -18,6 +18,9 @@ def evaluate_audit_rules(events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     executed = _count(events, "agent.harness", "action_executing")
     observations = _count(events, "agent.harness", "observation_built")
     finishes = _count(events, "agent.harness", "finish_emitted")
+    empty_specialist_outcomes = _empty_specialist_outcomes(events)
+    dependency_warnings = _dependency_warnings(events)
+    summary_dependency_unmet = _summary_dependency_unmet(events)
 
     if schema_rejects:
         issues.append(
@@ -46,6 +49,30 @@ def evaluate_audit_rules(events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     if executed and not finishes:
         issues.append(
             _issue("MISSING_FINISH_EVENT", "warning", "存在执行记录，但未看到 finish 事件。")
+        )
+    if empty_specialist_outcomes:
+        issues.append(
+            _issue(
+                "EMPTY_SPECIALIST_OUTCOME",
+                "warning",
+                f"有 {empty_specialist_outcomes} 个 specialist 调用结束后未产出有效结果。",
+            )
+        )
+    if dependency_warnings:
+        issues.append(
+            _issue(
+                "DOWNSTREAM_DATA_MISSING",
+                "warning",
+                f"检测到下游依赖未满足：{dependency_warnings[0]}",
+            )
+        )
+    if summary_dependency_unmet:
+        issues.append(
+            _issue(
+                "SUMMARY_WITH_UNMET_DEPENDENCY",
+                "warning",
+                "Manager 在依赖未满足时仍进入了汇总阶段。",
+            )
         )
     if authorized == 0:
         issues.append(_issue("NO_AUTHORIZED_ACTION", "warning", "未发现 Harness 放行记录。"))
@@ -78,6 +105,41 @@ def _count(events: List[Dict[str, Any]], span_name: str, event_name: str) -> int
         1
         for event in events
         if event["span_name"] == span_name and event["event_name"] == event_name
+    )
+
+
+def _empty_specialist_outcomes(events: List[Dict[str, Any]]) -> int:
+    count = 0
+    for event in events:
+        if event["span_name"] != "agent.harness" or event["event_name"] != "observation_built":
+            continue
+        payload = event.get("payload") or {}
+        if payload.get("action") != "run_specialist":
+            continue
+        if payload.get("ok") is False:
+            continue
+        if bool(payload.get("has_result")):
+            continue
+        count += 1
+    return count
+
+
+def _dependency_warnings(events: List[Dict[str, Any]]) -> List[str]:
+    warnings: List[str] = []
+    for event in events:
+        if event["span_name"] != "agent.harness" or event["event_name"] != "observation_built":
+            continue
+        payload = event.get("payload") or {}
+        warning = str(payload.get("dependency_warning") or "").strip()
+        if warning:
+            warnings.append(warning)
+    return warnings
+
+
+def _summary_dependency_unmet(events: List[Dict[str, Any]]) -> bool:
+    return any(
+        event["span_name"] == "agent.harness" and event["event_name"] == "summary_dependency_unmet"
+        for event in events
     )
 
 

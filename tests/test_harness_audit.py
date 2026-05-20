@@ -100,6 +100,90 @@ class HarnessAuditTest(unittest.TestCase):
         codes = {item["code"] for item in report["issues"]}
         self.assertIn("MISSING_FINISH_EVENT", codes)
 
+    def test_build_audit_report_flags_empty_specialist_outcome(self):
+        events = [
+            {
+                "span_name": "agent.harness",
+                "event_name": "action_authorized",
+                "payload": {"step": 1, "action": "delegate_tasks", "mode": "multi"},
+            },
+            {
+                "span_name": "agent.harness",
+                "event_name": "action_executing",
+                "payload": {
+                    "step": 1,
+                    "task_index": 0,
+                    "skill": "specialist:demo_query",
+                    "mode": "multi",
+                },
+            },
+            {
+                "span_name": "agent.harness",
+                "event_name": "observation_built",
+                "payload": {
+                    "step": 1,
+                    "task_index": 0,
+                    "action": "run_specialist",
+                    "agent_id": "demo_query",
+                    "ok": True,
+                    "has_result": False,
+                    "observation_preview": "（无工具结果）",
+                },
+            },
+            {
+                "span_name": "agent.harness",
+                "event_name": "finish_emitted",
+                "payload": {"step": 1, "action": "finish"},
+            },
+        ]
+        with patch("backend.agent.harness_audit.list_trace_events", return_value=events):
+            report = build_audit_report("t4")
+        codes = {item["code"] for item in report["issues"]}
+        self.assertIn("EMPTY_SPECIALIST_OUTCOME", codes)
+
+    def test_build_audit_report_flags_summary_with_unmet_dependency(self):
+        events = [
+            {
+                "span_name": "agent.harness",
+                "event_name": "action_authorized",
+                "payload": {"step": 1, "action": "delegate_tasks", "mode": "multi"},
+            },
+            {
+                "span_name": "agent.harness",
+                "event_name": "observation_built",
+                "payload": {
+                    "step": 1,
+                    "task_index": 1,
+                    "action": "run_specialist",
+                    "agent_id": "business_advisor",
+                    "ok": False,
+                    "has_result": False,
+                    "dependency_warning": "缺少已采纳指标的具体数值，无法生成建议",
+                    "observation_preview": "缺少已采纳指标的具体数值，无法生成建议",
+                },
+            },
+            {
+                "span_name": "agent.harness",
+                "event_name": "summary_dependency_unmet",
+                "payload": {
+                    "step": 1,
+                    "action": "finish",
+                    "warning_count": 1,
+                    "warnings": ["经营决策建议: 缺少已采纳指标的具体数值，无法生成建议"],
+                },
+            },
+            {
+                "span_name": "agent.harness",
+                "event_name": "finish_emitted",
+                "payload": {"step": 1, "action": "finish"},
+            },
+        ]
+        with patch("backend.agent.harness_audit.list_trace_events", return_value=events):
+            report = build_audit_report("t5")
+        codes = {item["code"] for item in report["issues"]}
+        self.assertIn("DOWNSTREAM_DATA_MISSING", codes)
+        self.assertIn("SUMMARY_WITH_UNMET_DEPENDENCY", codes)
+
 
 if __name__ == "__main__":
     unittest.main()

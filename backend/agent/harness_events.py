@@ -159,21 +159,29 @@ def log_harness_multi_task_observation(
     observation: str,
     last_skill_name: Optional[str],
     ok: bool = True,
+    result_kind: str = "",
+    has_result: bool = False,
+    has_rows: bool = False,
+    has_auto_analysis: bool = False,
+    dependency_warning: str = "",
 ) -> None:
-    _emit_harness_event(
-        trace_id,
-        state,
-        "observation_built",
-        extras={
-            "action": "run_specialist",
-            "round": round_index,
-            "task_index": task_index,
-            "agent_id": agent_id,
-            "skill": last_skill_name or f"specialist:{agent_id}",
-            "ok": ok,
-            "observation_preview": observation[:240],
-        },
-    )
+    extras: Dict[str, Any] = {
+        "action": "run_specialist",
+        "round": round_index,
+        "task_index": task_index,
+        "agent_id": agent_id,
+        "skill": last_skill_name or f"specialist:{agent_id}",
+        "ok": ok,
+        "observation_preview": observation[:240],
+        "has_result": has_result,
+        "has_rows": has_rows,
+        "has_auto_analysis": has_auto_analysis,
+    }
+    if result_kind:
+        extras["result_kind"] = result_kind
+    if dependency_warning:
+        extras["dependency_warning"] = dependency_warning[:200]
+    _emit_harness_event(trace_id, state, "observation_built", extras=extras)
 
 
 def log_harness_multi_finish(
@@ -191,6 +199,24 @@ def log_harness_multi_finish(
             "action": "finish",
             "block_count": block_count,
             "round_count": round_count,
+        },
+    )
+
+
+def log_harness_multi_summary_dependency_unmet(
+    trace_id: str,
+    state: HarnessState,
+    *,
+    warnings: List[str],
+) -> None:
+    _emit_harness_event(
+        trace_id,
+        state,
+        "summary_dependency_unmet",
+        extras={
+            "action": "finish",
+            "warning_count": len(warnings),
+            "warnings": warnings[:3],
         },
     )
 

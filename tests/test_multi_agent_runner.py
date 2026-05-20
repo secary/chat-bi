@@ -188,6 +188,107 @@ class MultiAgentRunnerHarnessTest(unittest.TestCase):
 
         asyncio.run(_run())
 
+    def test_multi_agent_logs_summary_dependency_unmet_before_synthesis(self) -> None:
+        async def _run() -> None:
+            async def fake_specialist(*args, **kwargs):
+                yield {"type": "text", "content": "缺少已采纳指标的具体数值，无法生成建议"}
+
+            async def fake_stream_result_events(*args, **kwargs):
+                yield {"type": "text", "content": "最终结果"}
+
+            events = []
+            with (
+                patch(
+                    "backend.agent.multi_agent_runner.call_manager_plan_llm",
+                    new_callable=AsyncMock,
+                    return_value={
+                        "user_intent_summary": "建议",
+                        "decomposition_reason": "先走经营建议专线",
+                        "finalize_after_this_batch": True,
+                        "tasks": [
+                            {
+                                "agent_id": "business_advisor",
+                                "handoff_instruction": "基于已采纳指标给经营建议",
+                                "depends_on": None,
+                            }
+                        ],
+                    },
+                ),
+                patch(
+                    "backend.agent.multi_agent_runner.validate_and_order_tasks",
+                    return_value=[
+                        (
+                            0,
+                            {
+                                "agent_id": "business_advisor",
+                                "handoff_instruction": "基于已采纳指标给经营建议",
+                                "depends_on": None,
+                            },
+                        )
+                    ],
+                ),
+                patch(
+                    "backend.agent.multi_agent_runner.skills_for_agent",
+                    return_value=[MagicMock()],
+                ),
+                patch(
+                    "backend.agent.multi_agent_runner.agent_label",
+                    return_value="经营决策建议",
+                ),
+                patch(
+                    "backend.agent.multi_agent_runner.agent_role_prompt",
+                    return_value="你是经营建议专线",
+                ),
+                patch(
+                    "backend.agent.multi_agent_runner.stream_specialist",
+                    side_effect=fake_specialist,
+                ),
+                patch(
+                    "backend.agent.multi_agent_runner.call_summarize_llm",
+                    new_callable=AsyncMock,
+                    return_value={"text": "最终结果"},
+                ),
+                patch(
+                    "backend.agent.multi_agent_runner.stream_result_events",
+                    side_effect=fake_stream_result_events,
+                ),
+                patch(
+                    "backend.agent.abort_state.is_aborted",
+                    return_value=False,
+                ),
+                patch(
+                    "backend.agent.harness_events.log_event",
+                    side_effect=lambda trace_id, span_name, event_name, **kwargs: events.append(
+                        {
+                            "trace_id": trace_id,
+                            "span_name": span_name,
+                            "event_name": event_name,
+                            "payload": kwargs.get("payload") or {},
+                        }
+                    ),
+                ),
+            ):
+                got = []
+                async for event in stream_chat_multi_agent(
+                    [{"role": "user", "content": "采纳全部指标然后给出经营建议"}],
+                    trace_id="t-summary-warning",
+                ):
+                    got.append(event)
+
+            self.assertEqual(got[-1]["type"], "done")
+            warnings = [
+                item
+                for item in events
+                if item["span_name"] == "agent.harness"
+                and item["event_name"] == "summary_dependency_unmet"
+            ]
+            self.assertEqual(len(warnings), 1)
+            self.assertEqual(warnings[0]["payload"].get("warning_count"), 1)
+
+        import asyncio
+
+        asyncio.run(_run())
+
 
 if __name__ == "__main__":
     unittest.main()

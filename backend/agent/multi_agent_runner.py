@@ -9,6 +9,7 @@ from backend.agent.harness_events import (
     log_harness_multi_batch_authorized,
     log_harness_multi_batch_validated,
     log_harness_multi_finish,
+    log_harness_multi_summary_dependency_unmet,
     log_harness_multi_task_executing,
     log_harness_multi_task_observation,
     log_harness_rejected,
@@ -54,6 +55,32 @@ def _has_structured_auto_analysis(result: Optional[Dict[str, Any]]) -> bool:
     )
 
 
+def _has_rows_result(result: Optional[Dict[str, Any]]) -> bool:
+    if not isinstance(result, dict):
+        return False
+    data = result.get("data")
+    return isinstance(data, dict) and isinstance(data.get("rows"), list) and bool(data["rows"])
+
+
+def _dependency_warning_from_observation(observation: str) -> str:
+    text = observation.strip()
+    if not text:
+        return ""
+    hints = (
+        "缺少",
+        "待补数据",
+        "无法生成建议",
+        "尚未获得工具结果",
+        "尚未获取工具结果",
+        "无工具结果",
+        "需要先",
+        "请先",
+    )
+    if any(hint in text for hint in hints):
+        return text[:200]
+    return ""
+
+
 async def stream_chat_multi_agent(
     messages: List[Dict[str, str]],
     trace_id: str = "",
@@ -82,6 +109,7 @@ async def stream_chat_multi_agent(
     last_result: Optional[Dict[str, Any]] = None
     last_skill_name: Optional[str] = None
     all_skill_executions: List[Dict[str, Any]] = []
+    summary_dependency_warnings: List[str] = []
     harness_state = HarnessState(
         trace_id=trace_id,
         user_text=_latest_user_question(messages),
@@ -337,6 +365,13 @@ async def stream_chat_multi_agent(
                 harness_state.record_skill(lsn, lr)
             else:
                 harness_state.record_accept()
+            result_kind = str(lr.get("kind") or "") if isinstance(lr, dict) else ""
+            has_result = bool(executions) or isinstance(lr, dict)
+            has_rows = _has_rows_result(lr)
+            has_auto_analysis = _has_structured_auto_analysis(lr)
+            dependency_warning = _dependency_warning_from_observation(obs)
+            if dependency_warning:
+                summary_dependency_warnings.append(f"{label}: {dependency_warning}")
             log_harness_multi_task_observation(
                 trace_id,
                 harness_state,
@@ -346,6 +381,11 @@ async def stream_chat_multi_agent(
                 observation=obs,
                 last_skill_name=lsn if isinstance(lsn, str) and lsn else None,
                 ok=not task_failed,
+                result_kind=result_kind,
+                has_result=has_result,
+                has_rows=has_rows,
+                has_auto_analysis=has_auto_analysis,
+                dependency_warning=dependency_warning,
             )
             hi = str(task["handoff_instruction"])
             progress_lines.append(
@@ -432,6 +472,12 @@ async def stream_chat_multi_agent(
         return
 
     q = _latest_user_question(messages)
+    if summary_dependency_warnings:
+        log_harness_multi_summary_dependency_unmet(
+            trace_id,
+            harness_state,
+            warnings=summary_dependency_warnings,
+        )
     yield {"type": "thinking", "content": "[Manager-汇总] 正在整合各子任务结论..."}
     try:
         synth = await call_summarize_llm(q, all_blocks, trace_id=trace_id)

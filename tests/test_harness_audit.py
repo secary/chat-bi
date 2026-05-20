@@ -60,11 +60,45 @@ class HarnessAuditTest(unittest.TestCase):
                 "event_name": "observation_built",
                 "payload": {"step": 1, "skill": "chatbi-semantic-query"},
             },
+            {
+                "span_name": "agent.harness",
+                "event_name": "finish_emitted",
+                "payload": {"step": 1, "action": "finish"},
+            },
         ]
         with patch("backend.agent.harness_audit.list_trace_events", return_value=events):
             report = build_audit_report("t2")
         self.assertEqual(report["status"], "ok")
         self.assertEqual(report["score"], 100)
+
+    def test_build_audit_report_flags_missing_finish(self):
+        events = [
+            {
+                "span_name": "agent.harness",
+                "event_name": "action_authorized",
+                "payload": {"step": 1, "action": "delegate_tasks", "mode": "multi"},
+            },
+            {
+                "span_name": "agent.harness",
+                "event_name": "action_executing",
+                "payload": {
+                    "step": 1,
+                    "task_index": 0,
+                    "skill": "specialist:demo_query",
+                    "mode": "multi",
+                },
+            },
+            {
+                "span_name": "agent.harness",
+                "event_name": "observation_built",
+                "payload": {"step": 1, "task_index": 0, "mode": "multi"},
+            },
+        ]
+        with patch("backend.agent.harness_audit.list_trace_events", return_value=events):
+            report = build_audit_report("t3")
+        self.assertEqual(report["status"], "warning")
+        codes = {item["code"] for item in report["issues"]}
+        self.assertIn("MISSING_FINISH_EVENT", codes)
 
 
 if __name__ == "__main__":

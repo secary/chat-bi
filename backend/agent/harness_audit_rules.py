@@ -17,6 +17,7 @@ def evaluate_audit_rules(events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     authorized = _count(events, "agent.harness", "action_authorized")
     executed = _count(events, "agent.harness", "action_executing")
     observations = _count(events, "agent.harness", "observation_built")
+    finishes = _count(events, "agent.harness", "finish_emitted")
 
     if schema_rejects:
         issues.append(
@@ -42,6 +43,10 @@ def evaluate_audit_rules(events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         issues.append(
             _issue("MISSING_OBSERVATION", "error", "存在工具执行，但未记录 observation。")
         )
+    if executed and not finishes:
+        issues.append(
+            _issue("MISSING_FINISH_EVENT", "warning", "存在执行记录，但未看到 finish 事件。")
+        )
     if authorized == 0:
         issues.append(_issue("NO_AUTHORIZED_ACTION", "warning", "未发现 Harness 放行记录。"))
     if _repeated_executions(events):
@@ -57,8 +62,12 @@ def _repeated_executions(events: List[Dict[str, Any]]) -> bool:
         if event["span_name"] != "agent.harness" or event["event_name"] != "action_executing":
             continue
         payload = event.get("payload") or {}
-        key = (int(payload.get("step") or 0), str(payload.get("skill") or ""))
-        if key in seen and key[1]:
+        key = (
+            int(payload.get("step") or 0),
+            int(payload.get("task_index") or -1),
+            str(payload.get("skill") or ""),
+        )
+        if key in seen and key[2]:
             return True
         seen.add(key)
     return False

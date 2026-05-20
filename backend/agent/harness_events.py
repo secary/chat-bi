@@ -8,21 +8,11 @@ from backend.trace import log_event
 
 
 def log_harness_validated(trace_id: str, state: HarnessState, action: HarnessAction) -> None:
-    log_event(
-        trace_id,
-        "agent.harness",
-        "action_validated",
-        payload=_payload(state, action),
-    )
+    _emit_harness_event(trace_id, state, "action_validated", action=action)
 
 
 def log_harness_authorized(trace_id: str, state: HarnessState, action: HarnessAction) -> None:
-    log_event(
-        trace_id,
-        "agent.harness",
-        "action_authorized",
-        payload=_payload(state, action),
-    )
+    _emit_harness_event(trace_id, state, "action_authorized", action=action)
 
 
 def log_harness_rejected(
@@ -52,9 +42,13 @@ def log_harness_executing(
     action: HarnessAction,
     args: List[str],
 ) -> None:
-    payload = _payload(state, action)
-    payload["args"] = args
-    log_event(trace_id, "agent.harness", "action_executing", payload=payload)
+    _emit_harness_event(
+        trace_id,
+        state,
+        "action_executing",
+        action=action,
+        extras={"args": args},
+    )
 
 
 def log_harness_observation(
@@ -66,25 +60,138 @@ def log_harness_observation(
     result_kind: str = "",
     error: str = "",
 ) -> None:
-    payload = _payload(state, None)
-    payload.update(
-        {
-            "skill": skill_name,
-            "ok": ok,
-            "result_kind": result_kind,
-        }
-    )
+    payload = {
+        "skill": skill_name,
+        "ok": ok,
+        "result_kind": result_kind,
+    }
     if error:
         payload["error"] = error
-    log_event(trace_id, "agent.harness", "observation_built", payload=payload)
+    _emit_harness_event(
+        trace_id,
+        state,
+        "observation_built",
+        extras=payload,
+    )
 
 
 def log_harness_finish(trace_id: str, state: HarnessState, action: HarnessAction) -> None:
-    log_event(
+    _emit_harness_event(
         trace_id,
-        "agent.harness",
+        state,
         "finish_emitted",
-        payload=_payload(state, action),
+        action=action,
+    )
+
+
+def log_harness_multi_batch_validated(
+    trace_id: str,
+    state: HarnessState,
+    *,
+    round_index: int,
+    task_count: int,
+    agent_ids: List[str],
+) -> None:
+    _emit_harness_event(
+        trace_id,
+        state,
+        "action_validated",
+        extras={
+            "action": "delegate_tasks",
+            "round": round_index,
+            "task_count": task_count,
+            "agent_ids": agent_ids,
+        },
+    )
+
+
+def log_harness_multi_batch_authorized(
+    trace_id: str,
+    state: HarnessState,
+    *,
+    round_index: int,
+    task_count: int,
+    agent_ids: List[str],
+) -> None:
+    _emit_harness_event(
+        trace_id,
+        state,
+        "action_authorized",
+        extras={
+            "action": "delegate_tasks",
+            "round": round_index,
+            "task_count": task_count,
+            "agent_ids": agent_ids,
+        },
+    )
+
+
+def log_harness_multi_task_executing(
+    trace_id: str,
+    state: HarnessState,
+    *,
+    round_index: int,
+    task_index: int,
+    agent_id: str,
+    handoff_instruction: str,
+    depends_on: Optional[int],
+) -> None:
+    extras: Dict[str, Any] = {
+        "action": "run_specialist",
+        "round": round_index,
+        "task_index": task_index,
+        "agent_id": agent_id,
+        "skill": f"specialist:{agent_id}",
+        "handoff_preview": handoff_instruction[:160],
+    }
+    if depends_on is not None:
+        extras["depends_on"] = depends_on
+    _emit_harness_event(trace_id, state, "action_executing", extras=extras)
+
+
+def log_harness_multi_task_observation(
+    trace_id: str,
+    state: HarnessState,
+    *,
+    round_index: int,
+    task_index: int,
+    agent_id: str,
+    observation: str,
+    last_skill_name: Optional[str],
+    ok: bool = True,
+) -> None:
+    _emit_harness_event(
+        trace_id,
+        state,
+        "observation_built",
+        extras={
+            "action": "run_specialist",
+            "round": round_index,
+            "task_index": task_index,
+            "agent_id": agent_id,
+            "skill": last_skill_name or f"specialist:{agent_id}",
+            "ok": ok,
+            "observation_preview": observation[:240],
+        },
+    )
+
+
+def log_harness_multi_finish(
+    trace_id: str,
+    state: HarnessState,
+    *,
+    block_count: int,
+    round_count: int,
+) -> None:
+    _emit_harness_event(
+        trace_id,
+        state,
+        "finish_emitted",
+        extras={
+            "action": "finish",
+            "block_count": block_count,
+            "round_count": round_count,
+        },
     )
 
 
@@ -106,3 +213,17 @@ def _payload(state: HarnessState, action: Optional[HarnessAction]) -> Dict[str, 
         if action.thought:
             payload["thought_preview"] = action.thought[:160]
     return payload
+
+
+def _emit_harness_event(
+    trace_id: str,
+    state: HarnessState,
+    event_name: str,
+    *,
+    action: Optional[HarnessAction] = None,
+    extras: Optional[Dict[str, Any]] = None,
+) -> None:
+    payload = _payload(state, action)
+    if extras:
+        payload.update(extras)
+    log_event(trace_id, "agent.harness", event_name, payload=payload)

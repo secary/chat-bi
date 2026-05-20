@@ -30,6 +30,8 @@ export interface UseChatReturn {
   loading: boolean;
   /** Last loaded message is user — assistant row not yet in DB (e.g. navigated away mid-stream). */
   assistantPending: boolean;
+  currentTraceId: string | null;
+  lastTraceId: string | null;
   sendMessage: (text: string, traceId?: string) => Promise<void>;
   abort: () => void;
 }
@@ -43,6 +45,8 @@ export function useChat(
 ): UseChatReturn {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
+  const [currentTraceId, setCurrentTraceId] = useState<string | null>(null);
+  const [lastTraceId, setLastTraceId] = useState<string | null>(null);
   const messagesRef = useRef(messages);
   const streamingRef = useRef(false);
   const currentTraceIdRef = useRef<string | null>(null);
@@ -51,6 +55,18 @@ export function useChat(
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
+
+  useEffect(() => {
+    return () => {
+      const tid = currentTraceIdRef.current;
+      if (tid) {
+        void abortChat(tid);
+      }
+      streamAbortRef.current?.abort();
+      streamAbortRef.current = null;
+      streamingRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (sessionId == null) {
@@ -159,6 +175,7 @@ export function useChat(
       try {
         const traceIdToUse = traceId || newTraceId();
         currentTraceIdRef.current = traceIdToUse;
+        setCurrentTraceId(traceIdToUse);
         const ac = new AbortController();
         streamAbortRef.current = ac;
         for await (const event of streamChat(
@@ -231,10 +248,14 @@ export function useChat(
           });
         }
       } finally {
+        if (currentTraceIdRef.current) {
+          setLastTraceId(currentTraceIdRef.current);
+        }
         streamAbortRef.current = null;
         streamingRef.current = false;
         setLoading(false);
         currentTraceIdRef.current = null;
+        setCurrentTraceId(null);
       }
     },
     [loading, sessionId, dbConnectionId, multiAgents],
@@ -248,7 +269,7 @@ export function useChat(
     streamAbortRef.current?.abort();
   }, []);
 
-  return { messages, loading, assistantPending, sendMessage, abort };
+  return { messages, loading, assistantPending, currentTraceId, lastTraceId, sendMessage, abort };
 }
 
 export function readMultiAgentsPreference(): boolean {

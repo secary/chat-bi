@@ -5,6 +5,15 @@ from __future__ import annotations
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from backend.agent.abort_async import ChatAbortedError
+from backend.agent.harness_events import (
+    log_harness_multi_batch_authorized,
+    log_harness_multi_batch_validated,
+    log_harness_multi_finish,
+    log_harness_multi_task_executing,
+    log_harness_multi_task_observation,
+    log_harness_rejected,
+)
+from backend.agent.harness_state import HarnessState
 from backend.agent.multi_agent_manager import call_manager_plan_llm, validate_and_order_tasks
 from backend.agent.multi_agent_messages import build_subtask_messages
 from backend.agent.multi_agent_registry import (
@@ -72,8 +81,16 @@ async def stream_chat_multi_agent(
     last_result: Optional[Dict[str, Any]] = None
     last_skill_name: Optional[str] = None
     all_skill_executions: List[Dict[str, Any]] = []
+    harness_state = HarnessState(
+        trace_id=trace_id,
+        user_text=_latest_user_question(messages),
+        max_steps=n_rounds,
+        session_id=session_id,
+        mode="multi",
+    )
 
     for rnd in range(1, n_rounds + 1):
+        harness_state.begin_step(rnd)
         if _is_aborted(trace_id):
             log_event(trace_id, "agent.multi", "aborted", level="INFO")
             yield {"type": "thinking", "content": "用户中止了查询。"}
@@ -95,6 +112,13 @@ async def stream_chat_multi_agent(
             yield {"type": "done", "content": None}
             return
         if not plan or not isinstance(plan, dict):
+            harness_state.record_rejection("Manager 未返回有效的多专线规划。")
+            log_harness_rejected(
+                trace_id,
+                harness_state,
+                category="schema_rejected",
+                reason="Manager 未返回有效的多专线规划。",
+            )
             if rnd == 1:
                 log_event(trace_id, "agent.multi", "fallback_single", level="INFO")
                 from backend.agent.runner import stream_chat as _single
@@ -137,6 +161,13 @@ async def stream_chat_multi_agent(
 
         ordered = validate_and_order_tasks(raw_tasks, cap)
         if ordered is None:
+            harness_state.record_rejection("Manager 子任务未通过 Harness 校验。")
+            log_harness_rejected(
+                trace_id,
+                harness_state,
+                category="policy_rejected",
+                reason="Manager 子任务未通过 Harness 校验。",
+            )
             if rnd == 1:
                 log_event(trace_id, "agent.multi", "fallback_single", level="INFO")
                 from backend.agent.runner import stream_chat as _single
@@ -155,6 +186,21 @@ async def stream_chat_multi_agent(
                 "content": "[Manager-规划] 子任务校验失败，按已有结果汇总。",
             }
             break
+        harness_state.record_accept()
+        log_harness_multi_batch_validated(
+            trace_id,
+            harness_state,
+            round_index=rnd,
+            task_count=len(ordered),
+            agent_ids=[str(task["agent_id"]) for _, task in ordered],
+        )
+        log_harness_multi_batch_authorized(
+            trace_id,
+            harness_state,
+            round_index=rnd,
+            task_count=len(ordered),
+            agent_ids=[str(task["agent_id"]) for _, task in ordered],
+        )
 
         if _is_aborted(trace_id):
             log_event(trace_id, "agent.multi", "aborted", level="INFO")
@@ -171,11 +217,27 @@ async def stream_chat_multi_agent(
             role = agent_role_prompt(agent_id)
             docs = skills_for_agent(agent_id)
             if not docs:
+                harness_state.record_rejection(f"{agent_id} 当前无可用技能。")
+                log_harness_rejected(
+                    trace_id,
+                    harness_state,
+                    category="policy_rejected",
+                    reason=f"{agent_id} 当前无可用技能。",
+                )
                 yield {"type": "thinking", "content": f"[{label}] 无可用技能，跳过。"}
                 continue
 
             dep = task.get("depends_on")
             prior = obs_by_idx.get(int(dep)) if type(dep) is int else None
+            log_harness_multi_task_executing(
+                trace_id,
+                harness_state,
+                round_index=rnd,
+                task_index=orig_idx,
+                agent_id=agent_id,
+                handoff_instruction=str(task["handoff_instruction"]),
+                depends_on=dep if type(dep) is int else None,
+            )
             sub_messages = build_subtask_messages(
                 messages,
                 str(task["handoff_instruction"]),
@@ -184,6 +246,7 @@ async def stream_chat_multi_agent(
             )
             sink: Dict[str, Any] = {}
             acc_text = ""
+            task_failed = False
 
             async for event in stream_specialist(
                 sub_messages,
@@ -219,6 +282,7 @@ async def stream_chat_multi_agent(
                     }
                     # Track skill-not-found errors for Manager re-planning
                     if "未找到技能" in err_content or "skill_not_in_line" in err_content:
+                        task_failed = True
                         skill_failure_this_batch = True
                         missing = err_content.split("未找到技能：")[-1].strip()
                         progress_lines.append(
@@ -264,8 +328,23 @@ async def stream_chat_multi_agent(
                         f"该专线不具备此技能。Manager 应在下一轮重新指派到拥有「{missing}」的专线。"
                     )
             if "skill_not_in_line" in obs:
+                task_failed = True
                 skill_failure_this_batch = True
             obs_by_idx[orig_idx] = obs
+            if isinstance(lsn, str) and lsn and isinstance(lr, dict):
+                harness_state.record_skill(lsn, lr)
+            else:
+                harness_state.record_accept()
+            log_harness_multi_task_observation(
+                trace_id,
+                harness_state,
+                round_index=rnd,
+                task_index=orig_idx,
+                agent_id=agent_id,
+                observation=obs,
+                last_skill_name=lsn if isinstance(lsn, str) and lsn else None,
+                ok=not task_failed,
+            )
             hi = str(task["handoff_instruction"])
             progress_lines.append(
                 f"[第{rnd}轮·{label}] 交办：{hi[:500]}\nObservation：{obs[:2000]}"
@@ -305,6 +384,12 @@ async def stream_chat_multi_agent(
                         "blocks": len(all_blocks),
                         "short_circuit": "auto_analysis_middleware",
                     },
+                )
+                log_harness_multi_finish(
+                    trace_id,
+                    harness_state,
+                    block_count=len(all_blocks),
+                    round_count=rnd,
                 )
                 yield {"type": "done", "content": None}
                 return
@@ -378,6 +463,12 @@ async def stream_chat_multi_agent(
     async for event in stream_result_events(skill_label, synth, merged):
         yield event
 
+    log_harness_multi_finish(
+        trace_id,
+        harness_state,
+        block_count=len(all_blocks),
+        round_count=min(n_rounds, max(1, len({block["round"] for block in all_blocks}))),
+    )
     log_event(
         trace_id,
         "agent.multi",

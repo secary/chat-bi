@@ -151,7 +151,6 @@ uv pip --python .venv/bin/python install -r requirements.txt
 - `test_chart_renderer.py::*`：图表渲染器缺 plan 字段时自动推断，空 rows 保持空 option。
 - `test_kpi_renderer.py::*`：KPI 卡片字段不匹配时回落到 default，字段精确命中时展示对应值。
 - `test_executor_file_ingestion_args.py::*`：文件导入执行参数优先提取上传路径，并可回退到最近一次用户上传文件。
-- `test_external_bank_demo_sql.py::*`：外部银行库 SQL 创建独立库、覆盖银行关联表、保留 ChatBI 兼容面和银行语义别名。
 
 ### Upload / Vision / Report
 

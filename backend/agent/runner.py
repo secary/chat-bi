@@ -166,7 +166,7 @@ async def _stream_chat_legacy(
     if should_skip_skill_for_message(user_text):
         log_event(trace_id, "agent.runner", "skip_skill_small_talk")
         _legacy_sink_write(result_sink, None, None)
-        yield {"type": "thinking", "content": "识别为简单话语，直接回复。"}
+        yield {"type": "thinking", "content": "正在准备回复..."}
         yield {"type": "text", "content": small_talk_reply(user_text)}
         yield {"type": "done", "content": None}
         return

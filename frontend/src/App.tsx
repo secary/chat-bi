@@ -10,6 +10,7 @@ import { LlmConfigPage } from './pages/LlmConfigPage';
 import { LoginPage } from './pages/LoginPage';
 import { UserAdminPage } from './pages/UserAdminPage';
 import { MultiAgentsAdminPage } from './pages/MultiAgentsAdminPage';
+import { HarnessAuditPage } from './pages/HarnessAuditPage';
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
               <Route path="/" element={<ChatPage />} />
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/multi-agents" element={<MultiAgentsAdminPage />} />
+              <Route path="/harness-audits" element={<HarnessAuditPage />} />
               <Route path="/skills" element={<SkillAdminPage />} />
               <Route path="/data-sources" element={<DataSourcesPage />} />
               <Route path="/llm" element={<LlmConfigPage />} />

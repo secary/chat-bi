@@ -19,7 +19,7 @@ output
 *.session.sql
 .pycache
 *.log
-.Ds_Store
+.DS_Store
 *.zip
 *.xlsx
 csv

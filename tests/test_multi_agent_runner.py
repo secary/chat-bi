@@ -1,0 +1,193 @@
+from __future__ import annotations
+
+import unittest
+from unittest.mock import AsyncMock, MagicMock, patch
+
+from backend.agent.multi_agent_runner import stream_chat_multi_agent
+
+
+class MultiAgentRunnerHarnessTest(unittest.TestCase):
+    def test_multi_agent_logs_harness_events_for_specialist_round(self) -> None:
+        async def _run() -> None:
+            async def fake_specialist(*args, **kwargs):
+                sink = kwargs["result_sink"]
+                sink["last_result"] = {
+                    "kind": "table",
+                    "text": "sales ok",
+                    "data": {"rows": [{"区域": "华东", "销售额": 100}]},
+                }
+                sink["last_skill_name"] = "chatbi-semantic-query"
+                sink["skill_executions"] = [
+                    {
+                        "skill": "chatbi-semantic-query",
+                        "result": sink["last_result"],
+                        "observation": "查到 1 行结果。",
+                        "step": 1,
+                    }
+                ]
+                yield {"type": "thinking", "content": "开始查询"}
+
+            async def fake_stream_result_events(*args, **kwargs):
+                yield {"type": "text", "content": "最终结果"}
+
+            events = []
+            with (
+                patch(
+                    "backend.agent.multi_agent_runner.call_manager_plan_llm",
+                    new_callable=AsyncMock,
+                    return_value={
+                        "user_intent_summary": "问数",
+                        "decomposition_reason": "单专线处理即可",
+                        "finalize_after_this_batch": True,
+                        "tasks": [
+                            {
+                                "agent_id": "demo_query",
+                                "handoff_instruction": "查询 1-4 月各区域销售额",
+                                "depends_on": None,
+                            }
+                        ],
+                    },
+                ),
+                patch(
+                    "backend.agent.multi_agent_runner.validate_and_order_tasks",
+                    return_value=[
+                        (
+                            0,
+                            {
+                                "agent_id": "demo_query",
+                                "handoff_instruction": "查询 1-4 月各区域销售额",
+                                "depends_on": None,
+                            },
+                        )
+                    ],
+                ),
+                patch(
+                    "backend.agent.multi_agent_runner.skills_for_agent",
+                    return_value=[MagicMock()],
+                ),
+                patch(
+                    "backend.agent.multi_agent_runner.agent_label",
+                    return_value="问数专线",
+                ),
+                patch(
+                    "backend.agent.multi_agent_runner.agent_role_prompt",
+                    return_value="你是问数专线",
+                ),
+                patch(
+                    "backend.agent.multi_agent_runner.stream_specialist",
+                    side_effect=fake_specialist,
+                ),
+                patch(
+                    "backend.agent.multi_agent_runner.call_summarize_llm",
+                    new_callable=AsyncMock,
+                    return_value={"text": "最终结果"},
+                ),
+                patch(
+                    "backend.agent.multi_agent_runner.stream_result_events",
+                    side_effect=fake_stream_result_events,
+                ),
+                patch(
+                    "backend.agent.abort_state.is_aborted",
+                    return_value=False,
+                ),
+                patch(
+                    "backend.agent.harness_events.log_event",
+                    side_effect=lambda trace_id, span_name, event_name, **kwargs: events.append(
+                        {
+                            "trace_id": trace_id,
+                            "span_name": span_name,
+                            "event_name": event_name,
+                            "payload": kwargs.get("payload") or {},
+                        }
+                    ),
+                ),
+            ):
+                got = []
+                async for event in stream_chat_multi_agent(
+                    [{"role": "user", "content": "1-4 月各区域销售额排行"}],
+                    trace_id="t-multi",
+                ):
+                    got.append(event)
+
+            self.assertEqual(got[-1]["type"], "done")
+            harness_events = [
+                (item["event_name"], item["payload"].get("action"))
+                for item in events
+                if item["span_name"] == "agent.harness"
+            ]
+            self.assertIn(("action_validated", "delegate_tasks"), harness_events)
+            self.assertIn(("action_authorized", "delegate_tasks"), harness_events)
+            self.assertIn(("action_executing", "run_specialist"), harness_events)
+            self.assertIn(("observation_built", "run_specialist"), harness_events)
+            self.assertIn(("finish_emitted", "finish"), harness_events)
+
+        import asyncio
+
+        asyncio.run(_run())
+
+    def test_multi_agent_invalid_tasks_log_rejection_and_fallback(self) -> None:
+        async def _run() -> None:
+            async def fake_single(*args, **kwargs):
+                yield {"type": "text", "content": "fallback"}
+                yield {"type": "done", "content": None}
+
+            events = []
+            with (
+                patch(
+                    "backend.agent.multi_agent_runner.call_manager_plan_llm",
+                    new_callable=AsyncMock,
+                    return_value={
+                        "user_intent_summary": "问数",
+                        "decomposition_reason": "invalid",
+                        "tasks": [{"agent_id": "demo_query"}],
+                    },
+                ),
+                patch(
+                    "backend.agent.multi_agent_runner.validate_and_order_tasks",
+                    return_value=None,
+                ),
+                patch(
+                    "backend.agent.abort_state.is_aborted",
+                    return_value=False,
+                ),
+                patch(
+                    "backend.agent.runner.stream_chat",
+                    side_effect=fake_single,
+                ),
+                patch(
+                    "backend.agent.harness_events.log_event",
+                    side_effect=lambda trace_id, span_name, event_name, **kwargs: events.append(
+                        {
+                            "trace_id": trace_id,
+                            "span_name": span_name,
+                            "event_name": event_name,
+                            "payload": kwargs.get("payload") or {},
+                        }
+                    ),
+                ),
+            ):
+                got = []
+                async for event in stream_chat_multi_agent(
+                    [{"role": "user", "content": "查销售额"}],
+                    trace_id="t-invalid",
+                ):
+                    got.append(event)
+
+            self.assertEqual(got[-2]["type"], "text")
+            self.assertEqual(got[-2]["content"], "fallback")
+            self.assertEqual(got[-1]["type"], "done")
+            rejected = [
+                item
+                for item in events
+                if item["span_name"] == "agent.harness" and item["event_name"] == "policy_rejected"
+            ]
+            self.assertEqual(len(rejected), 1)
+            self.assertIn("未通过 Harness 校验", rejected[0]["payload"].get("reason", ""))
+
+        import asyncio
+
+        asyncio.run(_run())
+
+
+if __name__ == "__main__":
+    unittest.main()

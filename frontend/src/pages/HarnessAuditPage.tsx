@@ -1,10 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { getHarnessAudit, listHarnessAuditCandidates } from '../api/client';
 import type { HarnessAuditCandidate, HarnessAuditReport } from '../types/admin';
 import { logger } from '../lib/logger';
 
 export function HarnessAuditPage() {
-  const [traceId, setTraceId] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTraceId = searchParams.get('trace_id') || '';
+  const initialTraceIdRef = useRef(initialTraceId || '');
+  const [traceId, setTraceId] = useState(initialTraceId);
   const [recent, setRecent] = useState<HarnessAuditCandidate[]>([]);
   const [report, setReport] = useState<HarnessAuditReport | null>(null);
   const [busy, setBusy] = useState(false);
@@ -25,12 +29,15 @@ export function HarnessAuditPage() {
     };
   }, []);
 
-  const inspect = async (nextTraceId: string) => {
+  const inspectTrace = useCallback(async (nextTraceId: string, updateUrl = true) => {
     const id = nextTraceId.trim();
     if (!id) return;
     setBusy(true);
     setError('');
     setTraceId(id);
+    if (updateUrl) {
+      setSearchParams({ trace_id: id });
+    }
     try {
       const data = await getHarnessAudit(id);
       setReport(data);
@@ -40,7 +47,16 @@ export function HarnessAuditPage() {
     } finally {
       setBusy(false);
     }
-  };
+  }, [setSearchParams]);
+
+  useEffect(() => {
+    const incoming = initialTraceIdRef.current;
+    if (!incoming) return;
+    queueMicrotask(() => {
+      void inspectTrace(incoming, false);
+      initialTraceIdRef.current = '';
+    });
+  }, [inspectTrace]);
 
   return (
     <div className="flex h-full flex-col gap-4 overflow-auto p-6 lg:p-8">
@@ -63,7 +79,7 @@ export function HarnessAuditPage() {
             type="button"
             className="rounded-lg bg-accent px-4 py-2 text-sm text-white disabled:opacity-50"
             disabled={busy || !traceId.trim()}
-            onClick={() => void inspect(traceId)}
+            onClick={() => void inspectTrace(traceId)}
           >
             {busy ? '分析中…' : '查看审计'}
           </button>
@@ -80,7 +96,7 @@ export function HarnessAuditPage() {
                 <button
                   type="button"
                   className="w-full rounded-lg border border-gray-100 px-3 py-2 text-left text-xs hover:bg-gray-50"
-                  onClick={() => void inspect(item.trace_id)}
+                  onClick={() => void inspectTrace(item.trace_id)}
                 >
                   <div className="truncate font-mono text-gray-800">{item.trace_id}</div>
                   <div className="mt-1 text-gray-400">events: {item.event_count}</div>

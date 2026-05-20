@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   readMultiAgentsPreference,
   readSidebarOpenPreference,
@@ -26,8 +27,11 @@ import {
   resolveInitialSessionId,
   writeLastSessionId,
 } from '../lib/sessionSelection';
+import { useAuth } from '../contexts/useAuth';
 
 export function ChatPage() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const bottomRef = useRef<HTMLDivElement>(null);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [suggestedPrompts, setSuggestedPrompts] = useState<string[]>([]);
@@ -38,13 +42,14 @@ export function ChatPage() {
   const [sidebarOpen, setSidebarOpen] = useState(() => readSidebarOpenPreference());
   const [pdfExporting, setPdfExporting] = useState(false);
 
-  const { messages, loading, assistantPending, sendMessage, abort } = useChat(
+  const { messages, loading, assistantPending, currentTraceId, lastTraceId, sendMessage, abort } = useChat(
     sessionId,
     dbConnId,
     multiAgents,
   );
   const inputBusy = loading || assistantPending;
   const showWelcome = shouldShowChatWelcomeView(booting, messages.length);
+  const inspectableTraceId = currentTraceId || lastTraceId;
 
   useEffect(() => {
     writeMultiAgentsPreference(multiAgents);
@@ -186,6 +191,26 @@ export function ChatPage() {
               }
             />
           </label>
+          {user?.role === 'admin' && inspectableTraceId ? (
+            <div className="ml-auto flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs text-gray-600">
+              <span className="text-gray-400">{currentTraceId ? '当前 trace' : '最近 trace'}</span>
+              <button
+                type="button"
+                className="max-w-[260px] truncate font-mono text-gray-800 transition-colors hover:text-accent"
+                title={inspectableTraceId}
+                onClick={() => navigate(`/harness-audits?trace_id=${encodeURIComponent(inspectableTraceId)}`)}
+              >
+                {inspectableTraceId}
+              </button>
+              <button
+                type="button"
+                className="rounded-md border border-gray-200 bg-white px-2 py-0.5 text-[11px] text-gray-700 transition-colors hover:bg-gray-100"
+                onClick={() => navigate(`/harness-audits?trace_id=${encodeURIComponent(inspectableTraceId)}`)}
+              >
+                去审计
+              </button>
+            </div>
+          ) : null}
         </header>
 
         {booting ? (

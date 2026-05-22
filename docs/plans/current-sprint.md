@@ -33,7 +33,7 @@
 ## 当前约定
 
 - `.venv` 由 `uv sync` 按 `pyproject.toml` + `uv.lock` 管理；`requires-python = ">=3.11"`。
-- `requirements.txt` 仅保留给 Docker/CI 兼容；新增 Python 依赖必须同步 `pyproject.toml`、`requirements.txt`，再执行 `uv lock`。
+- 新增 Python 依赖只改 `pyproject.toml`，再执行 `uv lock`；Docker/CI 同样使用 `uv sync --frozen`。
 - `bootstrap_dev.sh` 默认只配 Git hooks 和检查状态；不会自动跑 formatter。
 - 代码改动后显式跑 `scripts/format_code.py` 或 `bootstrap_dev.sh --format`，再跑相关测试套件。
 - 仅文档/说明改动不跑测试，只做必要自查。
@@ -50,7 +50,6 @@
 | 编号 | Gap                                                                                               | 下一步                                                                                             |
 | ---- | ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
 | G1   | 首次切到双实例拓扑时，旧 named volume / 宿主机目录不会自动迁移或重放初始化 SQL | 如需拿到纯净演示库与纯日志库，执行对应 compose 的 `down -v` 后再重新 `up -d --build` |
-| G2   | Python 依赖存在 `pyproject.toml` 与 `requirements.txt` 双事实源                                   | 新增依赖时同步两处；长期可考虑 Docker/CI 也切到 `uv sync` 后移除双写                               |
 | G3   | 在线 E2E 不进默认 CI，依赖 LLM / DB / 后端运行状态                                                | 后端和 LLM 可用时跑 `python scripts/e2e_smoke.py --cases S1,S4,E1` 或按需全量                      |
 | G4   | 上传文件复杂跨字段分析 / 风控建议仍偏轻量规则                                                     | 如要增强，新增上传数据分析或风控建议 Skill，不复用演示库 decision-advisor                          |
 | G5   | `docs/architecture/README.md` 等专题文档可能仍滞后于 guide / backend-architecture                 | 改动相关模块时顺手同步；主用户/技术文档在 `docs/guide/`，后端专题见 `docs/backend-architecture.md` |
@@ -59,6 +58,9 @@
 
 | 轮次 | 完成内容                                                                                                                                                                                                                                                                                                                                                                                                                              | 验证                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 185  | 将 Python 依赖管理彻底收敛到 `uv`：CI、`backend/Dockerfile` 与 Dependabot Python 生态全部切换到 `uv sync --frozen` / `package-ecosystem: uv`，并删除仓库里的 `requirements.txt`，把 Python 事实源从 `pyproject.toml`、`uv.lock`、`requirements.txt` 收敛为前两者 | 配置自查：确认 CI、Docker、Dependabot 均不再引用 `requirements.txt`；确认 `AGENTS.md` 与相关文档已改为 `uv` 单工作流说明 |
+| 184  | 继续补供应链防线：新增 `dependency-review.yml` PR 工作流和 `.github/dependency-review-config.yml`，在每次非草稿 PR 中检查新增/升级依赖的高危漏洞、运行时作用域和 OpenSSF Scorecard 信号；同时在 `AGENTS.md` 补充必须由仓库管理员在 GitHub Settings 中手动开启的 Dependency graph、Dependabot alerts/security updates、Secret scanning 与 required status check 要求 | 配置自查：确认 `Dependency Review` 工作流仅在 PR 触发；确认配置文件已指向高危运行时依赖阻断策略，并在 `AGENTS.md` 标明哪些能力无法仅靠仓库文件自动开启 |
+| 183  | 引入仓库级 Dependabot：新增 `.github/dependabot.yml`，按周检查根目录 Python、`frontend/` npm、GitHub Actions 与 Docker 依赖更新，并控制 PR 上限、标签和提交前缀；同时在 `AGENTS.md` 补充供应链与依赖更新说明，方便后续在线协作和仓库维护 | 配置自查：确认 `.github/dependabot.yml` 语法与目录路径匹配当前清单文件；确认 `AGENTS.md` 已标注 Python 多事实源下的 Dependabot 使用注意事项 |
 | 182  | 合并重复的测试自定义 agent：将原有 `test-case-generator.agent.md` 的细化测试流程吸收进 `testing-specialist.agent.md`，并删除旧文件，避免 GitHub 在线模式下出现两个职责高度重叠的测试 agent 选项 | 文档与配置自查：确认 `.github/agents/` 下仅保留一个测试 agent，且说明覆盖测试补充、注册、格式化、执行与失败诊断流程 |
 | 181  | 为 GitHub 在线协作补齐仓库级 agent 配置：新增 `.github/copilot-instructions.md` 作为在线模式通用说明，并新增 `testing-specialist.agent.md`、`docs-specialist.agent.md` 两个仓库内自定义 agent，同时把入口写回 `AGENTS.md`，方便在 GitHub 上直接选择测试或文档专职 agent 执行任务 | 文档与配置自查：确认 `.github/agents/*.agent.md`、`.github/copilot-instructions.md`、`AGENTS.md` 路径与说明互相一致 |
 | 180  | 继续调整审计页桌面端布局：将 Debug 时间线从审计结果内部彻底拆为右侧独立诊断卡片，与左侧“审计结果”卡同级并排、等高拉伸；同时给 Debug 卡增加淡蓝渐变底、强调边框和更像控制台的标题区，让它与普通白色信息卡形成明确区分 | `cd frontend && npm run lint -- src/pages/HarnessAuditPage.tsx src/components/HarnessDebugTimeline.tsx src/components/HarnessBusinessFlowCard.tsx` |

@@ -20,6 +20,7 @@ ChatBI 是银行场景的对话式数据分析 Demo，支持中文问数、语�
 | 当前迭代 | docs/plans/current-sprint.md |
 | 设计 | docs/design/ |
 | GitHub 在线 Agent | .github/copilot-instructions.md、.github/agents/ |
+| 依赖安全 | .github/dependabot.yml、.github/workflows/ |
 
 ## 快速进入
 - 首次或依赖变动：`bash scripts/bootstrap_dev.sh --sync`
@@ -34,8 +35,8 @@ ChatBI 是银行场景的对话式数据分析 Demo，支持中文问数、语�
 - 单文件不超过 300 行；新功能必须补测试并注册到 `scripts/run_tests.py` 的 `MODULE_SUITES`。
 - 禁止 `console.log`；前端 API 统一走 `apiClient`，禁止裸 `fetch()`。
 - Python 测试优先用 `.venv/bin/python`；本地环境默认 `.env.dev` 优先，其次 `.env`。
-- `.venv` 由 `uv sync` 按 `pyproject.toml` + `uv.lock` 管理；`requirements.txt` 仅兼容 Docker/CI。
-- 新增 Python 依赖必须同步 `pyproject.toml`、`requirements.txt`，再执行 `uv lock`。
+- `.venv` 由 `uv sync` 按 `pyproject.toml` + `uv.lock` 管理。
+- 新增 Python 依赖只改 `pyproject.toml`，再执行 `uv lock`。
 - Skill 新增/删除只改 `skills/<skill-name>/SKILL.md` 与可选 `scripts/`；问数/决策脚本只执行 `SELECT`。
 - 代码改动后跑 `scripts/format_code.py` 和相关测试套件；仅文档/说明改动不跑测试，只做必要自查。
 - 完成任务后更新 `docs/plans/current-sprint.md` 的 Gap 记录。
@@ -45,3 +46,11 @@ ChatBI 是银行场景的对话式数据分析 Demo，支持中文问数、语�
 - 测试专职 Agent：`.github/agents/testing-specialist.agent.md`
 - 文档专职 Agent：`.github/agents/docs-specialist.agent.md`
 - 若在 GitHub 在线模式分派任务，优先按职责选择对应 agent，避免测试和文档职责混改。
+
+## 依赖与供应链
+- 已接入 Dependabot 配置：`.github/dependabot.yml`，覆盖 Python、npm、GitHub Actions、Docker。
+- 已接入 PR 依赖审查：`.github/workflows/dependency-review.yml` + `.github/dependency-review-config.yml`。
+- Dependabot 主要降低“已知漏洞依赖长期不更新”和“Action / 基础镜像版本漂移”风险，不等于完全防止供应链投毒。
+- Python 依赖现已收敛为 `pyproject.toml` + `uv.lock` 双事实源；处理 Dependabot Python PR 时要确认 manifest 与 lockfile 一致更新。
+- 需要仓库管理员在 GitHub Settings 里确认 4 个开关已开启：Dependency graph、Dependabot alerts、Dependabot security updates、Secret scanning。
+- 如果要真正形成门禁，把 `Dependency Review` 工作流设为受保护分支的 required status check；否则它只会报警，不会阻止合并。

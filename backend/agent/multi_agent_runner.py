@@ -8,6 +8,7 @@ from backend.agent.abort_async import ChatAbortedError
 from backend.agent.harness_events import (
     log_harness_multi_batch_authorized,
     log_harness_multi_batch_validated,
+    log_harness_decision_content_audit,
     log_harness_multi_finish,
     log_harness_multi_summary_dependency_unmet,
     log_harness_multi_task_executing,
@@ -33,6 +34,7 @@ from backend.agent.skill_history import (
     merge_results_for_finish,
 )
 from backend.agent.formatter import stream_result_events
+from backend.agent.decision_content_audit import audit_decision_result
 from backend.agent.runner import stream_specialist
 from backend.agent.data_source_intent import resolve_data_source
 from backend.trace import log_event
@@ -75,9 +77,30 @@ def _harness_observation_metadata(result: Optional[Dict[str, Any]]) -> Dict[str,
         metadata["status"] = data["status"]
     if isinstance(data.get("row_count"), int):
         metadata["row_count"] = data["row_count"]
+    plan_summary = data.get("plan_summary")
+    if isinstance(plan_summary, dict):
+        metadata["plan_summary"] = {
+            "metric": plan_summary.get("metric"),
+            "dimensions": plan_summary.get("dimensions"),
+            "time_filter": plan_summary.get("time_filter"),
+            "order_by_metric_desc": plan_summary.get("order_by_metric_desc"),
+            "limit": plan_summary.get("limit"),
+        }
+    if isinstance(result.get("chart_plan"), dict):
+        metadata["has_chart_plan"] = True
+    kpis = result.get("kpis")
+    if isinstance(kpis, list):
+        metadata["kpi_count"] = len(kpis)
+    if str(result.get("kind") or "") == "decision":
+        metadata["decision_content_audit"] = audit_decision_result(result)
     if isinstance(data.get("dashboard_middleware"), dict):
         metadata["dashboard_ready"] = True
     return metadata
+
+
+def _decision_audit_from_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
+    audit = metadata.get("decision_content_audit")
+    return audit if isinstance(audit, dict) else {}
 
 
 def _dependency_warning_from_observation(observation: str) -> str:
@@ -390,6 +413,7 @@ async def stream_chat_multi_agent(
             dependency_warning = _dependency_warning_from_observation(obs)
             if dependency_warning:
                 summary_dependency_warnings.append(f"{label}: {dependency_warning}")
+            metadata = _harness_observation_metadata(lr)
             log_harness_multi_task_observation(
                 trace_id,
                 harness_state,
@@ -404,8 +428,17 @@ async def stream_chat_multi_agent(
                 has_rows=has_rows,
                 has_auto_analysis=has_auto_analysis,
                 dependency_warning=dependency_warning,
-                metadata=_harness_observation_metadata(lr),
+                metadata=metadata,
             )
+            audit = _decision_audit_from_metadata(metadata)
+            if audit:
+                log_harness_decision_content_audit(
+                    trace_id,
+                    harness_state,
+                    skill_name=lsn if isinstance(lsn, str) and lsn else f"specialist:{agent_id}",
+                    audit=audit,
+                    agent_id=agent_id,
+                )
             hi = str(task["handoff_instruction"])
             progress_lines.append(
                 f"[第{rnd}轮·{label}] 交办：{hi[:500]}\nObservation：{obs[:2000]}"

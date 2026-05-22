@@ -19,7 +19,11 @@ def list_trace_events(trace_id: str, limit: int = 500) -> List[Dict[str, Any]]:
 def list_recent_trace_ids(limit: int = 20) -> List[Dict[str, Any]]:
     rows = log_fetch_all(
         f"SELECT trace_id, MAX(created_at) AS last_seen, COUNT(*) AS event_count "
-        f"FROM {TRACE_LOG} GROUP BY trace_id ORDER BY last_seen DESC LIMIT %s",
+        f"FROM {TRACE_LOG} GROUP BY trace_id "
+        f"HAVING SUM(CASE "
+        f"WHEN span_name = 'http.chat' "
+        f"THEN 1 ELSE 0 END) > 0 "
+        f"ORDER BY last_seen DESC LIMIT %s",
         (limit,),
     )
     return [

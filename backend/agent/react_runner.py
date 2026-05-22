@@ -5,6 +5,7 @@ import tempfile
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from backend.agent.context_window import build_react_context
+from backend.agent.decision_content_audit import audit_decision_result
 from backend.agent.executor import (
     find_skill,
     latest_user_upload_path,
@@ -15,6 +16,7 @@ from backend.agent.executor import (
 from backend.agent.formatter import stream_result_events
 from backend.agent.harness_events import (
     log_harness_authorized,
+    log_harness_decision_content_audit,
     log_harness_executing,
     log_harness_finish,
     log_harness_observation,
@@ -188,16 +190,37 @@ def _harness_observation_extras(result: Optional[Dict[str, Any]]) -> Dict[str, A
         extras["status"] = data["status"]
     if isinstance(data.get("row_count"), int):
         extras["row_count"] = data["row_count"]
+    plan_summary = data.get("plan_summary")
+    if isinstance(plan_summary, dict):
+        extras["plan_summary"] = {
+            "metric": plan_summary.get("metric"),
+            "dimensions": plan_summary.get("dimensions"),
+            "time_filter": plan_summary.get("time_filter"),
+            "order_by_metric_desc": plan_summary.get("order_by_metric_desc"),
+            "limit": plan_summary.get("limit"),
+        }
     rows = data.get("rows")
     if isinstance(rows, list):
         extras["has_rows"] = bool(rows)
         extras.setdefault("row_count", len(rows))
+    if isinstance(result.get("chart_plan"), dict):
+        extras["has_chart_plan"] = True
+    kpis = result.get("kpis")
+    if isinstance(kpis, list):
+        extras["kpi_count"] = len(kpis)
+    if str(result.get("kind") or "") == "decision":
+        extras["decision_content_audit"] = audit_decision_result(result)
     if isinstance(data.get("dashboard_middleware"), dict):
         extras["has_auto_analysis"] = True
         extras["dashboard_ready"] = True
     if isinstance(data.get("analysis_proposal"), dict):
         extras["has_auto_analysis"] = True
     return extras
+
+
+def _decision_audit_from_extras(extras: Dict[str, Any]) -> Dict[str, Any]:
+    audit = extras.get("decision_content_audit")
+    return audit if isinstance(audit, dict) else {}
 
 
 def _write_auto_analysis_payload(payload: Dict[str, Any]) -> str:
@@ -827,6 +850,15 @@ async def stream_chat_react(
                     result_kind=str(result.get("kind") or ""),
                     extras=_harness_observation_extras(result),
                 )
+                audit = _decision_audit_from_extras(_harness_observation_extras(result))
+                if audit:
+                    log_harness_decision_content_audit(
+                        trace_id,
+                        harness_state,
+                        skill_name=skill_name,
+                        audit=audit,
+                        agent_id=specialist_agent_id,
+                    )
                 yield {
                     "type": "thinking",
                     "content": "自动分析已生成结构化结果，正在展示...",
@@ -846,14 +878,24 @@ async def stream_chat_react(
                 yield {"type": "done", "content": None}
                 return
             obs = summarize_observation(skill_name, result)
+            extras = _harness_observation_extras(result)
             log_harness_observation(
                 trace_id,
                 harness_state,
                 skill_name=skill_name,
                 ok=True,
                 result_kind=str(result.get("kind") or ""),
-                extras=_harness_observation_extras(result),
+                extras=extras,
             )
+            audit = _decision_audit_from_extras(extras)
+            if audit:
+                log_harness_decision_content_audit(
+                    trace_id,
+                    harness_state,
+                    skill_name=skill_name,
+                    audit=audit,
+                    agent_id=specialist_agent_id,
+                )
         except Exception as exc:
             log_event(
                 trace_id,

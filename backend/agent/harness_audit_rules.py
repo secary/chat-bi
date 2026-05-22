@@ -21,6 +21,7 @@ def evaluate_audit_rules(events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     empty_specialist_outcomes = _empty_specialist_outcomes(events)
     dependency_warnings = _dependency_warnings(events)
     summary_dependency_unmet = _summary_dependency_unmet(events)
+    decision_content_issues = _decision_content_issues(events)
 
     if schema_rejects:
         issues.append(
@@ -74,6 +75,7 @@ def evaluate_audit_rules(events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 "Manager 在依赖未满足时仍进入了汇总阶段。",
             )
         )
+    issues.extend(decision_content_issues)
     if authorized == 0:
         issues.append(_issue("NO_AUTHORIZED_ACTION", "warning", "未发现 Harness 放行记录。"))
     if _repeated_executions(events):
@@ -145,3 +147,31 @@ def _summary_dependency_unmet(events: List[Dict[str, Any]]) -> bool:
 
 def _issue(code: str, level: str, message: str) -> Dict[str, Any]:
     return {"code": code, "level": level, "message": message}
+
+
+def _decision_content_issues(events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    found: List[Dict[str, Any]] = []
+    seen: set[str] = set()
+    for event in events:
+        if event["span_name"] != "agent.harness" or event["event_name"] != "observation_built":
+            continue
+        payload = event.get("payload") or {}
+        audit = payload.get("decision_content_audit")
+        if not isinstance(audit, dict):
+            continue
+        for item in audit.get("issues") or []:
+            if not isinstance(item, dict):
+                continue
+            code = str(item.get("code") or "").strip()
+            message = str(item.get("message") or "").strip()
+            if not code or code in seen:
+                continue
+            seen.add(code)
+            found.append(
+                _issue(
+                    code,
+                    str(item.get("level") or "warning"),
+                    message or "决策建议内容审核发现风险。",
+                )
+            )
+    return found

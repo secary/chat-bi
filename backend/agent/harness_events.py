@@ -87,6 +87,43 @@ def log_harness_finish(trace_id: str, state: HarnessState, action: HarnessAction
     )
 
 
+def log_harness_decision_content_audit(
+    trace_id: str,
+    state: HarnessState,
+    *,
+    skill_name: str,
+    audit: Dict[str, Any],
+    agent_id: str | None = None,
+) -> None:
+    issues = audit.get("issues") if isinstance(audit.get("issues"), list) else []
+    payload: Dict[str, Any] = {
+        "skill": skill_name,
+        "audit_status": str(audit.get("status") or "ok"),
+        "issue_count": int(audit.get("issue_count") or len(issues)),
+        "issue_codes": [
+            str(item.get("code") or "").strip()
+            for item in issues
+            if isinstance(item, dict) and str(item.get("code") or "").strip()
+        ][:8],
+    }
+    if agent_id:
+        payload["agent_id"] = agent_id
+    level = "WARN" if payload["issue_count"] else "INFO"
+    message = (
+        f"决策建议内容审核发现 {payload['issue_count']} 个问题。"
+        if payload["issue_count"]
+        else "决策建议内容审核通过。"
+    )
+    _emit_harness_event(
+        trace_id,
+        state,
+        "decision_content_audited",
+        extras=payload,
+        level=level,
+        message=message,
+    )
+
+
 def log_harness_multi_batch_validated(
     trace_id: str,
     state: HarnessState,
@@ -254,8 +291,10 @@ def _emit_harness_event(
     *,
     action: Optional[HarnessAction] = None,
     extras: Optional[Dict[str, Any]] = None,
+    level: str = "INFO",
+    message: str = "",
 ) -> None:
     payload = _payload(state, action)
     if extras:
         payload.update(extras)
-    log_event(trace_id, "agent.harness", event_name, payload=payload)
+    log_event(trace_id, "agent.harness", event_name, message=message, payload=payload, level=level)

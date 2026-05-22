@@ -38,6 +38,22 @@ describe('auditDebug', () => {
     expect(summary).toContain('skill=chatbi-decision-advisor');
   });
 
+  it('summarizes decision content audit event payload', () => {
+    const summary = summarizeAuditEvent(
+      makeEvent({
+        event_name: 'decision_content_audited',
+        payload: {
+          skill: 'chatbi-decision-advisor',
+          audit_status: 'ok',
+          issue_count: 0,
+        },
+      }),
+    );
+    expect(summary).toContain('skill=chatbi-decision-advisor');
+    expect(summary).toContain('audit=ok');
+    expect(summary).toContain('issues=0');
+  });
+
   it('filters events by payload or event metadata', () => {
     const events = [
       makeEvent({
@@ -77,5 +93,12 @@ describe('auditDebug', () => {
         message: 'x',
       }),
     ).toBe('summary_dependency_unmet');
+    expect(
+      keywordForIssue({
+        code: 'DECISION_ADVICE_NOT_GROUNDED',
+        level: 'warning',
+        message: 'x',
+      }),
+    ).toBe('decision_content_audited');
   });
 });

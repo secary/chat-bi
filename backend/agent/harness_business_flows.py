@@ -2,6 +2,11 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
+from backend.agent.harness_business_flows_decision import (
+    summarize_decision_content_audit_flow,
+)
+from backend.agent.harness_business_flows_semantic import summarize_semantic_query_flow
+
 _UPLOAD_SKILLS = {"chatbi-file-ingestion", "chatbi-auto-analysis"}
 
 
@@ -10,6 +15,12 @@ def summarize_business_flows(events: List[Dict[str, Any]]) -> List[Dict[str, Any
     upload_flow = _summarize_upload_analysis_flow(events)
     if upload_flow:
         flows.append(upload_flow)
+    semantic_query_flow = summarize_semantic_query_flow(events)
+    if semantic_query_flow:
+        flows.append(semantic_query_flow)
+    decision_content_flow = summarize_decision_content_audit_flow(events)
+    if decision_content_flow:
+        flows.append(decision_content_flow)
     return flows
 
 

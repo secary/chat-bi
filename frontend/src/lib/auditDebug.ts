@@ -27,12 +27,16 @@ export function summarizeAuditEvent(event: HarnessAuditEvent): string {
   const skill = toText(payload.skill);
   const reason = toText(payload.reason);
   const warning = toText(payload.dependency_warning);
+  const auditStatus = toText(payload.audit_status);
+  const issueCount = typeof payload.issue_count === 'number' ? payload.issue_count : null;
 
   if (action) parts.push(action);
   if (agentId) parts.push(`agent=${agentId}`);
   if (skill) parts.push(`skill=${skill}`);
   if (reason) parts.push(reason);
   if (warning) parts.push(warning);
+  if (auditStatus) parts.push(`audit=${auditStatus}`);
+  if (issueCount !== null) parts.push(`issues=${String(issueCount)}`);
 
   if (parts.length > 0) return parts.join(' · ');
   if (event.message) return event.message;
@@ -58,7 +62,8 @@ export function auditEventTone(event: HarnessAuditEvent): 'critical' | 'warning'
   }
   if (
     eventName.includes('summary_dependency_unmet') ||
-    eventName.includes('observation_built')
+    eventName.includes('observation_built') ||
+    eventName.includes('decision_content_audited')
   ) {
     return 'warning';
   }
@@ -76,6 +81,12 @@ export function keywordForIssue(issue: HarnessAuditIssue): string {
     EMPTY_SPECIALIST_OUTCOME: 'has_result false',
     DOWNSTREAM_DATA_MISSING: 'dependency_warning',
     SUMMARY_WITH_UNMET_DEPENDENCY: 'summary_dependency_unmet',
+    FACTS_MISSING_FOR_DECISION: 'decision_content_audited',
+    DECISION_ADVICE_EMPTY: 'decision_content_audited',
+    DECISION_ADVICE_INCOMPLETE: 'decision_content_audited',
+    DECISION_ADVICE_TOO_GENERIC: 'decision_content_audited',
+    DECISION_ADVICE_NOT_GROUNDED: 'decision_content_audited',
+    DECISION_SCOPE_MISMATCH: 'decision_content_audited',
   };
   return mapping[issue.code] || issue.code;
 }

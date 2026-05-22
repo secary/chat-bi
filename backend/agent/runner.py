@@ -300,6 +300,8 @@ async def stream_specialist(
     result_sink: Optional[Dict[str, Any]] = None,
     subagent_mode: bool = False,
     specialist_agent_id: Optional[str] = None,
+    initial_last_result: Optional[Dict[str, Any]] = None,
+    initial_last_skill_name: Optional[str] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """
     Runs one specialist pass for a single agent in multi-agent mode.
@@ -318,6 +320,8 @@ async def stream_specialist(
             result_sink=result_sink,
             subagent_react=subagent_mode,
             specialist_agent_id=specialist_agent_id,
+            initial_last_result=initial_last_result,
+            initial_last_skill_name=initial_last_skill_name,
         ):
             yield event
         return

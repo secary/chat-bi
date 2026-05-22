@@ -147,6 +147,8 @@ async def stream_chat_multi_agent(
     n_rounds = max_manager_rounds()
     all_blocks: List[Dict[str, str]] = []
     progress_lines: List[str] = []
+    obs_by_idx: Dict[int, str] = {}
+    result_by_idx: Dict[int, Dict[str, Any]] = {}
     last_result: Optional[Dict[str, Any]] = None
     last_skill_name: Optional[str] = None
     all_skill_executions: List[Dict[str, Any]] = []
@@ -278,7 +280,6 @@ async def stream_chat_multi_agent(
             yield {"type": "done", "content": None}
             return
 
-        obs_by_idx: Dict[int, str] = {}
         skill_failure_this_batch = False
         batch_data_intent = resolve_data_source(messages)
         for orig_idx, task in ordered:
@@ -299,6 +300,7 @@ async def stream_chat_multi_agent(
 
             dep = task.get("depends_on")
             prior = obs_by_idx.get(int(dep)) if type(dep) is int else None
+            prior_state = result_by_idx.get(int(dep)) if type(dep) is int else None
             log_harness_multi_task_executing(
                 trace_id,
                 harness_state,
@@ -329,6 +331,17 @@ async def stream_chat_multi_agent(
                 result_sink=sink,
                 subagent_mode=True,
                 specialist_agent_id=agent_id,
+                initial_last_result=(
+                    prior_state.get("last_result")
+                    if isinstance(prior_state, dict)
+                    and isinstance(prior_state.get("last_result"), dict)
+                    else None
+                ),
+                initial_last_skill_name=(
+                    str(prior_state.get("last_skill_name") or "")
+                    if isinstance(prior_state, dict) and prior_state.get("last_skill_name")
+                    else None
+                ),
             ):
                 if _is_aborted(trace_id):
                     log_event(trace_id, "agent.multi", "aborted", level="INFO")
@@ -367,6 +380,11 @@ async def stream_chat_multi_agent(
                 last_result = lr
             if isinstance(lsn, str) and lsn:
                 last_skill_name = lsn
+            if isinstance(lr, dict):
+                result_by_idx[orig_idx] = {
+                    "last_result": lr,
+                    "last_skill_name": lsn if isinstance(lsn, str) and lsn else None,
+                }
             executions = get_skill_executions(sink)
             if executions:
                 all_skill_executions.extend(executions)

@@ -349,6 +349,8 @@ async def stream_chat_react(
     subagent_react: bool = False,
     specialist_agent_id: Optional[str] = None,
     session_id: Optional[int] = None,
+    initial_last_result: Optional[Dict[str, Any]] = None,
+    initial_last_skill_name: Optional[str] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """
     ReAct multi-step agent loop.
@@ -418,8 +420,13 @@ async def stream_chat_react(
         session_id=session_id,
         mode="subagent" if subagent_react else "single",
     )
-    last_skill_name: Optional[str] = None
-    last_result: Optional[Dict[str, Any]] = None
+    harness_state.seed_last_result(initial_last_skill_name, initial_last_result)
+    last_skill_name: Optional[str] = (
+        initial_last_skill_name if isinstance(initial_last_result, dict) else None
+    )
+    last_result: Optional[Dict[str, Any]] = (
+        dict(initial_last_result) if isinstance(initial_last_result, dict) else None
+    )
     local_executions: List[Dict[str, Any]] = []
     called_skills: list[str] = []
     last_ingestion_rows: List[Dict[str, Any]] = list(cached_upload_rows)
@@ -526,6 +533,8 @@ async def stream_chat_react(
                 harness_state,
                 sorted(allowed_slugs),
                 messages=messages,
+                specialist_agent_id=specialist_agent_id if subagent_react else None,
+                preferred_skills=preferred_skill_slugs,
             )
             if not policy.ok:
                 harness_state.record_rejection(policy.reason)

@@ -30,6 +30,15 @@ def authorize_action(
     specialist_agent_id: Optional[str] = None,
     preferred_skills: Optional[Sequence[str]] = None,
 ) -> HarnessPolicyDecision:
+    if action.action == "finish":
+        finish_block = _finish_blocker(
+            action,
+            state,
+            specialist_agent_id=specialist_agent_id,
+        )
+        if finish_block is not None:
+            return finish_block
+        return HarnessPolicyDecision(ok=True)
     if action.action != "call_skill":
         return HarnessPolicyDecision(ok=True)
 
@@ -97,6 +106,34 @@ def _has_rows_result(state: HarnessState) -> bool:
     rows = data.get("rows")
     preview_rows = data.get("preview_rows")
     return _is_non_empty_list(rows) or _is_non_empty_list(preview_rows)
+
+
+def _has_decision_result(state: HarnessState) -> bool:
+    result = state.last_result
+    if not isinstance(result, dict):
+        return False
+    if state.last_skill_name == "chatbi-decision-advisor":
+        return True
+    return str(result.get("kind") or "") == "decision"
+
+
+def _finish_blocker(
+    action: HarnessAction,
+    state: HarnessState,
+    *,
+    specialist_agent_id: Optional[str],
+) -> HarnessPolicyDecision | None:
+    if specialist_agent_id != "business_advisor":
+        return None
+    if _has_decision_result(state):
+        return None
+    return HarnessPolicyDecision(
+        ok=False,
+        reason="business_advisor 不能在未执行 chatbi-decision-advisor 前直接 finish。",
+        suggested_text=(
+            "请先基于已有查询结果调用经营建议技能；若仍缺少结构化结果，请改派问数或上传分析专线。"
+        ),
+    )
 
 
 def _is_non_empty_list(value: object) -> bool:

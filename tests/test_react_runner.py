@@ -122,6 +122,57 @@ class ReactRunnerTest(unittest.TestCase):
 
         asyncio.run(run())
 
+    def test_business_advisor_uses_seeded_query_result_before_finish(self):
+        first = {
+            "action": "call_skill",
+            "skill": "chatbi-decision-advisor",
+            "skill_args": [],
+            "thought": "基于前置问数结果生成建议",
+        }
+        second = {
+            "action": "finish",
+            "text": "整理建议。",
+            "chart_plan": None,
+            "kpi_cards": [],
+        }
+        query_result = {
+            "kind": "table",
+            "text": "查询完成",
+            "data": {"rows": [{"区域": "华东", "毛利率": "21%"}]},
+        }
+        advice_result = {
+            "kind": "decision",
+            "text": "建议继续深耕华东。",
+            "data": {"advices": [{"title": "深耕华东"}]},
+        }
+
+        async def run():
+            cfg = replace(settings, agent_react=True, agent_max_steps=4)
+            with patch("backend.agent.react_runner.settings", cfg):
+                with patch(
+                    "backend.agent.react_runner.call_llm_for_react_step",
+                    new_callable=AsyncMock,
+                ) as mock_llm:
+                    mock_llm.side_effect = [first, second]
+                    with patch("backend.agent.react_runner.run_script") as mock_run:
+                        mock_run.return_value = advice_result
+                        events = await _collect(
+                            stream_chat_react(
+                                [{"role": "user", "content": "请给经营建议"}],
+                                trace_id="t-business-advisor",
+                                subagent_react=True,
+                                specialist_agent_id="business_advisor",
+                                skill_docs=scan_skills_enabled(settings.skills_dir),
+                                initial_last_result=query_result,
+                                initial_last_skill_name="chatbi-semantic-query",
+                            )
+                        )
+                        mock_run.assert_called_once()
+                        self.assertEqual(mock_llm.await_count, 2)
+                        self.assertTrue(any("深耕华东" in str(e.get("content")) for e in events))
+
+        asyncio.run(run())
+
     def test_harness_rejects_invalid_action_then_allows_finish(self):
         invalid = {
             "action": "launch_missile",

@@ -22,6 +22,16 @@ class HarnessState:
     def begin_step(self, step_index: int) -> None:
         self.step_index = step_index
 
+    def seed_last_result(
+        self,
+        skill_name: Optional[str],
+        result: Optional[Dict[str, Any]],
+    ) -> None:
+        if not isinstance(result, dict):
+            return
+        self.last_skill_name = skill_name
+        self.last_result = result
+
     def record_skill(self, skill_name: str, result: Dict[str, Any]) -> None:
         self.completed_skills.append(skill_name)
         self.last_skill_name = skill_name

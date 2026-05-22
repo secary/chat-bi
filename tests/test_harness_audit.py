@@ -244,6 +244,130 @@ class HarnessAuditTest(unittest.TestCase):
         self.assertEqual(step_map["auto_analysis"]["status"], "completed")
         self.assertEqual(step_map["dashboard_generation"]["status"], "completed")
 
+    def test_build_audit_report_includes_semantic_query_flow(self):
+        events = [
+            {
+                "span_name": "agent.harness",
+                "event_name": "action_executing",
+                "payload": {
+                    "step": 1,
+                    "skill": "chatbi-semantic-query",
+                },
+            },
+            {
+                "span_name": "agent.harness",
+                "event_name": "observation_built",
+                "payload": {
+                    "step": 1,
+                    "skill": "chatbi-semantic-query",
+                    "ok": True,
+                    "row_count": 4,
+                    "has_chart_plan": True,
+                    "kpi_count": 1,
+                    "plan_summary": {
+                        "metric": "销售额",
+                        "dimensions": ["区域"],
+                        "time_filter": "`order_date` >= '2026-01-01'",
+                        "order_by_metric_desc": True,
+                        "limit": None,
+                    },
+                },
+            },
+            {
+                "span_name": "agent.harness",
+                "event_name": "finish_emitted",
+                "payload": {"step": 1, "action": "finish"},
+            },
+        ]
+        with patch("backend.agent.harness_audit.list_trace_events", return_value=events):
+            report = build_audit_report("query-trace")
+        flows = {item["flow_key"]: item for item in report["business_flows"]}
+        query = flows["semantic_query"]
+        self.assertEqual(query["status"], "completed")
+        self.assertIn("图表或 KPI", query["summary"])
+        step_map = {step["key"]: step for step in query["steps"]}
+        self.assertEqual(step_map["semantic_match"]["status"], "completed")
+        self.assertEqual(step_map["query_plan"]["status"], "completed")
+        self.assertEqual(step_map["rows_ready"]["status"], "completed")
+        self.assertEqual(step_map["visual_output"]["status"], "completed")
+
+    def test_build_audit_report_flags_decision_content_risks(self):
+        events = [
+            {
+                "span_name": "agent.harness",
+                "event_name": "action_authorized",
+                "payload": {"step": 1, "skill": "chatbi-decision-advisor"},
+            },
+            {
+                "span_name": "agent.harness",
+                "event_name": "observation_built",
+                "payload": {
+                    "step": 1,
+                    "skill": "chatbi-decision-advisor",
+                    "ok": True,
+                    "decision_content_audit": {
+                        "status": "warning",
+                        "issue_count": 2,
+                        "issues": [
+                            {
+                                "code": "DECISION_ADVICE_TOO_GENERIC",
+                                "level": "warning",
+                                "message": "有 1 条建议表述偏泛，缺少明确对象或动作。",
+                            },
+                            {
+                                "code": "DECISION_ADVICE_NOT_GROUNDED",
+                                "level": "warning",
+                                "message": "有 1 条建议依据里缺少明显的业务事实证据。",
+                            },
+                        ],
+                    },
+                },
+            },
+            {
+                "span_name": "agent.harness",
+                "event_name": "finish_emitted",
+                "payload": {"step": 1, "action": "finish"},
+            },
+        ]
+        with patch("backend.agent.harness_audit.list_trace_events", return_value=events):
+            report = build_audit_report("decision-trace")
+        codes = {item["code"] for item in report["issues"]}
+        self.assertIn("DECISION_ADVICE_TOO_GENERIC", codes)
+        self.assertIn("DECISION_ADVICE_NOT_GROUNDED", codes)
+
+    def test_build_audit_report_includes_decision_content_audit_flow(self):
+        events = [
+            {
+                "span_name": "agent.harness",
+                "event_name": "observation_built",
+                "payload": {
+                    "step": 1,
+                    "skill": "chatbi-decision-advisor",
+                    "ok": True,
+                    "decision_content_audit": {
+                        "status": "ok",
+                        "issue_count": 0,
+                        "issues": [],
+                    },
+                },
+            },
+            {
+                "span_name": "agent.harness",
+                "event_name": "finish_emitted",
+                "payload": {"step": 1, "action": "finish"},
+            },
+        ]
+        with patch("backend.agent.harness_audit.list_trace_events", return_value=events):
+            report = build_audit_report("decision-audit-ok")
+        flows = {item["flow_key"]: item for item in report["business_flows"]}
+        audit = flows["decision_content_audit"]
+        self.assertEqual(audit["status"], "completed")
+        self.assertIn("未发现明显风险", audit["summary"])
+        step_map = {step["key"]: step for step in audit["steps"]}
+        self.assertEqual(step_map["facts_grounding"]["status"], "completed")
+        self.assertEqual(step_map["advice_quality"]["status"], "completed")
+        self.assertEqual(step_map["scope_consistency"]["status"], "completed")
+
 
 if __name__ == "__main__":
     unittest.main()

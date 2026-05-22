@@ -36,6 +36,7 @@ MODULE_SUITES: dict[str, list[str]] = {
         "tests/test_executor_run_script.py",
         "tests/test_run_tests_script.py",
         "tests/test_trace.py",
+        "tests/test_trace_repo.py",
     ],
     "skills": [
         "tests/test_auto_analysis_skill.py",
@@ -57,6 +58,7 @@ MODULE_SUITES: dict[str, list[str]] = {
         "tests/test_agent_workflow.py",
         "tests/test_chat_route_disconnect.py",
         "tests/test_data_source_intent.py",
+        "tests/test_decision_content_audit.py",
         "tests/test_harness_audit.py",
         "tests/test_harness_policy.py",
         "tests/test_multi_agent_registry.py",

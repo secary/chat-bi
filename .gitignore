@@ -8,6 +8,7 @@ database/mysql-data-*
 .codex
 
 *debug*
+!auditDebug*
 data/
 output
 .venv

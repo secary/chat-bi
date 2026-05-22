@@ -19,6 +19,7 @@ ChatBI 是银行场景的对话式数据分析 Demo，支持中文问数、语�
 | 测试/CI | docs/testing/README.md、docs/ci-cd/README.md |
 | 当前迭代 | docs/plans/current-sprint.md |
 | 设计 | docs/design/ |
+| GitHub 在线 Agent | .github/copilot-instructions.md、.github/agents/ |
 
 ## 快速进入
 - 首次或依赖变动：`bash scripts/bootstrap_dev.sh --sync`
@@ -38,3 +39,9 @@ ChatBI 是银行场景的对话式数据分析 Demo，支持中文问数、语�
 - Skill 新增/删除只改 `skills/<skill-name>/SKILL.md` 与可选 `scripts/`；问数/决策脚本只执行 `SELECT`。
 - 代码改动后跑 `scripts/format_code.py` 和相关测试套件；仅文档/说明改动不跑测试，只做必要自查。
 - 完成任务后更新 `docs/plans/current-sprint.md` 的 Gap 记录。
+
+## GitHub 在线协作
+- 仓库级 Copilot 在线说明：`.github/copilot-instructions.md`
+- 测试专职 Agent：`.github/agents/testing-specialist.agent.md`
+- 文档专职 Agent：`.github/agents/docs-specialist.agent.md`
+- 若在 GitHub 在线模式分派任务，优先按职责选择对应 agent，避免测试和文档职责混改。

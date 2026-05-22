@@ -184,6 +184,66 @@ class HarnessAuditTest(unittest.TestCase):
         self.assertIn("DOWNSTREAM_DATA_MISSING", codes)
         self.assertIn("SUMMARY_WITH_UNMET_DEPENDENCY", codes)
 
+    def test_build_audit_report_includes_upload_analysis_flow(self):
+        events = [
+            {
+                "span_name": "agent.harness",
+                "event_name": "action_executing",
+                "payload": {
+                    "step": 1,
+                    "skill": "chatbi-file-ingestion",
+                },
+            },
+            {
+                "span_name": "agent.harness",
+                "event_name": "observation_built",
+                "payload": {
+                    "step": 1,
+                    "skill": "chatbi-file-ingestion",
+                    "ok": True,
+                    "analysis_mode": "schema_validated",
+                    "row_count": 12,
+                    "has_rows": True,
+                },
+            },
+            {
+                "span_name": "agent.harness",
+                "event_name": "action_executing",
+                "payload": {
+                    "step": 2,
+                    "skill": "chatbi-auto-analysis",
+                },
+            },
+            {
+                "span_name": "agent.harness",
+                "event_name": "observation_built",
+                "payload": {
+                    "step": 2,
+                    "skill": "chatbi-auto-analysis",
+                    "ok": True,
+                    "status": "ready",
+                    "has_auto_analysis": True,
+                    "dashboard_ready": True,
+                },
+            },
+            {
+                "span_name": "agent.harness",
+                "event_name": "finish_emitted",
+                "payload": {"step": 2, "action": "finish"},
+            },
+        ]
+        with patch("backend.agent.harness_audit.list_trace_events", return_value=events):
+            report = build_audit_report("upload-trace")
+        flows = {item["flow_key"]: item for item in report["business_flows"]}
+        upload = flows["upload_analysis"]
+        self.assertEqual(upload["status"], "completed")
+        self.assertIn("看板结果已就绪", upload["summary"])
+        step_map = {step["key"]: step for step in upload["steps"]}
+        self.assertEqual(step_map["file_ingestion"]["status"], "completed")
+        self.assertEqual(step_map["schema_validation"]["status"], "completed")
+        self.assertEqual(step_map["auto_analysis"]["status"], "completed")
+        self.assertEqual(step_map["dashboard_generation"]["status"], "completed")
+
 
 if __name__ == "__main__":
     unittest.main()

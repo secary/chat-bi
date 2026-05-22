@@ -62,6 +62,24 @@ def _has_rows_result(result: Optional[Dict[str, Any]]) -> bool:
     return isinstance(data, dict) and isinstance(data.get("rows"), list) and bool(data["rows"])
 
 
+def _harness_observation_metadata(result: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    if not isinstance(result, dict):
+        return {}
+    data = result.get("data")
+    if not isinstance(data, dict):
+        return {}
+    metadata: Dict[str, Any] = {}
+    if isinstance(data.get("analysis_mode"), str):
+        metadata["analysis_mode"] = data["analysis_mode"]
+    if isinstance(data.get("status"), str):
+        metadata["status"] = data["status"]
+    if isinstance(data.get("row_count"), int):
+        metadata["row_count"] = data["row_count"]
+    if isinstance(data.get("dashboard_middleware"), dict):
+        metadata["dashboard_ready"] = True
+    return metadata
+
+
 def _dependency_warning_from_observation(observation: str) -> str:
     text = observation.strip()
     if not text:
@@ -386,6 +404,7 @@ async def stream_chat_multi_agent(
                 has_rows=has_rows,
                 has_auto_analysis=has_auto_analysis,
                 dependency_warning=dependency_warning,
+                metadata=_harness_observation_metadata(lr),
             )
             hi = str(task["handoff_instruction"])
             progress_lines.append(

@@ -175,6 +175,31 @@ def _is_terminal_auto_analysis_result(skill_name: str, result: Optional[Dict[str
     return str(data.get("status") or "") in {"need_confirmation", "ready"}
 
 
+def _harness_observation_extras(result: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    if not isinstance(result, dict):
+        return {}
+    data = result.get("data")
+    if not isinstance(data, dict):
+        return {}
+    extras: Dict[str, Any] = {}
+    if isinstance(data.get("analysis_mode"), str):
+        extras["analysis_mode"] = data["analysis_mode"]
+    if isinstance(data.get("status"), str):
+        extras["status"] = data["status"]
+    if isinstance(data.get("row_count"), int):
+        extras["row_count"] = data["row_count"]
+    rows = data.get("rows")
+    if isinstance(rows, list):
+        extras["has_rows"] = bool(rows)
+        extras.setdefault("row_count", len(rows))
+    if isinstance(data.get("dashboard_middleware"), dict):
+        extras["has_auto_analysis"] = True
+        extras["dashboard_ready"] = True
+    if isinstance(data.get("analysis_proposal"), dict):
+        extras["has_auto_analysis"] = True
+    return extras
+
+
 def _write_auto_analysis_payload(payload: Dict[str, Any]) -> str:
     handle = tempfile.NamedTemporaryFile(
         "w",
@@ -800,6 +825,7 @@ async def stream_chat_react(
                     skill_name=skill_name,
                     ok=True,
                     result_kind=str(result.get("kind") or ""),
+                    extras=_harness_observation_extras(result),
                 )
                 yield {
                     "type": "thinking",
@@ -826,6 +852,7 @@ async def stream_chat_react(
                 skill_name=skill_name,
                 ok=True,
                 result_kind=str(result.get("kind") or ""),
+                extras=_harness_observation_extras(result),
             )
         except Exception as exc:
             log_event(

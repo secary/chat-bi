@@ -136,12 +136,28 @@ export interface HarnessAuditEvent {
   created_at: string;
 }
 
+export interface HarnessBusinessFlowStep {
+  key: string;
+  label: string;
+  status: string;
+  detail: string;
+}
+
+export interface HarnessBusinessFlowCard {
+  flow_key: string;
+  title: string;
+  status: string;
+  summary: string;
+  steps: HarnessBusinessFlowStep[];
+}
+
 export interface HarnessAuditReport {
   trace_id: string;
   status: string;
   score: number;
   summary: string;
   issues: HarnessAuditIssue[];
+  business_flows: HarnessBusinessFlowCard[];
   events: HarnessAuditEvent[];
   event_count: number;
 }

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
+from backend.agent.harness_business_flows import summarize_business_flows
 from backend.agent.harness_audit_rules import evaluate_audit_rules
 from backend.trace_repo import list_recent_trace_ids, list_trace_events
 
@@ -9,6 +10,7 @@ from backend.trace_repo import list_recent_trace_ids, list_trace_events
 def build_audit_report(trace_id: str) -> Dict[str, Any]:
     events = list_trace_events(trace_id)
     issues = evaluate_audit_rules(events)
+    business_flows = summarize_business_flows(events)
     status = _status_for_issues(issues)
     return {
         "trace_id": trace_id,
@@ -16,6 +18,7 @@ def build_audit_report(trace_id: str) -> Dict[str, Any]:
         "score": _score_for_issues(issues),
         "summary": _summary(status, issues),
         "issues": issues,
+        "business_flows": business_flows,
         "events": events,
         "event_count": len(events),
     }

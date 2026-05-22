@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { getHarnessAudit, listHarnessAuditCandidates } from '../api/client';
+import { HarnessBusinessFlowCardView } from '../components/HarnessBusinessFlowCard';
 import type { HarnessAuditCandidate, HarnessAuditReport } from '../types/admin';
 import {
   auditEventTone,
@@ -136,15 +137,9 @@ export function HarnessAuditPage() {
                 <span className="rounded-full bg-gray-100 px-3 py-1 font-mono text-xs text-gray-700">
                   {report.trace_id}
                 </span>
-                <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700">
-                  状态：{report.status}
-                </span>
-                <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700">
-                  评分：{report.score}
-                </span>
-                <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700">
-                  events：{report.event_count}
-                </span>
+                <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700">状态：{report.status}</span>
+                <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700">评分：{report.score}</span>
+                <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700">events：{report.event_count}</span>
                 <button
                   type="button"
                   className="rounded-full border border-gray-200 px-3 py-1 text-xs text-gray-700 hover:bg-gray-50"
@@ -154,6 +149,12 @@ export function HarnessAuditPage() {
                 </button>
               </div>
               <p className="text-gray-600">{report.summary}</p>
+              {report.business_flows.length > 0 ? (
+                <div>
+                  <p className="mb-2 text-xs font-semibold tracking-wide text-gray-500">业务链路状态</p>
+                  <div className="space-y-3">{report.business_flows.map((flow) => <HarnessBusinessFlowCardView key={flow.flow_key} flow={flow} />)}</div>
+                </div>
+              ) : null}
               <div>
                 <p className="mb-2 text-xs font-semibold tracking-wide text-gray-500">问题列表</p>
                 {report.issues.length === 0 ? (

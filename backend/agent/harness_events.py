@@ -59,6 +59,7 @@ def log_harness_observation(
     ok: bool,
     result_kind: str = "",
     error: str = "",
+    extras: Optional[Dict[str, Any]] = None,
 ) -> None:
     payload = {
         "skill": skill_name,
@@ -67,6 +68,8 @@ def log_harness_observation(
     }
     if error:
         payload["error"] = error
+    if extras:
+        payload.update(extras)
     _emit_harness_event(
         trace_id,
         state,
@@ -164,8 +167,9 @@ def log_harness_multi_task_observation(
     has_rows: bool = False,
     has_auto_analysis: bool = False,
     dependency_warning: str = "",
+    metadata: Optional[Dict[str, Any]] = None,
 ) -> None:
-    extras: Dict[str, Any] = {
+    payload: Dict[str, Any] = {
         "action": "run_specialist",
         "round": round_index,
         "task_index": task_index,
@@ -178,10 +182,12 @@ def log_harness_multi_task_observation(
         "has_auto_analysis": has_auto_analysis,
     }
     if result_kind:
-        extras["result_kind"] = result_kind
+        payload["result_kind"] = result_kind
     if dependency_warning:
-        extras["dependency_warning"] = dependency_warning[:200]
-    _emit_harness_event(trace_id, state, "observation_built", extras=extras)
+        payload["dependency_warning"] = dependency_warning[:200]
+    if metadata:
+        payload.update(metadata)
+    _emit_harness_event(trace_id, state, "observation_built", extras=payload)
 
 
 def log_harness_multi_finish(

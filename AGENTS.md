@@ -49,8 +49,8 @@ ChatBI 是银行场景的对话式数据分析 Demo，支持中文问数、语�
 
 ## 依赖与供应链
 - 已接入 Dependabot 配置：`.github/dependabot.yml`，覆盖 Python、npm、GitHub Actions、Docker。
-- 已接入 PR 依赖审查：`.github/workflows/dependency-review.yml` + `.github/dependency-review-config.yml`。
+- 已接入 PR 供应链检查：`.github/workflows/dependency-review.yml`，其中 Python 走 `uv export --frozen` + `pip-audit`，前端走 `npm audit --audit-level=high`。
 - Dependabot 主要降低“已知漏洞依赖长期不更新”和“Action / 基础镜像版本漂移”风险，不等于完全防止供应链投毒。
 - Python 依赖现已收敛为 `pyproject.toml` + `uv.lock` 双事实源；处理 Dependabot Python PR 时要确认 manifest 与 lockfile 一致更新。
 - 需要仓库管理员在 GitHub Settings 里确认 4 个开关已开启：Dependency graph、Dependabot alerts、Dependabot security updates、Secret scanning。
-- 如果要真正形成门禁，把 `Dependency Review` 工作流设为受保护分支的 required status check；否则它只会报警，不会阻止合并。
+- 如果要真正形成门禁，把 `Supply Chain Audit` 工作流设为受保护分支的 required status check；否则它只会报警，不会阻止合并。

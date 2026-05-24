@@ -11,6 +11,20 @@ from typing import Any, Dict, List
 from backend.report.pdf_summary import _markdown_to_html, summarize_session_for_pdf
 
 
+def _has_weasyprint_cjk_font() -> bool:
+    """Return whether the runtime can provide a CJK-capable font for WeasyPrint."""
+    try:
+        from backend.report.pdf_chart_png import _select_sans_fonts
+        from matplotlib import font_manager
+    except Exception:
+        return False
+
+    installed = {font.name for font in font_manager.fontManager.ttflist}
+    picked = _select_sans_fonts(installed)
+    # DejaVu Sans alone is not enough for the Chinese text used in our PDF export.
+    return any(name != "DejaVu Sans" for name in picked)
+
+
 def _chart_to_png_bytes(chart: Any) -> bytes | None:
     from backend.report.pdf_chart_png import echarts_option_to_png_bytes
 
@@ -128,6 +142,8 @@ def render_session_pdf_bytes(messages: List[Dict[str, Any]], session_title: str)
     """Return PDF bytes, fallback to ReportLab when WeasyPrint fails."""
     html_doc = messages_to_html_document(messages, session_title or "ChatBI 会话报告")
     try:
+        if not _has_weasyprint_cjk_font():
+            raise RuntimeError("No CJK font available for WeasyPrint")
         from weasyprint import HTML
 
         return HTML(string=html_doc).write_pdf()

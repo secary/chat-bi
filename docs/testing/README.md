@@ -58,7 +58,7 @@ PYTHONPATH=. .venv/bin/python scripts/run_tests.py all --frontend
 
 ```bash
 uv pip --python .venv/bin/python show pytest pymysql
-uv pip --python .venv/bin/python install -r requirements.txt
+uv sync
 ```
 
 ## 模块套件

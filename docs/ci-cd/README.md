@@ -18,13 +18,13 @@ ChatBI 当前落地的是 CI 自动测试：同事开发前后端功能或修复
 
 - Ubuntu latest
 - Python 3.11
-- `requirements.txt`（pip 缓存加速）
+- `pyproject.toml` + `uv.lock`（使用 `uv sync --frozen`）
 - 系统依赖：`libpango-1.0-0`、`libpangoft2-1.0-0`（WeasyPrint PDF 生成）
 
 执行步骤：
 
 1. **Lint**：`ruff check` + `black --check`，规则配置见 `pyproject.toml`
-2. **pytest**：`python scripts/run_tests.py all -- -q`
+2. **pytest**：`.venv/bin/python scripts/run_tests.py all -- -q`
 
 CI 环境关闭或降级外部依赖：
 

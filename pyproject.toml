@@ -6,7 +6,7 @@ dependencies = [
     "fastapi==0.136.1",
     "starlette==1.0.1",
     "uvicorn[standard]==0.46.0",
-    "sse-starlette==2.4.1",
+    "sse-starlette==3.4.4",
     "litellm==1.83.14",
     "pydantic==2.12.5",
     "python-dotenv==1.2.2",

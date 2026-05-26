@@ -4,11 +4,11 @@ updates:
   - package-ecosystem: "uv"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
       day: "monday"
       time: "09:00"
       timezone: "Asia/Shanghai"
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 1
     labels:
       - "dependencies"
       - "python"
@@ -23,11 +23,11 @@ updates:
   - package-ecosystem: "npm"
     directory: "/frontend"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
       day: "monday"
       time: "09:30"
       timezone: "Asia/Shanghai"
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 1
     labels:
       - "dependencies"
       - "frontend"
@@ -42,11 +42,11 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
       day: "tuesday"
       time: "09:00"
       timezone: "Asia/Shanghai"
-    open-pull-requests-limit: 2
+    open-pull-requests-limit: 1
     labels:
       - "dependencies"
       - "github-actions"
@@ -56,11 +56,11 @@ updates:
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
       day: "tuesday"
       time: "09:30"
       timezone: "Asia/Shanghai"
-    open-pull-requests-limit: 2
+    open-pull-requests-limit: 1
     labels:
       - "dependencies"
       - "docker"

@@ -4,6 +4,8 @@ import unittest
 from unittest.mock import patch
 
 from backend.agent.harness_audit import build_audit_report
+from backend.agent.harness_events import log_harness_decision_content_audit
+from backend.agent.harness_state import HarnessState
 
 
 class HarnessAuditTest(unittest.TestCase):
@@ -70,6 +72,59 @@ class HarnessAuditTest(unittest.TestCase):
             report = build_audit_report("t2")
         self.assertEqual(report["status"], "ok")
         self.assertEqual(report["score"], 100)
+
+    def test_log_harness_decision_content_audit_emits_full_audit_payload(self):
+        captured = {}
+        state = HarnessState(trace_id="t-audit", user_text="给建议", max_steps=4)
+        state.begin_step(2)
+        audit = {
+            "status": "warning",
+            "issue_count": 2,
+            "issues": [
+                {
+                    "code": "DECISION_ADVICE_TOO_GENERIC",
+                    "level": "warning",
+                    "message": "有 1 条建议表述偏泛，缺少明确对象或动作。",
+                },
+                {
+                    "code": "DECISION_ADVICE_NOT_GROUNDED",
+                    "level": "warning",
+                    "message": "有 1 条建议依据里缺少明显的业务事实证据。",
+                },
+            ],
+        }
+
+        def fake_log_event(trace_id, span_name, event_name, message="", payload=None, level="INFO"):
+            captured.update(
+                {
+                    "trace_id": trace_id,
+                    "span_name": span_name,
+                    "event_name": event_name,
+                    "message": message,
+                    "payload": payload or {},
+                    "level": level,
+                }
+            )
+
+        with patch("backend.agent.harness_events.log_event", side_effect=fake_log_event):
+            log_harness_decision_content_audit(
+                "t-audit",
+                state,
+                skill_name="chatbi-decision-advisor",
+                audit=audit,
+                agent_id="business_advisor",
+            )
+
+        self.assertEqual(captured["event_name"], "decision_content_audited")
+        self.assertEqual(captured["level"], "WARN")
+        self.assertEqual(captured["payload"]["audit_status"], "warning")
+        self.assertEqual(captured["payload"]["issue_count"], 2)
+        self.assertEqual(
+            captured["payload"]["issue_codes"],
+            ["DECISION_ADVICE_TOO_GENERIC", "DECISION_ADVICE_NOT_GROUNDED"],
+        )
+        self.assertEqual(captured["payload"]["agent_id"], "business_advisor")
+        self.assertEqual(captured["payload"]["decision_content_audit"], audit)
 
     def test_build_audit_report_flags_missing_finish(self):
         events = [

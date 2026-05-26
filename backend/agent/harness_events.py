@@ -96,15 +96,24 @@ def log_harness_decision_content_audit(
     agent_id: str | None = None,
 ) -> None:
     issues = audit.get("issues") if isinstance(audit.get("issues"), list) else []
+    audit_status = str(audit.get("status") or "ok")
+    issue_count = int(audit.get("issue_count") or len(issues))
     payload: Dict[str, Any] = {
         "skill": skill_name,
-        "audit_status": str(audit.get("status") or "ok"),
-        "issue_count": int(audit.get("issue_count") or len(issues)),
+        "audit_status": audit_status,
+        "issue_count": issue_count,
         "issue_codes": [
             str(item.get("code") or "").strip()
             for item in issues
             if isinstance(item, dict) and str(item.get("code") or "").strip()
         ][:8],
+        # Keep the full audit payload on the dedicated event so downstream
+        # readers can migrate off observation_built without losing detail.
+        "decision_content_audit": {
+            "status": audit_status,
+            "issue_count": issue_count,
+            "issues": issues,
+        },
     }
     if agent_id:
         payload["agent_id"] = agent_id

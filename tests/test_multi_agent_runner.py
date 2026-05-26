@@ -109,6 +109,9 @@ class MultiAgentRunnerHarnessTest(unittest.TestCase):
             ]
             self.assertFalse(any("开始查询" in item for item in thinking))
             self.assertFalse(any("问数专线" in item for item in thinking))
+            self.assertIn("正在理解问题...", thinking)
+            self.assertIn("正在处理信息...", thinking)
+            self.assertIn("正在整理答案...", thinking)
 
         import asyncio
 

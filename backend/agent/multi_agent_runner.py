@@ -260,6 +260,7 @@ async def stream_chat_multi_agent(
     summary_dependency_warnings: List[str] = []
     forced_followup_plan: Optional[Dict[str, Any]] = None
     controlled_intent = classify_multi_agent_intent(messages)
+    public_progress_emitted: set[str] = set()
     harness_state = HarnessState(
         trace_id=trace_id,
         user_text=_latest_user_question(messages),
@@ -267,6 +268,16 @@ async def stream_chat_multi_agent(
         session_id=session_id,
         mode="multi",
     )
+
+    def public_progress(key: str, content: str) -> Optional[Dict[str, str]]:
+        if key in public_progress_emitted:
+            return None
+        public_progress_emitted.add(key)
+        return {"type": "thinking", "content": content}
+
+    event = public_progress("understand", "正在理解问题...")
+    if event:
+        yield event
 
     for rnd in range(1, n_rounds + 1):
         harness_state.begin_step(rnd)
@@ -387,7 +398,9 @@ async def stream_chat_multi_agent(
                     category="policy_rejected",
                     reason=f"{agent_id} 当前无可用技能。",
                 )
-                yield {"type": "thinking", "content": f"[{label}] 无可用技能，跳过。"}
+                event = public_progress("retry", "正在调整处理方式...")
+                if event:
+                    yield event
                 continue
 
             dep = task.get("depends_on")
@@ -417,6 +430,9 @@ async def stream_chat_multi_agent(
             sink: Dict[str, Any] = {}
             acc_text = ""
             task_failed = False
+            event = public_progress("process", "正在处理信息...")
+            if event:
+                yield event
 
             async for event in stream_specialist(
                 sub_messages,
@@ -450,7 +466,7 @@ async def stream_chat_multi_agent(
                     err_content = str(event.get("content") or "")
                     yield {
                         "type": "thinking",
-                        "content": f"[{label}] 错误：{err_content}",
+                        "content": "处理时遇到问题，正在尝试调整...",
                     }
                     # Track skill-not-found errors for Manager re-planning
                     if "未找到技能" in err_content or "skill_not_in_line" in err_content:
@@ -657,6 +673,9 @@ async def stream_chat_multi_agent(
             harness_state,
             warnings=summary_dependency_warnings,
         )
+    event = public_progress("summarize", "正在整理答案...")
+    if event:
+        yield event
     try:
         synth = await call_summarize_llm(q, all_blocks, trace_id=trace_id)
     except ChatAbortedError:

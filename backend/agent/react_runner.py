@@ -337,6 +337,65 @@ def _force_subagent_converge_on_policy_reject(
     return f"本专线停止继续试错。{suggestion}"
 
 
+def _result_signature(result: Optional[Dict[str, Any]]) -> tuple[Any, ...]:
+    if not isinstance(result, dict):
+        return ()
+    data = result.get("data")
+    rows: List[Dict[str, Any]] = []
+    plan_summary: Dict[str, Any] = {}
+    if isinstance(data, dict):
+        raw_rows = data.get("rows")
+        if isinstance(raw_rows, list):
+            rows = [row for row in raw_rows[:3] if isinstance(row, dict)]
+        raw_plan = data.get("plan_summary")
+        if isinstance(raw_plan, dict):
+            plan_summary = raw_plan
+    row_keys = tuple(sorted(str(key) for row in rows for key in row.keys()))
+    row_values = tuple(tuple(sorted((str(k), str(v)) for k, v in row.items())) for row in rows)
+    return (
+        str(result.get("kind") or ""),
+        str(result.get("text") or "")[:240],
+        row_keys,
+        row_values,
+        str(plan_summary.get("metric") or ""),
+        tuple(str(item) for item in plan_summary.get("dimensions", []) or []),
+        str(plan_summary.get("time_filter") or ""),
+    )
+
+
+def _args_signature(args: List[str]) -> tuple[str, ...]:
+    return tuple(str(arg) for arg in args)
+
+
+def _should_stop_repeated_subagent_skill(
+    *,
+    subagent_react: bool,
+    skill_name: str,
+    args: List[str],
+    last_skill_name: Optional[str],
+    last_result: Optional[Dict[str, Any]],
+    repeated_skill_count: int,
+    previous_args_signature: tuple[str, ...],
+    previous_signature: tuple[Any, ...],
+) -> bool:
+    if not subagent_react:
+        return False
+    if skill_name != last_skill_name:
+        return False
+    if not previous_signature:
+        return False
+    current_args_signature = _args_signature(args)
+    if (
+        current_args_signature
+        and current_args_signature == previous_args_signature
+        and repeated_skill_count >= 1
+    ):
+        return True
+    if repeated_skill_count < 2:
+        return False
+    return previous_signature == _result_signature(last_result)
+
+
 async def stream_chat_react(
     messages: List[Dict[str, Any]],
     trace_id: str = "",
@@ -429,6 +488,9 @@ async def stream_chat_react(
     )
     local_executions: List[Dict[str, Any]] = []
     called_skills: list[str] = []
+    last_result_signature: tuple[Any, ...] = _result_signature(last_result)
+    last_skill_args_signature: tuple[str, ...] = ()
+    repeated_skill_count = 0
     last_ingestion_rows: List[Dict[str, Any]] = list(cached_upload_rows)
     last_ingestion_column_labels: Optional[Dict[str, Any]] = None
 
@@ -633,6 +695,39 @@ async def stream_chat_react(
             )
         if skill_name == "chatbi-chart-recommendation":
             args = _chart_recommendation_args(user_text, args, last_result)
+        if _should_stop_repeated_subagent_skill(
+            subagent_react=subagent_react,
+            skill_name=skill_name,
+            args=args,
+            last_skill_name=last_skill_name,
+            last_result=last_result,
+            repeated_skill_count=repeated_skill_count,
+            previous_args_signature=last_skill_args_signature,
+            previous_signature=last_result_signature,
+        ):
+            log_event(
+                trace_id,
+                "agent.runner",
+                "repeated_skill_converged",
+                payload={
+                    "mode": "react_subagent",
+                    "skill": skill_name,
+                    "agent_id": specialist_agent_id,
+                    "repeat_count": repeated_skill_count + 1,
+                },
+            )
+            yield {
+                "type": "thinking",
+                "content": "连续查询未获得新增信息，已基于当前结果交回路由层。",
+            }
+            merged = _finish_merged(
+                result_sink, plan, last_skill_name, last_result, local_executions
+            )
+            async for event in stream_result_events(last_skill_name or skill_name, plan, merged):
+                yield event
+            sync_skill_sink(result_sink, last_result, last_skill_name)
+            yield {"type": "done", "content": None}
+            return
         if _should_short_circuit_repeated_file_ingestion(
             skill_name,
             args,
@@ -767,10 +862,19 @@ async def stream_chat_react(
                     extra=skill_result_log_payload(result),
                 ),
             )
+            previous_skill_name = last_skill_name
             last_skill_name = skill_name
             last_result = result
             harness_state.record_skill(skill_name, result)
             called_skills.append(skill_name)
+            current_signature = _result_signature(result)
+            repeated_skill_count = (
+                repeated_skill_count + 1
+                if skill_name == previous_skill_name and current_signature == last_result_signature
+                else 1
+            )
+            last_result_signature = current_signature
+            last_skill_args_signature = _args_signature(args)
             record_skill_execution(result_sink, skill_name, result, step + 1)
             if result_sink is None:
                 local_executions.append(

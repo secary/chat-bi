@@ -215,6 +215,10 @@ class MultiAgentRunnerHarnessTest(unittest.TestCase):
                     },
                 ),
                 patch(
+                    "backend.agent.multi_agent_runner.classify_multi_agent_intent",
+                    return_value=None,
+                ),
+                patch(
                     "backend.agent.multi_agent_runner.validate_and_order_tasks",
                     return_value=[
                         (
@@ -432,6 +436,196 @@ class MultiAgentRunnerHarnessTest(unittest.TestCase):
                 captured["initial_last_result"]["data"]["rows"][0]["区域"],
                 "华东",
             )
+
+        import asyncio
+
+        asyncio.run(_run())
+
+    def test_multi_agent_harness_routes_query_result_to_business_advisor(self) -> None:
+        async def _run() -> None:
+            captured = {"agents": []}
+            events = []
+
+            async def fake_specialist(*args, **kwargs):
+                sink = kwargs["result_sink"]
+                agent_id = kwargs["specialist_agent_id"]
+                captured["agents"].append(agent_id)
+                if agent_id == "demo_query":
+                    sink["last_result"] = {
+                        "kind": "table",
+                        "text": "query ok",
+                        "data": {"rows": [{"区域": "华东", "销售额": "100", "毛利": "22"}]},
+                    }
+                    sink["last_skill_name"] = "chatbi-semantic-query"
+                    sink["skill_executions"] = [
+                        {
+                            "skill": "chatbi-semantic-query",
+                            "result": sink["last_result"],
+                            "observation": "查到 1 行结果。",
+                            "step": 1,
+                        }
+                    ]
+                else:
+                    captured["seed_result"] = kwargs.get("initial_last_result")
+                    captured["seed_skill_name"] = kwargs.get("initial_last_skill_name")
+                    sink["last_result"] = {
+                        "kind": "decision",
+                        "text": "建议聚焦华东。",
+                        "data": {
+                            "facts": {
+                                "overview": {
+                                    "sales": "100",
+                                    "target_achievement_rate": "88%",
+                                    "gross_margin_rate": "22%",
+                                }
+                            },
+                            "advices": [
+                                {
+                                    "decision": "聚焦华东",
+                                    "reason": "华东销售额100，毛利率22%。",
+                                    "actions": ["继续推进重点客户"],
+                                }
+                            ],
+                        },
+                    }
+                    sink["last_skill_name"] = "chatbi-decision-advisor"
+                    sink["skill_executions"] = [
+                        {
+                            "skill": "chatbi-decision-advisor",
+                            "result": sink["last_result"],
+                            "observation": "已生成经营建议。",
+                            "step": 1,
+                        }
+                    ]
+                yield {"type": "thinking", "content": "处理中"}
+
+            async def fake_stream_result_events(*args, **kwargs):
+                yield {"type": "text", "content": "最终结果"}
+
+            with (
+                patch(
+                    "backend.agent.multi_agent_runner.call_manager_plan_llm",
+                    new_callable=AsyncMock,
+                    return_value={
+                        "user_intent_summary": "先查数再给建议",
+                        "decomposition_reason": "先查数",
+                        "finalize_after_this_batch": True,
+                        "tasks": [
+                            {
+                                "agent_id": "demo_query",
+                                "handoff_instruction": "先查询华东近3个月销售和毛利",
+                                "depends_on": None,
+                            }
+                        ],
+                    },
+                ) as mock_manager,
+                patch(
+                    "backend.agent.multi_agent_runner.validate_and_order_tasks",
+                    side_effect=[
+                        [
+                            (
+                                0,
+                                {
+                                    "agent_id": "demo_query",
+                                    "handoff_instruction": "先查询华东近3个月销售和毛利",
+                                    "depends_on": None,
+                                },
+                            )
+                        ],
+                        [
+                            (
+                                0,
+                                {
+                                    "agent_id": "business_advisor",
+                                    "handoff_instruction": "基于前置问数结果直接生成经营建议，优先引用已有 rows 与结构化事实，不要重复问数；若事实不足，请明确指出缺口。",
+                                    "depends_on": None,
+                                },
+                            )
+                        ],
+                    ],
+                ),
+                patch(
+                    "backend.agent.multi_agent_runner.skills_for_agent",
+                    return_value=[MagicMock()],
+                ),
+                patch(
+                    "backend.agent.multi_agent_runner.agent_label",
+                    side_effect=lambda agent_id: agent_id,
+                ),
+                patch(
+                    "backend.agent.multi_agent_runner.agent_role_prompt",
+                    side_effect=lambda agent_id: f"你是 {agent_id}",
+                ),
+                patch(
+                    "backend.agent.multi_agent_runner.stream_specialist",
+                    side_effect=fake_specialist,
+                ),
+                patch(
+                    "backend.agent.multi_agent_runner.call_summarize_llm",
+                    new_callable=AsyncMock,
+                    return_value={"text": "最终结果"},
+                ),
+                patch(
+                    "backend.agent.multi_agent_runner.stream_result_events",
+                    side_effect=fake_stream_result_events,
+                ),
+                patch(
+                    "backend.agent.abort_state.is_aborted",
+                    return_value=False,
+                ),
+                patch(
+                    "backend.agent.harness_events.log_event",
+                    side_effect=lambda trace_id, span_name, event_name, **kwargs: events.append(
+                        {
+                            "trace_id": trace_id,
+                            "span_name": span_name,
+                            "event_name": event_name,
+                            "payload": kwargs.get("payload") or {},
+                        }
+                    ),
+                ),
+                patch(
+                    "backend.agent.multi_agent_runner.log_event",
+                    side_effect=lambda trace_id, span_name, event_name, **kwargs: events.append(
+                        {
+                            "trace_id": trace_id,
+                            "span_name": span_name,
+                            "event_name": event_name,
+                            "payload": kwargs.get("payload") or {},
+                        }
+                    ),
+                ),
+            ):
+                got = []
+                async for event in stream_chat_multi_agent(
+                    [{"role": "user", "content": "基于华东近3个月销售和毛利给经营建议"}],
+                    trace_id="t-route-handoff",
+                ):
+                    got.append(event)
+
+            self.assertEqual(got[-1]["type"], "done")
+            self.assertEqual(mock_manager.await_count, 0)
+            self.assertEqual(captured["agents"], ["demo_query", "business_advisor"])
+            self.assertEqual(captured["seed_skill_name"], "chatbi-semantic-query")
+            self.assertEqual(
+                captured["seed_result"]["data"]["rows"][0]["区域"],
+                "华东",
+            )
+            transitions = [
+                item
+                for item in events
+                if item["span_name"] == "agent.harness"
+                and item["event_name"] == "route_transition_selected"
+            ]
+            self.assertEqual(len(transitions), 1)
+            self.assertEqual(transitions[0]["payload"].get("to_agent"), "business_advisor")
+            completed = [
+                item
+                for item in events
+                if item["span_name"] == "agent.harness"
+                and item["event_name"] == "route_objective_completed"
+            ]
+            self.assertEqual(len(completed), 1)
 
         import asyncio
 

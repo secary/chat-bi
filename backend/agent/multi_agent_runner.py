@@ -1,4 +1,4 @@
-"""Multi-agent orchestration: Manager multi-round plan → specialists → synthesis."""
+"""Multi-agent orchestration: Manager first-route planning → audited route transitions."""
 
 from __future__ import annotations
 
@@ -16,6 +16,11 @@ from backend.agent.harness_events import (
     log_harness_rejected,
 )
 from backend.agent.harness_state import HarnessState
+from backend.agent.multi_agent_intent import (
+    build_initial_plan_from_intent,
+    build_next_plan_from_intent,
+    classify_multi_agent_intent,
+)
 from backend.agent.multi_agent_manager import call_manager_plan_llm, validate_and_order_tasks
 from backend.agent.multi_agent_messages import build_subtask_messages
 from backend.agent.multi_agent_registry import (
@@ -38,6 +43,18 @@ from backend.agent.decision_content_audit import audit_decision_result
 from backend.agent.runner import stream_specialist
 from backend.agent.data_source_intent import resolve_data_source
 from backend.trace import log_event
+
+_DECISION_ROUTE_KEYWORDS = (
+    "经营建议",
+    "建议",
+    "决策意见",
+    "管理建议",
+    "下一步动作",
+    "怎么做",
+)
+
+_ROUTE_SEED_AGENT_IDS = {"business_advisor", "viz_board"}
+_TERMINAL_ROUTE_AGENT_IDS = {"business_advisor"}
 
 
 def _latest_user_question(messages: List[Dict[str, str]]) -> str:
@@ -122,6 +139,97 @@ def _dependency_warning_from_observation(observation: str) -> str:
     return ""
 
 
+def _wants_decision_route(user_question: str) -> bool:
+    text = user_question.strip()
+    return bool(text) and any(keyword in text for keyword in _DECISION_ROUTE_KEYWORDS)
+
+
+def _has_decision_result(
+    result: Optional[Dict[str, Any]],
+    skill_name: Optional[str],
+) -> bool:
+    if not isinstance(result, dict):
+        return False
+    if skill_name == "chatbi-decision-advisor":
+        return True
+    return str(result.get("kind") or "") == "decision"
+
+
+def _build_audited_followup_plan(
+    *,
+    user_question: str,
+    all_blocks: List[Dict[str, str]],
+    last_result: Optional[Dict[str, Any]],
+    last_skill_name: Optional[str],
+    round_index: int,
+) -> Optional[Dict[str, Any]]:
+    if round_index <= 1:
+        return None
+    if not _wants_decision_route(user_question):
+        return None
+    if _has_decision_result(last_result, last_skill_name):
+        return None
+    if not _has_rows_result(last_result):
+        return None
+    if any(block.get("agent") == "business_advisor" for block in all_blocks):
+        return None
+    return {
+        "user_intent_summary": "基于现有事实生成经营建议",
+        "decomposition_reason": "Harness 多路由：问数结果已就绪，直接切换到经营建议专线。",
+        "tasks": [
+            {
+                "agent_id": "business_advisor",
+                "handoff_instruction": (
+                    "基于前置问数结果直接生成经营建议，优先引用已有 rows 与结构化事实，"
+                    "不要重复问数；若事实不足，请明确指出缺口。"
+                ),
+                "depends_on": None,
+            }
+        ],
+        "finalize_after_this_batch": True,
+        "routed_by": "harness",
+    }
+
+
+def _seed_result_for_route(
+    agent_id: str,
+    prior_state: Optional[Dict[str, Any]],
+    last_result: Optional[Dict[str, Any]],
+    last_skill_name: Optional[str],
+) -> tuple[Optional[Dict[str, Any]], Optional[str]]:
+    if isinstance(prior_state, dict):
+        prior_result = prior_state.get("last_result")
+        prior_skill = prior_state.get("last_skill_name")
+        return (
+            prior_result if isinstance(prior_result, dict) else None,
+            str(prior_skill) if isinstance(prior_skill, str) and prior_skill else None,
+        )
+    if agent_id in _ROUTE_SEED_AGENT_IDS and isinstance(last_result, dict):
+        return last_result, last_skill_name if isinstance(last_skill_name, str) else None
+    return None, None
+
+
+def _route_objective_completed(
+    *,
+    user_question: str,
+    all_blocks: List[Dict[str, str]],
+    last_result: Optional[Dict[str, Any]],
+    last_skill_name: Optional[str],
+    controlled_intent: Optional[Dict[str, Any]] = None,
+) -> bool:
+    if isinstance(controlled_intent, dict):
+        required = [
+            str(route)
+            for route in controlled_intent.get("required_routes", [])
+            if str(route).strip()
+        ]
+        completed = {str(block.get("agent") or "") for block in all_blocks}
+        return bool(required) and all(route in completed for route in required)
+    if _wants_decision_route(user_question) and _has_decision_result(last_result, last_skill_name):
+        return any(block.get("agent") in _TERMINAL_ROUTE_AGENT_IDS for block in all_blocks)
+    return False
+
+
 async def stream_chat_multi_agent(
     messages: List[Dict[str, str]],
     trace_id: str = "",
@@ -153,6 +261,13 @@ async def stream_chat_multi_agent(
     last_skill_name: Optional[str] = None
     all_skill_executions: List[Dict[str, Any]] = []
     summary_dependency_warnings: List[str] = []
+    forced_followup_plan: Optional[Dict[str, Any]] = None
+    controlled_intent = classify_multi_agent_intent(messages)
+    if (
+        isinstance(controlled_intent, dict)
+        and len(controlled_intent.get("required_routes", [])) <= 1
+    ):
+        controlled_intent = None
     harness_state = HarnessState(
         trace_id=trace_id,
         user_text=_latest_user_question(messages),
@@ -170,43 +285,84 @@ async def stream_chat_multi_agent(
             return
 
         digest = "\n\n".join(progress_lines)
-        try:
-            plan = await call_manager_plan_llm(
-                messages,
-                trace_id=trace_id,
-                round_index=rnd,
-                progress_digest=digest,
-                session_id=session_id,
-            )
-        except ChatAbortedError:
-            log_event(trace_id, "agent.multi", "aborted", level="INFO")
-            yield {"type": "thinking", "content": "用户中止了查询。"}
-            yield {"type": "done", "content": None}
-            return
-        if not plan or not isinstance(plan, dict):
-            harness_state.record_rejection("Manager 未返回有效的多专线规划。")
-            log_harness_rejected(
+        routed_by_harness = False
+        if forced_followup_plan is not None:
+            plan = forced_followup_plan
+            forced_followup_plan = None
+            routed_by_harness = True
+            log_event(
                 trace_id,
-                harness_state,
-                category="schema_rejected",
-                reason="Manager 未返回有效的多专线规划。",
+                "agent.harness",
+                "route_transition_selected",
+                payload={
+                    "mode": "multi",
+                    "step": rnd,
+                    "from_skill": last_skill_name,
+                    "to_agent": plan["tasks"][0]["agent_id"],
+                    "reason": plan.get("decomposition_reason"),
+                },
             )
-            if rnd == 1:
-                log_event(trace_id, "agent.multi", "fallback_single", level="INFO")
-                from backend.agent.runner import stream_chat as _single
-
-                async for event in _single(
+        elif rnd == 1 and controlled_intent is not None:
+            plan = build_initial_plan_from_intent(controlled_intent)
+            if not plan:
+                controlled_intent = None
+                continue
+            routed_by_harness = True
+            log_event(
+                trace_id,
+                "agent.harness",
+                "route_intent_classified",
+                payload={
+                    "mode": "multi",
+                    "step": rnd,
+                    "intent_type": controlled_intent.get("intent_type"),
+                    "required_routes": controlled_intent.get("required_routes"),
+                    "final_outputs": controlled_intent.get("final_outputs"),
+                    "summary": controlled_intent.get("summary"),
+                },
+            )
+        else:
+            try:
+                plan = await call_manager_plan_llm(
                     messages,
                     trace_id=trace_id,
-                    skill_db_overrides=skill_db_overrides,
-                    memory_block=memory_block,
-                    multi_agents=False,
-                ):
-                    yield event
+                    round_index=rnd,
+                    progress_digest=digest,
+                    session_id=session_id,
+                )
+            except ChatAbortedError:
+                log_event(trace_id, "agent.multi", "aborted", level="INFO")
+                yield {"type": "thinking", "content": "用户中止了查询。"}
+                yield {"type": "done", "content": None}
                 return
-            break
+            if not plan or not isinstance(plan, dict):
+                harness_state.record_rejection("Manager 未返回有效的多专线规划。")
+                log_harness_rejected(
+                    trace_id,
+                    harness_state,
+                    category="schema_rejected",
+                    reason="Manager 未返回有效的多专线规划。",
+                )
+                if rnd == 1:
+                    log_event(trace_id, "agent.multi", "fallback_single", level="INFO")
+                    from backend.agent.runner import stream_chat as _single
 
-        tag = f"[Manager-规划 R{rnd}]" if rnd > 1 else "[Manager-规划]"
+                    async for event in _single(
+                        messages,
+                        trace_id=trace_id,
+                        skill_db_overrides=skill_db_overrides,
+                        memory_block=memory_block,
+                        multi_agents=False,
+                    ):
+                        yield event
+                    return
+                break
+
+        tag = (
+            f"[Harness-路由 R{rnd}]"
+            if routed_by_harness
+            else (f"[Manager-规划 R{rnd}]" if rnd > 1 else "[Manager-规划]")
+        )
         dr = plan.get("decomposition_reason") or ""
         yield {
             "type": "thinking",
@@ -301,6 +457,12 @@ async def stream_chat_multi_agent(
             dep = task.get("depends_on")
             prior = obs_by_idx.get(int(dep)) if type(dep) is int else None
             prior_state = result_by_idx.get(int(dep)) if type(dep) is int else None
+            seeded_result, seeded_skill_name = _seed_result_for_route(
+                agent_id,
+                prior_state,
+                last_result,
+                last_skill_name,
+            )
             log_harness_multi_task_executing(
                 trace_id,
                 harness_state,
@@ -331,17 +493,8 @@ async def stream_chat_multi_agent(
                 result_sink=sink,
                 subagent_mode=True,
                 specialist_agent_id=agent_id,
-                initial_last_result=(
-                    prior_state.get("last_result")
-                    if isinstance(prior_state, dict)
-                    and isinstance(prior_state.get("last_result"), dict)
-                    else None
-                ),
-                initial_last_skill_name=(
-                    str(prior_state.get("last_skill_name") or "")
-                    if isinstance(prior_state, dict) and prior_state.get("last_skill_name")
-                    else None
-                ),
+                initial_last_result=seeded_result,
+                initial_last_skill_name=seeded_skill_name,
             ):
                 if _is_aborted(trace_id):
                     log_event(trace_id, "agent.multi", "aborted", level="INFO")
@@ -506,8 +659,52 @@ async def stream_chat_multi_agent(
                 yield {"type": "done", "content": None}
                 return
 
+        if _route_objective_completed(
+            user_question=harness_state.user_text,
+            all_blocks=all_blocks,
+            last_result=last_result,
+            last_skill_name=last_skill_name,
+            controlled_intent=controlled_intent,
+        ):
+            log_event(
+                trace_id,
+                "agent.harness",
+                "route_objective_completed",
+                payload={
+                    "mode": "multi",
+                    "step": rnd,
+                    "last_skill_name": last_skill_name,
+                    "completed_agents": [block.get("agent") for block in all_blocks],
+                },
+            )
+            yield {
+                "type": "thinking",
+                "content": "[Harness-路由] 经营建议已完成，直接进入汇总。",
+            }
+            break
+
         if rnd >= n_rounds:
             break
+        completed_agents = [str(block.get("agent") or "") for block in all_blocks]
+        if controlled_intent is not None:
+            forced_followup_plan = build_next_plan_from_intent(
+                controlled_intent,
+                completed_agents=completed_agents,
+            )
+        else:
+            forced_followup_plan = _build_audited_followup_plan(
+                user_question=harness_state.user_text,
+                all_blocks=all_blocks,
+                last_result=last_result,
+                last_skill_name=last_skill_name,
+                round_index=rnd + 1,
+            )
+        if forced_followup_plan is not None:
+            yield {
+                "type": "thinking",
+                "content": "[Harness-路由] 已满足前置条件，下一轮切换到下一条专线。",
+            }
+            continue
         fin = plan.get("finalize_after_this_batch")
         stop_planning = fin is None or bool(fin)
         if skill_failure_this_batch and rnd < n_rounds:

@@ -1,4 +1,4 @@
-"""Multi-agent orchestration: Manager first-route planning → audited route transitions."""
+"""Multi-agent orchestration: controlled intent routing → audited route transitions."""
 
 from __future__ import annotations
 
@@ -20,8 +20,9 @@ from backend.agent.multi_agent_intent import (
     build_initial_plan_from_intent,
     build_next_plan_from_intent,
     classify_multi_agent_intent,
+    route_sequence_from_intent,
 )
-from backend.agent.multi_agent_manager import call_manager_plan_llm, validate_and_order_tasks
+from backend.agent.multi_agent_manager import validate_and_order_tasks
 from backend.agent.multi_agent_messages import build_subtask_messages
 from backend.agent.multi_agent_registry import (
     agent_label,
@@ -218,11 +219,7 @@ def _route_objective_completed(
     controlled_intent: Optional[Dict[str, Any]] = None,
 ) -> bool:
     if isinstance(controlled_intent, dict):
-        required = [
-            str(route)
-            for route in controlled_intent.get("required_routes", [])
-            if str(route).strip()
-        ]
+        required = route_sequence_from_intent(controlled_intent)
         completed = {str(block.get("agent") or "") for block in all_blocks}
         return bool(required) and all(route in completed for route in required)
     if _wants_decision_route(user_question) and _has_decision_result(last_result, last_skill_name):
@@ -238,10 +235,10 @@ async def stream_chat_multi_agent(
     session_id: Optional[int] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """
-    Manager pattern (multi-round):
-      1. Manager LLM plans batch of subtasks (may repeat with Observation digest).
-      2. Each subtask runs stream_specialist (subagent ReAct / legacy).
-      3. Synthesis LLM merges all batches for the user.
+    Controlled multi-agent pattern:
+      1. Deterministic intent routing selects the current specialist route.
+      2. Harness generates and audits internal specialist tasks.
+      3. Synthesis LLM merges completed specialist observations for the user.
     """
     from backend.agent.abort_state import is_aborted as _is_aborted
 
@@ -263,11 +260,6 @@ async def stream_chat_multi_agent(
     summary_dependency_warnings: List[str] = []
     forced_followup_plan: Optional[Dict[str, Any]] = None
     controlled_intent = classify_multi_agent_intent(messages)
-    if (
-        isinstance(controlled_intent, dict)
-        and len(controlled_intent.get("required_routes", [])) <= 1
-    ):
-        controlled_intent = None
     harness_state = HarnessState(
         trace_id=trace_id,
         user_text=_latest_user_question(messages),
@@ -284,12 +276,9 @@ async def stream_chat_multi_agent(
             yield {"type": "done", "content": None}
             return
 
-        digest = "\n\n".join(progress_lines)
-        routed_by_harness = False
         if forced_followup_plan is not None:
             plan = forced_followup_plan
             forced_followup_plan = None
-            routed_by_harness = True
             log_event(
                 trace_id,
                 "agent.harness",
@@ -302,12 +291,10 @@ async def stream_chat_multi_agent(
                     "reason": plan.get("decomposition_reason"),
                 },
             )
-        elif rnd == 1 and controlled_intent is not None:
+        elif rnd == 1 and isinstance(controlled_intent, dict):
             plan = build_initial_plan_from_intent(controlled_intent)
             if not plan:
-                controlled_intent = None
-                continue
-            routed_by_harness = True
+                break
             log_event(
                 trace_id,
                 "agent.harness",
@@ -316,75 +303,28 @@ async def stream_chat_multi_agent(
                     "mode": "multi",
                     "step": rnd,
                     "intent_type": controlled_intent.get("intent_type"),
-                    "required_routes": controlled_intent.get("required_routes"),
+                    "current_route": controlled_intent.get("current_route"),
+                    "route_sequence": route_sequence_from_intent(controlled_intent),
                     "final_outputs": controlled_intent.get("final_outputs"),
                     "summary": controlled_intent.get("summary"),
                 },
             )
         else:
-            try:
-                plan = await call_manager_plan_llm(
-                    messages,
-                    trace_id=trace_id,
-                    round_index=rnd,
-                    progress_digest=digest,
-                    session_id=session_id,
-                )
-            except ChatAbortedError:
-                log_event(trace_id, "agent.multi", "aborted", level="INFO")
-                yield {"type": "thinking", "content": "用户中止了查询。"}
-                yield {"type": "done", "content": None}
-                return
-            if not plan or not isinstance(plan, dict):
-                harness_state.record_rejection("Manager 未返回有效的多专线规划。")
+            if rnd == 1:
+                harness_state.record_rejection("受控意图识别未命中多专线路由。")
                 log_harness_rejected(
                     trace_id,
                     harness_state,
-                    category="schema_rejected",
-                    reason="Manager 未返回有效的多专线规划。",
+                    category="intent_unmatched",
+                    reason="受控意图识别未命中多专线路由。",
                 )
-                if rnd == 1:
-                    log_event(trace_id, "agent.multi", "fallback_single", level="INFO")
-                    from backend.agent.runner import stream_chat as _single
-
-                    async for event in _single(
-                        messages,
-                        trace_id=trace_id,
-                        skill_db_overrides=skill_db_overrides,
-                        memory_block=memory_block,
-                        multi_agents=False,
-                    ):
-                        yield event
-                    return
-                break
-
-        tag = (
-            f"[Harness-路由 R{rnd}]"
-            if routed_by_harness
-            else (f"[Manager-规划 R{rnd}]" if rnd > 1 else "[Manager-规划]")
-        )
-        dr = plan.get("decomposition_reason") or ""
-        yield {
-            "type": "thinking",
-            "content": f"{tag} {dr}".strip() or f"{tag} 已完成子任务编排。",
-        }
-        summary = plan.get("user_intent_summary")
-        if isinstance(summary, str) and summary.strip():
-            yield {"type": "thinking", "content": f"{tag} 意图：{summary.strip()}"}
+            break
 
         raw_tasks = plan.get("tasks") if isinstance(plan.get("tasks"), list) else []
         if rnd > 1:
             if not raw_tasks and bool(plan.get("ready_for_final_answer")):
-                yield {
-                    "type": "thinking",
-                    "content": "[Manager-规划] 不再派发子任务，进入汇总。",
-                }
                 break
             if not raw_tasks:
-                yield {
-                    "type": "thinking",
-                    "content": "[Manager-规划] 本轮未给出子任务，进入汇总。",
-                }
                 break
 
         ordered = validate_and_order_tasks(raw_tasks, cap)
@@ -409,10 +349,6 @@ async def stream_chat_multi_agent(
                 ):
                     yield event
                 return
-            yield {
-                "type": "thinking",
-                "content": "[Manager-规划] 子任务校验失败，按已有结果汇总。",
-            }
             break
         harness_state.record_accept()
         log_harness_multi_batch_validated(
@@ -503,8 +439,7 @@ async def stream_chat_multi_agent(
                     return
                 et = event.get("type")
                 if et == "thinking":
-                    c = str(event.get("content") or "")
-                    yield {"type": "thinking", "content": f"[{label}] {c}"}
+                    pass
                 elif et == "text":
                     acc_text += str(event.get("content") or "")
                 elif et == "chart":
@@ -625,10 +560,6 @@ async def stream_chat_multi_agent(
             )
 
             if _has_structured_auto_analysis(last_result):
-                yield {
-                    "type": "thinking",
-                    "content": "[Manager-汇总] 已生成结构化分析中间件，直接输出。",
-                }
                 merged_auto = merge_results_for_finish(
                     all_skill_executions or get_skill_executions(sink),
                     {},
@@ -638,6 +569,7 @@ async def stream_chat_multi_agent(
                     last_skill_name or "chatbi-auto-analysis",
                     {},
                     merged_auto if merged_auto else (last_result or {}),
+                    include_thinking=False,
                 ):
                     yield event
                 log_event(
@@ -677,10 +609,6 @@ async def stream_chat_multi_agent(
                     "completed_agents": [block.get("agent") for block in all_blocks],
                 },
             )
-            yield {
-                "type": "thinking",
-                "content": "[Harness-路由] 经营建议已完成，直接进入汇总。",
-            }
             break
 
         if rnd >= n_rounds:
@@ -700,29 +628,13 @@ async def stream_chat_multi_agent(
                 round_index=rnd + 1,
             )
         if forced_followup_plan is not None:
-            yield {
-                "type": "thinking",
-                "content": "[Harness-路由] 已满足前置条件，下一轮切换到下一条专线。",
-            }
             continue
         fin = plan.get("finalize_after_this_batch")
         stop_planning = fin is None or bool(fin)
         if skill_failure_this_batch and rnd < n_rounds:
             stop_planning = False
-            yield {
-                "type": "thinking",
-                "content": "[Manager-规划] 子专线技能调用失败，将进行下一轮重新指派。",
-            }
         if stop_planning:
-            yield {
-                "type": "thinking",
-                "content": "[Manager-规划] 本批完成后进入汇总。",
-            }
             break
-        yield {
-            "type": "thinking",
-            "content": "[Manager-规划] 将继续下一轮规划。",
-        }
 
     if not all_blocks:
         log_event(trace_id, "agent.multi", "fallback_single", level="INFO")
@@ -745,7 +657,6 @@ async def stream_chat_multi_agent(
             harness_state,
             warnings=summary_dependency_warnings,
         )
-    yield {"type": "thinking", "content": "[Manager-汇总] 正在整合各子任务结论..."}
     try:
         synth = await call_summarize_llm(q, all_blocks, trace_id=trace_id)
     except ChatAbortedError:
@@ -773,9 +684,7 @@ async def stream_chat_multi_agent(
         if synth.get("text"):
             merged["text"] = synth["text"]
 
-    yield {"type": "thinking", "content": "[Manager-汇总] 正在输出最终结论..."}
-
-    async for event in stream_result_events(skill_label, synth, merged):
+    async for event in stream_result_events(skill_label, synth, merged, include_thinking=False):
         yield event
 
     log_harness_multi_finish(

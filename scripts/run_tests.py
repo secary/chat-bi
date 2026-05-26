@@ -65,6 +65,7 @@ MODULE_SUITES: dict[str, list[str]] = {
         "tests/test_multi_agent_manager.py",
         "tests/test_multi_agent_intent.py",
         "tests/test_multi_agent_runner.py",
+        "tests/test_multi_agent_summarize.py",
         "tests/test_multi_agent_router.py",
         "tests/test_observation.py",
         "tests/test_planner_parse_json.py",

@@ -1,13 +1,13 @@
 # 多专线子 Agent：按 skills/*/SKILL.md 能力域划分；Manager 仅从中择线与拆解子任务。
 # `skill_mode: dynamic` 时，`skills` 表示优先技能，运行时仍可动态调用其他已启用技能。
 # `skill_mode: restricted` 时，`skills` 才是唯一白名单；`blocked_skills` 始终硬拒绝。
-# max_manager_rounds：Manager 规划 LLM 最多调用轮数（每轮一批子任务）；上传后再出图等可设 >1。
+# max_manager_rounds：协同调度最多轮数（每轮一批子任务）；上传后再出图等可设 >1。
 max_agents_per_round: 4
 max_manager_rounds: 5
 agents:
   upload_analyst:
     enabled: true
-    label: 上传与文件分析
+    label: A线
     skill_mode: restricted
     role_prompt: |-
       你是【上传与文件分析】专线：只处理用户本地上传的 CSV/XLSX（对话中常含 `/tmp/chatbi-uploads/` 路径）。
@@ -20,7 +20,7 @@ agents:
 
   demo_query:
     enabled: true
-    label: 演示库问数与澄清
+    label: B线
     skill_mode: restricted
     role_prompt: |-
       你是【演示库问数】专线：处理对演示业务库的中文自然语言问数、表/字段概览、指标口径解释与问法澄清。
@@ -35,7 +35,7 @@ agents:
 
   period_compare:
     enabled: true
-    label: 环比与经营对比
+    label: C线
     skill_mode: restricted
     role_prompt: |-
       你是【环比与经营对比】专线：专门处理「环比」「月度对比」「比上月/上月」等跨期指标对比类问题。
@@ -47,7 +47,7 @@ agents:
 
   viz_board:
     enabled: true
-    label: 图表与看板编排
+    label: D线
     skill_mode: restricted
     role_prompt: |-
       你是【图表与看板】专线：在已有表格/Observation 或明确可视化意图时，推荐图表类型（`chatbi-chart-recommendation`）或编排仪表盘布局与 JSON（`chatbi-dashboard-orchestration`）。
@@ -59,7 +59,7 @@ agents:
 
   semantic_config:
     enabled: true
-    label: 语义别名维护
+    label: E线
     skill_mode: restricted
     role_prompt: |-
       你是【语义别名】专线：维护业务指标/维度的别名映射，便于问数命中语义层。只使用 `chatbi-alias-manager`；不做经营长篇解读（应交给决策建议专线）。
@@ -69,7 +69,7 @@ agents:
 
   business_advisor:
     enabled: true
-    label: 经营决策建议
+    label: F线
     skill_mode: restricted
     role_prompt: |-
       你是【经营决策建议】专线：在已有或可引用的事实数据基础上，输出授信/风险/增长等角度的经营建议（`chatbi-decision-advisor`）。

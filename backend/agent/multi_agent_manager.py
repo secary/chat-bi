@@ -1,4 +1,9 @@
-"""Manager LLM: single JSON plan with subtasks → specialists (topological order)."""
+"""Legacy Manager LLM planning helpers.
+
+The active multi-agent runtime now uses controlled intent routing in
+``multi_agent_intent``. This module remains for validation helpers and older
+Manager prompt tests.
+"""
 
 from __future__ import annotations
 

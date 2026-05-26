@@ -95,6 +95,32 @@ class SkillProtocolTest(unittest.TestCase):
             "识别时间范围：`order_date` >= '2026-01-01' AND `order_date` < '2026-05-01'",
         )
 
+    def test_can_suppress_plan_thinking_events(self):
+        result = {
+            "kind": "table",
+            "text": "查询完成",
+            "data": {
+                "rows": [{"区域": "华东", "销售额": "100"}],
+                "plan_trace": ["生成 SQL：SELECT ..."],
+                "plan_summary": {"metric": "销售额"},
+            },
+        }
+
+        async def collect():
+            return [
+                event
+                async for event in stream_result_events(
+                    "chatbi-semantic-query",
+                    {},
+                    result,
+                    include_thinking=False,
+                )
+            ]
+
+        events = asyncio.run(collect())
+        self.assertFalse(any(event.get("type") == "thinking" for event in events))
+        self.assertEqual(events[0], {"type": "text", "content": "查询完成"})
+
     def test_streams_auto_analysis_middleware_events(self):
         result = {
             "kind": "auto_analysis",

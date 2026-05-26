@@ -10,12 +10,14 @@ from backend.agent.planner import parse_json_object
 from backend.llm_runtime import chatbi_acompletion
 from backend.trace import log_event
 
-SUMMARY_SYSTEM = """你是 ChatBI 多专线的 **Manager**：综合各子任务专线返回的 Observation 摘要，向用户输出一份连贯、可执行的 Markdown 最终答复。
+SUMMARY_SYSTEM = """你是 ChatBI 的最终回答生成器：综合多个执行结果，向用户输出一份连贯、可执行的 Markdown 最终答复。
 
 规则：
-- 仅基于各子任务的「交办说明 handoff_instruction」与 Observation、以及用户问题组织语言；禁止编造未出现的数字
-- 同一专线的 observation 可能含多段「第 N 次 · skill」工具摘要，须全部纳入最终答复，禁止只写最后一段
-- 结构清晰：可先总述，再按子任务或专线分点；必要时用列表
+- 仅基于用户问题与 results[].observation 组织语言；禁止编造未出现的数字
+- 同一结果的 observation 可能含多段「第 N 次 · skill」工具摘要，须全部纳入最终答复，禁止只写最后一段
+- 面向业务用户回答，不要暴露内部执行线、agent id、skill 名、handoff_instruction、Observation 等工程字段
+- 禁止输出“查询专线”“执行线”“专线”“agent”“skill”等内部链路说明
+- 结构清晰：可先总述，再按业务主题分点；必要时用列表
 - 输出 JSON（仅此一个对象）：
 {
   "text": "给用户的完整 Markdown 正文",
@@ -30,11 +32,11 @@ async def call_summarize_llm(
     blocks: List[Dict[str, str]],
     trace_id: str = "",
 ) -> Optional[Dict[str, Any]]:
-    """blocks: items with keys agent, label, observation, handoff_instruction (optional)."""
+    """Summarize result blocks without exposing internal route metadata."""
     body = json.dumps(
         {
             "user_question": user_question,
-            "specialists": blocks,
+            "results": _public_result_blocks(blocks),
         },
         ensure_ascii=False,
     )
@@ -69,3 +71,18 @@ async def call_summarize_llm(
         return parse_json_object(content)
     except (json.JSONDecodeError, ValueError):
         return None
+
+
+def _public_result_blocks(blocks: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    out: List[Dict[str, str]] = []
+    for idx, block in enumerate(blocks, start=1):
+        observation = str(block.get("observation") or "").strip()
+        if not observation:
+            continue
+        out.append(
+            {
+                "result_no": str(idx),
+                "observation": observation,
+            }
+        )
+    return out

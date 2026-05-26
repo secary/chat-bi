@@ -33,22 +33,6 @@ class MultiAgentRunnerHarnessTest(unittest.TestCase):
             events = []
             with (
                 patch(
-                    "backend.agent.multi_agent_runner.call_manager_plan_llm",
-                    new_callable=AsyncMock,
-                    return_value={
-                        "user_intent_summary": "问数",
-                        "decomposition_reason": "单专线处理即可",
-                        "finalize_after_this_batch": True,
-                        "tasks": [
-                            {
-                                "agent_id": "demo_query",
-                                "handoff_instruction": "查询 1-4 月各区域销售额",
-                                "depends_on": None,
-                            }
-                        ],
-                    },
-                ),
-                patch(
                     "backend.agent.multi_agent_runner.validate_and_order_tasks",
                     return_value=[
                         (
@@ -120,6 +104,11 @@ class MultiAgentRunnerHarnessTest(unittest.TestCase):
             self.assertIn(("action_executing", "run_specialist"), harness_events)
             self.assertIn(("observation_built", "run_specialist"), harness_events)
             self.assertIn(("finish_emitted", "finish"), harness_events)
+            thinking = [
+                str(item.get("content") or "") for item in got if item.get("type") == "thinking"
+            ]
+            self.assertFalse(any("开始查询" in item for item in thinking))
+            self.assertFalse(any("问数专线" in item for item in thinking))
 
         import asyncio
 
@@ -133,15 +122,6 @@ class MultiAgentRunnerHarnessTest(unittest.TestCase):
 
             events = []
             with (
-                patch(
-                    "backend.agent.multi_agent_runner.call_manager_plan_llm",
-                    new_callable=AsyncMock,
-                    return_value={
-                        "user_intent_summary": "问数",
-                        "decomposition_reason": "invalid",
-                        "tasks": [{"agent_id": "demo_query"}],
-                    },
-                ),
                 patch(
                     "backend.agent.multi_agent_runner.validate_and_order_tasks",
                     return_value=None,
@@ -199,26 +179,6 @@ class MultiAgentRunnerHarnessTest(unittest.TestCase):
             events = []
             with (
                 patch(
-                    "backend.agent.multi_agent_runner.call_manager_plan_llm",
-                    new_callable=AsyncMock,
-                    return_value={
-                        "user_intent_summary": "建议",
-                        "decomposition_reason": "先走经营建议专线",
-                        "finalize_after_this_batch": True,
-                        "tasks": [
-                            {
-                                "agent_id": "business_advisor",
-                                "handoff_instruction": "基于已采纳指标给经营建议",
-                                "depends_on": None,
-                            }
-                        ],
-                    },
-                ),
-                patch(
-                    "backend.agent.multi_agent_runner.classify_multi_agent_intent",
-                    return_value=None,
-                ),
-                patch(
                     "backend.agent.multi_agent_runner.validate_and_order_tasks",
                     return_value=[
                         (
@@ -274,7 +234,7 @@ class MultiAgentRunnerHarnessTest(unittest.TestCase):
             ):
                 got = []
                 async for event in stream_chat_multi_agent(
-                    [{"role": "user", "content": "采纳全部指标然后给出经营建议"}],
+                    [{"role": "user", "content": "给出经营建议"}],
                     trace_id="t-summary-warning",
                 ):
                     got.append(event)
@@ -338,36 +298,6 @@ class MultiAgentRunnerHarnessTest(unittest.TestCase):
                 yield {"type": "text", "content": "最终结果"}
 
             with (
-                patch(
-                    "backend.agent.multi_agent_runner.call_manager_plan_llm",
-                    new_callable=AsyncMock,
-                    side_effect=[
-                        {
-                            "user_intent_summary": "问数+建议",
-                            "decomposition_reason": "先查数再给建议",
-                            "finalize_after_this_batch": False,
-                            "tasks": [
-                                {
-                                    "agent_id": "demo_query",
-                                    "handoff_instruction": "查询 1-4 月各区域毛利率",
-                                    "depends_on": None,
-                                }
-                            ],
-                        },
-                        {
-                            "user_intent_summary": "给建议",
-                            "decomposition_reason": "基于前置结果给建议",
-                            "finalize_after_this_batch": True,
-                            "tasks": [
-                                {
-                                    "agent_id": "business_advisor",
-                                    "handoff_instruction": "基于前置问数结果给经营建议",
-                                    "depends_on": 0,
-                                }
-                            ],
-                        },
-                    ],
-                ),
                 patch(
                     "backend.agent.multi_agent_runner.validate_and_order_tasks",
                     side_effect=[
@@ -504,22 +434,6 @@ class MultiAgentRunnerHarnessTest(unittest.TestCase):
 
             with (
                 patch(
-                    "backend.agent.multi_agent_runner.call_manager_plan_llm",
-                    new_callable=AsyncMock,
-                    return_value={
-                        "user_intent_summary": "先查数再给建议",
-                        "decomposition_reason": "先查数",
-                        "finalize_after_this_batch": True,
-                        "tasks": [
-                            {
-                                "agent_id": "demo_query",
-                                "handoff_instruction": "先查询华东近3个月销售和毛利",
-                                "depends_on": None,
-                            }
-                        ],
-                    },
-                ) as mock_manager,
-                patch(
                     "backend.agent.multi_agent_runner.validate_and_order_tasks",
                     side_effect=[
                         [
@@ -604,7 +518,6 @@ class MultiAgentRunnerHarnessTest(unittest.TestCase):
                     got.append(event)
 
             self.assertEqual(got[-1]["type"], "done")
-            self.assertEqual(mock_manager.await_count, 0)
             self.assertEqual(captured["agents"], ["demo_query", "business_advisor"])
             self.assertEqual(captured["seed_skill_name"], "chatbi-semantic-query")
             self.assertEqual(

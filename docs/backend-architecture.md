@@ -92,7 +92,9 @@ agent/
 ├── intent_guard.py          # 寒暄短路
 ├── query_decision.py        # query + decision 联合意图
 ├── upload_context.py        # 上传路径跟进提示
-├── upload_path_detect.py    # 路径检测工具
+├── data_source_intent.py    # 演示库 / 上传文件意图与路径检测
+├── execution_decider.py     # single / multi / ask 执行模式预审计
+├── execution_audit.py       # single 补救与 multi 事实收束审计
 ├── context_window.py        # 滑动窗口 + 摘要注入（ReAct / Manager）
 ├── abort_state.py           # 按 trace_id 的中止 Event
 ├── abort_async.py           # await_with_abort 包装 LLM

@@ -5,7 +5,7 @@ from dataclasses import replace
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from backend.agent.execution_auditor import audit_single_result_for_remediation
+from backend.agent.execution_audit import audit_single_result_for_remediation
 from backend.agent.execution_decider import decide_execution_mode
 from backend.agent.runner import stream_chat
 from backend.config import settings

@@ -24,7 +24,8 @@ from backend.agent.multi_agent_intent import (
 )
 from backend.agent.multi_agent_manager import validate_and_order_tasks
 from backend.agent.multi_agent_messages import build_subtask_messages
-from backend.agent.multi_agent_final_audit import (
+from backend.agent.execution_audit import (
+    audit_summary_against_fact_ledger,
     audit_multi_final_synthesis,
     build_factual_fallback,
 )
@@ -768,6 +769,33 @@ async def stream_chat_multi_agent(
             "content": "汇总阶段未能生成回答，请重试或关闭多专线模式。",
         }
         log_event(trace_id, "agent.multi", "summary_empty", level="WARN")
+        yield {"type": "done", "content": None}
+        return
+    summary_audit = audit_summary_against_fact_ledger(
+        summary_text=str(synth.get("text") or ""),
+        fact_ledger=final_audit.fact_ledger,
+    )
+    log_event(
+        trace_id,
+        "agent.harness",
+        "multi_summary_claim_audit",
+        payload={
+            "status": summary_audit.status,
+            "issue_count": len(summary_audit.issues),
+            "issues": summary_audit.issues,
+        },
+        level="WARN" if summary_audit.status != "ok" else "INFO",
+    )
+    if summary_audit.should_block_summary:
+        yield {"type": "thinking", "content": "最终回答未通过事实收束审计，已降级为事实摘要。"}
+        yield {"type": "text", "content": build_factual_fallback(summary_audit)}
+        log_event(
+            trace_id,
+            "agent.multi",
+            "summary_blocked_by_claim_audit",
+            payload={"issues": summary_audit.issues},
+            level="WARN",
+        )
         yield {"type": "done", "content": None}
         return
 

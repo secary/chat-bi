@@ -23,8 +23,7 @@ from backend.agent.harness_events import (
     log_harness_rejected,
     log_harness_validated,
 )
-from backend.agent.harness_policy import authorize_action
-from backend.agent.harness_runner import rejection_observation
+from backend.agent.harness_policy import authorize_action, rejection_observation
 from backend.agent.harness_schema import HarnessAction, validate_harness_action
 from backend.agent.harness_state import HarnessState
 from backend.agent.intent_guard import small_talk_reply, should_skip_skill_for_message

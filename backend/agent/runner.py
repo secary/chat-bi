@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, AsyncGenerator, Dict, List, Optional, Union
 
-from backend.agent.execution_auditor import (
+from backend.agent.execution_audit import (
     RemediationAction,
     audit_single_result_for_remediation,
     chart_recommendation_args,

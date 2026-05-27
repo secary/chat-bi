@@ -350,6 +350,93 @@ class MultiAgentRunnerHarnessTest(unittest.TestCase):
 
         asyncio.run(_run())
 
+    def test_multi_agent_blocks_summary_with_unsupported_number_claim(self) -> None:
+        async def _run() -> None:
+            async def fake_specialist(*args, **kwargs):
+                sink = kwargs["result_sink"]
+                sink["last_result"] = {
+                    "kind": "table",
+                    "text": "query ok",
+                    "data": {"rows": [{"区域": "华东", "销售额": "100"}]},
+                }
+                sink["last_skill_name"] = "chatbi-semantic-query"
+                sink["skill_executions"] = [
+                    {
+                        "skill": "chatbi-semantic-query",
+                        "result": sink["last_result"],
+                        "observation": "华东销售额为 100 元。",
+                        "step": 1,
+                    }
+                ]
+                yield {"type": "thinking", "content": "处理中"}
+
+            summarize = AsyncMock(return_value={"text": "华东销售额为 999 元。"})
+            events = []
+            with (
+                patch(
+                    "backend.agent.multi_agent_runner.validate_and_order_tasks",
+                    return_value=[
+                        (
+                            0,
+                            {
+                                "agent_id": "demo_query",
+                                "handoff_instruction": "查询华东销售额",
+                                "depends_on": None,
+                            },
+                        )
+                    ],
+                ),
+                patch(
+                    "backend.agent.multi_agent_runner.skills_for_agent", return_value=[MagicMock()]
+                ),
+                patch("backend.agent.multi_agent_runner.agent_label", return_value="问数专线"),
+                patch(
+                    "backend.agent.multi_agent_runner.agent_role_prompt",
+                    return_value="你是问数专线",
+                ),
+                patch(
+                    "backend.agent.multi_agent_runner.stream_specialist",
+                    side_effect=fake_specialist,
+                ),
+                patch("backend.agent.multi_agent_runner.call_summarize_llm", summarize),
+                patch("backend.agent.abort_state.is_aborted", return_value=False),
+                patch(
+                    "backend.agent.multi_agent_runner.log_event",
+                    side_effect=lambda trace_id, span_name, event_name, **kwargs: events.append(
+                        {
+                            "trace_id": trace_id,
+                            "span_name": span_name,
+                            "event_name": event_name,
+                            "payload": kwargs.get("payload") or {},
+                        }
+                    ),
+                ),
+            ):
+                got = []
+                async for event in stream_chat_multi_agent(
+                    [{"role": "user", "content": "查华东销售额"}],
+                    trace_id="t-claim-audit-block",
+                ):
+                    got.append(event)
+
+            summarize.assert_awaited_once()
+            texts = [
+                str(event.get("content") or "") for event in got if event.get("type") == "text"
+            ]
+            self.assertTrue(any("未通过最终事实审计" in text for text in texts))
+            claim_audits = [
+                item
+                for item in events
+                if item["span_name"] == "agent.harness"
+                and item["event_name"] == "multi_summary_claim_audit"
+            ]
+            self.assertEqual(claim_audits[0]["payload"].get("status"), "error")
+            self.assertIn("999", str(claim_audits[0]["payload"].get("issues")))
+
+        import asyncio
+
+        asyncio.run(_run())
+
     def test_multi_agent_passes_dependency_result_into_business_advisor(self) -> None:
         async def _run() -> None:
             captured = {}

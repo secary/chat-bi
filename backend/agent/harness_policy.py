@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
-from typing import List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence
 
 from backend.agent.executor import latest_user_upload_path
 from backend.agent.harness_schema import HarnessAction
+from backend.agent.harness_schema import HarnessValidation
 from backend.agent.harness_state import HarnessState
 
 _STRONGLY_SCOPED_SKILLS = {
@@ -20,6 +22,16 @@ class HarnessPolicyDecision:
     ok: bool
     reason: str = ""
     suggested_text: str = ""
+
+
+def rejection_observation(
+    validation: HarnessValidation | None, policy: HarnessPolicyDecision | None
+) -> str:
+    if validation and not validation.ok:
+        return _rejection_obs("schema_rejected", validation.reason)
+    if policy and not policy.ok:
+        return _rejection_obs("policy_rejected", policy.reason)
+    return _rejection_obs("unknown_rejected", "未知 Harness 拒绝。")
 
 
 def authorize_action(
@@ -148,3 +160,10 @@ def _scoped_skill_suggestion(skill_name: str) -> str:
         "chatbi-alias-manager": "请改派语义别名专线维护指标/维度别名。",
     }
     return suggestions.get(skill_name, "请改派更合适的专线，或补齐该技能的前置条件后再继续。")
+
+
+def _rejection_obs(category: str, reason: str, extra: Dict[str, Any] | None = None) -> str:
+    payload: Dict[str, Any] = {"ok": False, "category": category, "reason": reason}
+    if extra:
+        payload.update(extra)
+    return json.dumps(payload, ensure_ascii=False)

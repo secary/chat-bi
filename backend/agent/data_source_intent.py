@@ -7,7 +7,6 @@ from enum import Enum
 from typing import Dict, List, Optional, Tuple
 
 from backend.agent.executor import latest_user_prompt_for_demo_data_skills
-from backend.agent.upload_path_detect import has_upload_file_reference
 
 _UPLOAD_PATH_RE = re.compile(r"/tmp/chatbi-uploads/[A-Za-z0-9._-]+", re.IGNORECASE)
 
@@ -72,6 +71,18 @@ class DataSourceIntent(str, Enum):
     DEMO_DATABASE = "demo_database"
     UPLOAD_FILE = "upload_file"
     AMBIGUOUS = "ambiguous"
+
+
+def has_upload_file_reference(text: str) -> bool:
+    """True when dialogue text suggests a local uploaded CSV/XLSX path."""
+    if not text:
+        return False
+    low = text.lower()
+    if "chatbi-uploads" in low:
+        return True
+    if "/tmp/" in low and any(ext in low for ext in (".csv", ".xlsx", ".xls")):
+        return True
+    return False
 
 
 def current_user_text(messages: List[Dict[str, str]]) -> str:

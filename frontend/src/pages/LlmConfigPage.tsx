@@ -1,86 +1,71 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
-  deleteLlmProfile,
   getLlmSettings,
   postLlmProfile,
   postLlmProfileTest,
-  postLlmProfilesTestAll,
   putLlmProfile,
   putLlmProfilesActive,
-  putLlmProfilesReorder,
-  putLlmSettings,
 } from '../api/client';
 import type { LlmProfilePublic, LlmSettingsView } from '../types/admin';
 import { logger } from '../lib/logger';
-import { validateLlmConfig } from '../lib/llmConfigValidation';
-import { LlmProfileList } from '../components/LlmProfileList';
-import { LlmConfigEditorCard } from '../components/LlmConfigEditorCard';
+import { LLM_PROVIDER_PRESETS } from '../lib/llmProviderPresets';
 
-function profileToForm(p: LlmProfilePublic) {
-  return {
-    displayName: p.display_name ?? '',
-    model: p.model ?? '',
-    apiBase: p.api_base ?? '',
-    apiKey: '',
-    supportsVision: p.supports_vision ?? false,
-  };
+type SaveState = 'idle' | 'saving' | 'testing' | 'success' | 'error';
+
+function findProfileForPreset(profiles: LlmProfilePublic[], model: string, apiBase: string) {
+  const normalizedBase = apiBase.replace(/\/+$/, '');
+  return profiles.find(
+    (profile) =>
+      profile.model === model && (profile.api_base || '').replace(/\/+$/, '') === normalizedBase,
+  );
+}
+
+function profileLabel(profile: LlmProfilePublic): string {
+  return profile.display_name?.trim() || profile.model;
+}
+
+function statusText(status: string): string {
+  if (status === 'ok') return '可用';
+  if (status === 'error') return '连接失败';
+  return '未检测';
+}
+
+function statusClass(status: string): string {
+  if (status === 'ok') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+  if (status === 'error') return 'border-red-200 bg-red-50 text-red-700';
+  return 'border-gray-200 bg-gray-50 text-gray-600';
 }
 
 export function LlmConfigPage() {
   const [view, setView] = useState<LlmSettingsView | null>(null);
+  const [providerId, setProviderId] = useState(LLM_PROVIDER_PRESETS[0]?.id ?? '');
   const [displayName, setDisplayName] = useState('');
-  const [model, setModel] = useState('');
-  const [apiBase, setApiBase] = useState('');
   const [apiKey, setApiKey] = useState('');
-  const [supportsVision, setSupportsVision] = useState(false);
-  const [error, setError] = useState('');
-  const [saved, setSaved] = useState('');
-  const [selectedKey, setSelectedKey] = useState<number | 'new'>('new');
-  const [busyTest, setBusyTest] = useState<'all' | number | null>(null);
-  const [visionBusy, setVisionBusy] = useState(false);
+  const [state, setState] = useState<SaveState>('idle');
+  const [message, setMessage] = useState('');
+  const [busyProfileId, setBusyProfileId] = useState<number | null>(null);
 
   const profiles = view?.profiles ?? [];
-  const activeProfileId =
-    view?.active_profile_id !== undefined ? view.active_profile_id : null;
-
-  const refreshView = useCallback(async () => {
-    const v = await getLlmSettings();
-    setView(v);
-    return v;
-  }, []);
+  const preset = useMemo(
+    () => LLM_PROVIDER_PRESETS.find((item) => item.id === providerId) ?? LLM_PROVIDER_PRESETS[0],
+    [providerId],
+  );
+  const effectiveSource = view?.effective_source === 'saved_settings' ? '管理页配置' : '环境变量';
+  const activeProfile = profiles.find((profile) => profile.id === view?.active_profile_id);
+  const activeStatus = activeProfile?.health_status || 'unknown';
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
-        const v = await getLlmSettings();
+        const next = await getLlmSettings();
         if (cancelled) return;
-        setView(v);
-        const list = v.profiles ?? [];
-        if (list.length > 0) {
-          const pref = v.active_profile_id ?? list[0]?.id;
-          if (pref !== undefined && pref !== null) {
-            const match = list.find((p) => p.id === pref);
-            if (match) {
-              setSelectedKey(pref);
-              const f = profileToForm(match);
-              setDisplayName(f.displayName);
-              setModel(f.model);
-              setApiBase(f.apiBase);
-              setApiKey('');
-              setSupportsVision(f.supportsVision);
-              return;
-            }
-          }
-        }
-        setSelectedKey('new');
-        setDisplayName('');
-        setModel('');
-        setApiBase('');
-        setApiKey('');
-        setSupportsVision(false);
-      } catch (e) {
-        logger.error('llm settings', e);
+        setView(next);
+      } catch (error) {
+        if (cancelled) return;
+        logger.error('llm settings', error);
+        setState('error');
+        setMessage('读取配置失败，请稍后重试。');
       }
     })();
     return () => {
@@ -88,263 +73,224 @@ export function LlmConfigPage() {
     };
   }, []);
 
-  const applySelection = (id: number) => {
-    const p = profiles.find((x) => x.id === id);
-    if (!p) return;
-    setSelectedKey(id);
-    const f = profileToForm(p);
-    setDisplayName(f.displayName);
-    setModel(f.model);
-    setApiBase(f.apiBase);
-    setApiKey('');
-    setSupportsVision(f.supportsVision);
-    setSaved('');
-    setError('');
+  const refreshView = async () => {
+    const next = await getLlmSettings();
+    setView(next);
+    return next;
   };
 
-  const save = async () => {
-    const vld = validateLlmConfig(model, apiBase);
-    if (vld.errors.length > 0) {
-      setSaved('');
-      setError(vld.errors[0]);
+  const saveAndEnable = async () => {
+    if (!preset || !apiKey.trim()) {
+      setState('error');
+      setMessage('请选择厂商并填写 API Key。');
       return;
     }
+    setState('saving');
+    setMessage('正在保存并测试连接...');
     try {
-      setError('');
-      if (selectedKey === 'new') {
-        const payload: Parameters<typeof postLlmProfile>[0] = {
-          display_name: displayName.trim() || null,
-          model: model.trim(),
-          api_base: apiBase.trim() || null,
-        };
-        if (apiKey.trim()) payload.api_key = apiKey.trim();
-        payload.supports_vision = supportsVision;
-        await postLlmProfile(payload);
-      } else {
-        const payload: Parameters<typeof putLlmProfile>[1] = {
-          display_name: displayName.trim() || null,
-          model: model.trim(),
-          api_base: apiBase.trim() || null,
-        };
-        if (apiKey.trim()) payload.api_key = apiKey.trim();
-        payload.supports_vision = supportsVision;
-        await putLlmProfile(selectedKey, payload);
-      }
-      const v = await refreshView();
+      const latest = await refreshView();
+      const existing = findProfileForPreset(latest.profiles ?? [], preset.model, preset.apiBase);
+      const payload = {
+        display_name: displayName.trim() || preset.label,
+        model: preset.model,
+        api_base: preset.apiBase,
+        api_key: apiKey.trim(),
+      };
+      const profileId = existing
+        ? (await putLlmProfile(existing.id, payload)).profile.id
+        : (await postLlmProfile(payload)).profile.id;
+      await putLlmProfilesActive(profileId);
+      const test = await postLlmProfileTest(profileId);
+      await refreshView();
       setApiKey('');
-      setSaved('已保存。');
-      const list = v.profiles ?? [];
-      if (selectedKey === 'new' && list.length > 0) {
-        const last = list[list.length - 1];
-        if (last) applySelection(last.id);
+      if (test.ok) {
+        setState('success');
+        setMessage(`${payload.display_name} 已启用，连接测试通过。`);
+      } else {
+        setState('error');
+        setMessage(test.message || '连接测试失败，请检查 API Key。');
       }
-    } catch (e) {
-      setSaved('');
-      setError(e instanceof Error ? e.message : String(e));
-      logger.error('save llm profile', e);
+    } catch (error) {
+      logger.error('simple llm setup', error);
+      setState('error');
+      setMessage(error instanceof Error ? error.message : '保存失败，请稍后重试。');
     }
   };
 
-  const move = async (id: number, dir: 'up' | 'down') => {
-    const ids = profiles.map((p) => p.id);
-    const i = ids.indexOf(id);
-    if (i < 0) return;
-    const j = dir === 'up' ? i - 1 : i + 1;
-    if (j < 0 || j >= ids.length) return;
-    const next = [...ids];
-    [next[i], next[j]] = [next[j], next[i]];
+  const activateProfile = async (profile: LlmProfilePublic) => {
     try {
-      await putLlmProfilesReorder(next);
+      setBusyProfileId(profile.id);
+      await putLlmProfilesActive(profile.id);
       await refreshView();
-    } catch (e) {
-      logger.error('reorder llm profiles', e);
-    }
-  };
-
-  const activate = async (id: number) => {
-    try {
-      await putLlmProfilesActive(id);
-      await refreshView();
-    } catch (e) {
-      logger.error('set active llm profile', e);
-    }
-  };
-
-  const runTest = async (id: number) => {
-    try {
-      setBusyTest(id);
-      await postLlmProfileTest(id);
-      await refreshView();
-    } catch (e) {
-      logger.error('test llm profile', e);
+      setState('success');
+      setMessage(`${profileLabel(profile)} 已设为当前使用。`);
+    } catch (error) {
+      logger.error('activate llm profile', error);
+      setState('error');
+      setMessage('启用失败，请稍后重试。');
     } finally {
-      setBusyTest(null);
+      setBusyProfileId(null);
     }
   };
 
-  const runTestAll = async () => {
+  const testProfile = async (profile: LlmProfilePublic) => {
     try {
-      setBusyTest('all');
-      await postLlmProfilesTestAll();
+      setBusyProfileId(profile.id);
+      const result = await postLlmProfileTest(profile.id);
       await refreshView();
-    } catch (e) {
-      logger.error('test all llm profiles', e);
+      setState(result.ok ? 'success' : 'error');
+      setMessage(result.ok ? `${profileLabel(profile)} 连接测试通过。` : result.message);
+    } catch (error) {
+      logger.error('test llm profile', error);
+      setState('error');
+      setMessage('测试失败，请稍后重试。');
     } finally {
-      setBusyTest(null);
-    }
-  };
-
-  const remove = async (id: number) => {
-    try {
-      await deleteLlmProfile(id);
-      const v = await refreshView();
-      const list = v.profiles ?? [];
-      if (selectedKey === id) {
-        if (list.length > 0 && list[0]) {
-          applySelection(list[0].id);
-        } else {
-          setSelectedKey('new');
-          setDisplayName('');
-          setModel('');
-          setApiBase('');
-          setApiKey('');
-          setSupportsVision(false);
-        }
-      }
-    } catch (e) {
-      logger.error('delete llm profile', e);
+      setBusyProfileId(null);
     }
   };
 
   return (
-    <div className="h-full overflow-auto p-6 lg:p-8">
-      <h2 className="mb-4 text-lg font-semibold tracking-tight text-gray-900">LLM 配置</h2>
-      <div className="mb-4 max-w-xl rounded-xl border border-accent/20 bg-accent-light p-3.5 text-sm text-accent">
-        当前生效模型：
-        <span className="ml-1 font-medium">{view?.effective_model || '未配置'}</span>
-        <span className="ml-2 text-xs text-accent/70">
-          来源：{view?.effective_source === 'saved_settings' ? '管理页配置' : '环境变量'}
-        </span>
-        {view?.effective_api_base && (
-          <div className="mt-1 text-xs text-accent/80">API Base：{view.effective_api_base}</div>
-        )}
-        <div className="mt-1 text-xs text-accent/80">
-          API Key：{view?.effective_api_key_set ? '已配置' : '未配置'}
+    <div className="h-full overflow-auto px-6 py-6 lg:px-8">
+      <div className="mx-auto max-w-3xl">
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold tracking-tight text-gray-900">LLM 配置</h2>
+          <p className="mt-1 text-sm text-gray-500">选择厂商，填入 API Key，然后测试并启用。</p>
         </div>
-      </div>
-      <div className="mb-4 max-w-xl rounded-xl border border-gray-200 bg-surface p-3.5 text-sm text-gray-800 shadow-card">
-        <div className="font-medium text-gray-900">图像识读</div>
-        {view?.vision_disabled_by_env ? (
-          <p className="mt-2 text-xs text-gray-600">
-            进程环境已设置 CHATBI_VISION_DISABLED，图像结构化抽取已关闭。
-          </p>
+
+        <section className="mb-5 rounded-lg border border-gray-200 bg-white p-4 shadow-card">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-xs text-gray-500">当前使用</div>
+              <div className="mt-1 truncate text-base font-semibold text-gray-900">
+                {activeProfile ? profileLabel(activeProfile) : view?.effective_model || '未配置'}
+              </div>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+                <span>来源：{effectiveSource}</span>
+                <span>API Key：{view?.effective_api_key_set ? '已配置' : '未配置'}</span>
+              </div>
+            </div>
+            <span className={`rounded-full border px-2.5 py-1 text-xs ${statusClass(activeStatus)}`}>
+              {statusText(activeStatus)}
+            </span>
+          </div>
+        </section>
+
+        {profiles.length > 0 ? (
+          <section className="mb-5 rounded-lg border border-gray-200 bg-white p-4 shadow-card">
+            <div className="mb-3 text-sm font-medium text-gray-900">已保存模型</div>
+            <div className="flex flex-wrap gap-2">
+              {profiles.map((profile) => {
+                const active = profile.id === view?.active_profile_id;
+                const busy = busyProfileId === profile.id;
+                return (
+                  <div
+                    key={profile.id}
+                    className={
+                      'flex items-center gap-2 rounded-lg border px-2.5 py-2 text-sm ' +
+                      (active ? 'border-accent bg-accent-light text-accent' : 'border-gray-200 bg-white text-gray-700')
+                    }
+                  >
+                    <button type="button" onClick={() => void activateProfile(profile)} className="max-w-[180px] truncate font-medium">
+                      {profileLabel(profile)}
+                    </button>
+                    <span className={`rounded-full border px-1.5 py-0.5 text-[10px] ${statusClass(profile.health_status || 'unknown')}`}>
+                      {statusText(profile.health_status || 'unknown')}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={busyProfileId !== null}
+                      onClick={() => void testProfile(profile)}
+                      className="rounded border border-gray-200 bg-white px-2 py-0.5 text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      {busy ? '测试中…' : '测试'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
         ) : null}
-        {!view?.vision_disabled_by_env && view && view.vision_extract_enabled === false ? (
-          <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-            未配置专用视觉模型档案，且当前对话默认模型未标记「支持多模态图像」时，上传图片将无法结构化识读。请在下方选择专用视觉档案，或在档案表单中勾选「该模型支持多模态图像」。
-          </p>
-        ) : null}
-        {!view?.vision_disabled_by_env && view?.vision_extract_enabled ? (
-          <p className="mt-2 text-xs text-emerald-700">当前已具备图像识读所需的模型配置。</p>
-        ) : null}
-        <label className="mt-3 block text-xs text-gray-500">
-          <span className="mb-1 block text-sm text-gray-700">专用视觉模型档案（可选）</span>
-          <select
-            className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30 disabled:opacity-50"
-            disabled={visionBusy}
-            value={view?.vision_profile_id ?? ''}
-            onChange={(e) => {
-              const raw = e.target.value;
-              const next = raw === '' ? null : Number(raw);
-              if (raw !== '' && Number.isNaN(next)) return;
-              void (async () => {
-                try {
-                  setVisionBusy(true);
-                  await putLlmSettings({ vision_profile_id: next });
-                  await refreshView();
-                } catch (err) {
-                  logger.error('vision profile setting', err);
-                } finally {
-                  setVisionBusy(false);
+
+        <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-card">
+          <div className="space-y-5">
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-900">选择厂商</label>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {LLM_PROVIDER_PRESETS.map((item) => {
+                  const selected = item.id === providerId;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        setProviderId(item.id);
+                        setState('idle');
+                        setMessage('');
+                      }}
+                      className={
+                        'rounded-lg border px-3 py-3 text-left text-sm transition-colors ' +
+                        (selected
+                          ? 'border-accent bg-accent-light text-accent'
+                          : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50')
+                      }
+                    >
+                      <div className="font-medium">{item.label}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <label className="block text-sm font-medium text-gray-900">
+              备注名
+              <input
+                className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm transition-all focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+                value={displayName}
+                onChange={(event) => setDisplayName(event.target.value)}
+                placeholder={preset ? `${preset.label} 默认模型` : '便于识别，例如：生产 MiniMax'}
+              />
+            </label>
+
+            <label className="block text-sm font-medium text-gray-900">
+              API Key
+              <input
+                type="password"
+                className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm transition-all focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+                value={apiKey}
+                onChange={(event) => {
+                  setApiKey(event.target.value);
+                  setState('idle');
+                  setMessage('');
+                }}
+                placeholder="粘贴厂商控制台生成的 API Key"
+              />
+            </label>
+
+            {message ? (
+              <div
+                className={
+                  'rounded-lg border px-3 py-2 text-sm ' +
+                  (state === 'success'
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                    : state === 'error'
+                      ? 'border-red-200 bg-red-50 text-red-700'
+                      : 'border-gray-200 bg-gray-50 text-gray-600')
                 }
-              })();
-            }}
-          >
-            <option value="">未配置（按主模型多模态选项）</option>
-            {profiles.map((p) => (
-              <option key={p.id} value={p.id}>
-                {(p.display_name || p.model).trim() || p.model} — {p.model}
-              </option>
-            ))}
-          </select>
-        </label>
-        <p className="mt-2 text-xs text-gray-500">
-          若设置了专用视觉档案，识图将仅使用该档案，不会回退到列表中的其它模型。
-        </p>
-      </div>
-      <p className="mb-4 max-w-4xl text-xs text-gray-500">
-        保存多条模型后，右侧可切换「对话默认」；请求失败时会按列表顺序（当前选用优先，其余从上到下）自动尝试其它模型。
-      </p>
-      <div className="grid max-w-6xl gap-8 lg:grid-cols-[1fr_340px]">
-        <div>
-          <p className="mb-4 text-sm text-gray-500">
-            此处保存的配置会覆盖进程环境变量中的 `LLM_MODEL` / `API_BASE` / `OPENAI_API_KEY`（非空字段）。
-            {view?.updated_at ? ` 最近更新：${String(view.updated_at)}` : ''}
-          </p>
-          <LlmConfigEditorCard
-            displayName={displayName}
-            setDisplayName={setDisplayName}
-            model={model}
-            setModel={setModel}
-            apiBase={apiBase}
-            setApiBase={setApiBase}
-            apiKey={apiKey}
-            setApiKey={setApiKey}
-            supportsVision={supportsVision}
-            setSupportsVision={setSupportsVision}
-            selectedKey={selectedKey}
-            profiles={profiles}
-            saved={saved}
-            error={error}
-            setSaved={setSaved}
-            setError={setError}
-            onSave={save}
-            onNewBlank={() => {
-              setSelectedKey('new');
-              setDisplayName('');
-              setModel('');
-              setApiBase('');
-              setApiKey('');
-              setSupportsVision(false);
-              setSaved('');
-              setError('');
-            }}
-          />
-        </div>
-        <aside className="lg:border-l lg:border-gray-100 lg:pl-8">
-          <LlmProfileList
-            profiles={profiles}
-            activeProfileId={activeProfileId ?? null}
-            selectedKey={selectedKey}
-            busyTest={busyTest}
-            onSelect={(id) => applySelection(id)}
-            onSelectNew={() => {
-              setSelectedKey('new');
-              setDisplayName('');
-              setModel('');
-              setApiBase('');
-              setApiKey('');
-              setSupportsVision(false);
-              setSaved('');
-              setError('');
-            }}
-            onActivate={(id) => void activate(id)}
-            onDelete={(id) => void remove(id)}
-            onTest={(id) => void runTest(id)}
-            onTestAll={() => void runTestAll()}
-            onMove={(id, dir) => void move(id, dir)}
-          />
-        </aside>
+              >
+                {message}
+              </div>
+            ) : null}
+
+            <button
+              type="button"
+              onClick={() => void saveAndEnable()}
+              disabled={state === 'saving'}
+              className="w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-50 sm:w-auto"
+            >
+              {state === 'saving' ? '测试中…' : '测试并启用'}
+            </button>
+          </div>
+        </section>
       </div>
     </div>
   );

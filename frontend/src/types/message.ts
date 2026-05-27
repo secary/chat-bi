@@ -116,7 +116,7 @@ export interface ChatRequest {
   }>;
   session_id?: number;
   db_connection_id?: number;
-  multi_agents?: boolean;
+  multi_agents?: boolean | 'auto' | 'single';
 }
 
 export interface UploadedFile {

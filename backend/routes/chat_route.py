@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import re
 from time import perf_counter
-from typing import Any, AsyncGenerator, Dict, List, Optional
+from typing import Any, AsyncGenerator, Dict, List, Literal, Optional, Union
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -36,7 +36,7 @@ class ChatRequest(BaseModel):
     history: List[dict] = Field(default_factory=list)
     session_id: Optional[int] = None
     db_connection_id: Optional[int] = None
-    multi_agents: bool = False
+    multi_agents: Union[bool, Literal["auto", "single"]] = "auto"
 
 
 @router.post("/abort")

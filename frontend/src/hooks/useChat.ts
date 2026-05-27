@@ -85,12 +85,9 @@ export interface UseChatReturn {
   abort: () => void;
 }
 
-const MULTI_AGENTS_KEY = 'chatbi_multi_agents';
-
 export function useChat(
   sessionId: number | null,
   dbConnectionId: number | null,
-  multiAgents: boolean,
 ): UseChatReturn {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
@@ -234,7 +231,7 @@ export function useChat(
             history,
             session_id: sessionId,
             db_connection_id: dbConnectionId ?? undefined,
-            multi_agents: multiAgents,
+            multi_agents: 'auto',
           },
           traceIdToUse,
           { signal: ac.signal },
@@ -319,7 +316,7 @@ export function useChat(
         setCurrentTraceId(null);
       }
     },
-    [loading, sessionId, dbConnectionId, multiAgents],
+    [loading, sessionId, dbConnectionId],
   );
 
   const abort = useCallback(() => {
@@ -331,22 +328,6 @@ export function useChat(
   }, []);
 
   return { messages, loading, assistantPending, currentTraceId, lastTraceId, sendMessage, abort };
-}
-
-export function readMultiAgentsPreference(): boolean {
-  try {
-    return localStorage.getItem(MULTI_AGENTS_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
-export function writeMultiAgentsPreference(value: boolean): void {
-  try {
-    localStorage.setItem(MULTI_AGENTS_KEY, value ? '1' : '0');
-  } catch {
-    /* ignore */
-  }
 }
 
 const SIDEBAR_OPEN_KEY = 'chatbi_sidebar_open';

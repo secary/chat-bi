@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from typing import Any, AsyncGenerator, Dict, List, Optional
+from typing import Any, AsyncGenerator, Dict, List, Optional, Union
 
+from backend.agent.execution_decider import ExecutionDecision, decide_execution_mode
 from backend.agent.executor import (
     find_skill,
     latest_user_content,
@@ -98,16 +99,63 @@ stream_chat_legacy is not in use by default. It is not ReAct mode.
 """
 
 
+async def _stream_ask_for_clarification(
+    decision: ExecutionDecision,
+    trace_id: str = "",
+) -> AsyncGenerator[Dict[str, Any], None]:
+    log_event(
+        trace_id,
+        "agent.harness",
+        "execution_decision_ask",
+        payload={
+            "mode": decision.mode,
+            "reason": decision.reason,
+            "route_sequence": decision.route_sequence,
+            "confidence": decision.confidence,
+            "risk_flags": decision.risk_flags,
+        },
+    )
+    yield {"type": "thinking", "content": "正在确认最稳妥的处理方式..."}
+    yield {
+        "type": "text",
+        "content": "我可以给经营建议，但需要先有明确事实范围。请补充要分析的指标、时间或区域，例如“基于华东近3个月销售和毛利给经营建议”。",
+    }
+    yield {"type": "done", "content": None}
+
+
 async def stream_chat(
     messages: List[Dict[str, str]],
     trace_id: str = "",
     skill_db_overrides: Optional[Dict[str, str]] = None,
     memory_block: Optional[str] = None,
-    multi_agents: bool = False,
+    multi_agents: Union[bool, str] = "auto",
     session_id: Optional[int] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """Agent entry point: routes to multi-agent, ReAct, or legacy execution mode."""
-    if multi_agents:
+    force_multi = multi_agents is True
+    force_single = isinstance(multi_agents, str) and multi_agents == "single"
+    decision: Optional[ExecutionDecision] = None
+    if not force_multi and not force_single:
+        decision = decide_execution_mode(messages)
+        log_event(
+            trace_id,
+            "agent.harness",
+            "execution_decision_selected",
+            payload={
+                "mode": decision.mode,
+                "reason": decision.reason,
+                "route_sequence": decision.route_sequence,
+                "confidence": decision.confidence,
+                "risk_flags": decision.risk_flags,
+            },
+        )
+        if decision.mode == "ask":
+            async for event in _stream_ask_for_clarification(decision, trace_id=trace_id):
+                yield event
+            return
+        force_multi = decision.mode == "multi"
+
+    if force_multi:
         from backend.agent.multi_agent_runner import stream_chat_multi_agent
 
         async for event in stream_chat_multi_agent(
@@ -116,6 +164,7 @@ async def stream_chat(
             skill_db_overrides=skill_db_overrides,
             memory_block=memory_block,
             session_id=session_id,
+            controlled_intent=decision.intent if decision else None,
         ):
             yield event
         return

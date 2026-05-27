@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  readMultiAgentsPreference,
   readSidebarOpenPreference,
   useChat,
-  writeMultiAgentsPreference,
   writeSidebarOpenPreference,
 } from '../hooks/useChat';
 import { AssistantPendingNotice } from '../components/AssistantPendingNotice';
@@ -12,7 +10,6 @@ import { ChatComposerDock } from '../components/ChatComposerDock';
 import { ChatSessionSidebar } from '../components/ChatSessionSidebar';
 import { MessageBubble } from '../components/MessageBubble';
 import { ChatWelcomeHero } from '../components/ChatWelcomeHero';
-import { Switch } from '../components/Switch';
 import { shouldShowChatWelcomeView } from '../lib/chatWelcomeView';
 import {
   createSessionApi,
@@ -38,22 +35,14 @@ export function ChatPage() {
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [dbConnId, setDbConnId] = useState<number | null>(null);
   const [booting, setBooting] = useState(true);
-  const [multiAgents, setMultiAgents] = useState(() => readMultiAgentsPreference());
   const [sidebarOpen, setSidebarOpen] = useState(() => readSidebarOpenPreference());
   const [pdfExporting, setPdfExporting] = useState(false);
 
-  const { messages, loading, assistantPending, currentTraceId, lastTraceId, sendMessage, abort } = useChat(
-    sessionId,
-    dbConnId,
-    multiAgents,
-  );
+  const { messages, loading, assistantPending, currentTraceId, lastTraceId, sendMessage, abort } =
+    useChat(sessionId, dbConnId);
   const inputBusy = loading || assistantPending;
   const showWelcome = shouldShowChatWelcomeView(booting, messages.length);
   const inspectableTraceId = currentTraceId || lastTraceId;
-
-  useEffect(() => {
-    writeMultiAgentsPreference(multiAgents);
-  }, [multiAgents]);
 
   useEffect(() => {
     writeSidebarOpenPreference(sidebarOpen);
@@ -159,18 +148,6 @@ export function ChatPage() {
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <header className="flex flex-wrap items-center gap-3 border-b border-gray-200 bg-white/80 backdrop-blur-sm px-5 py-2.5">
-          <div className="flex items-center gap-2 text-xs text-gray-600">
-            <Switch
-              id="multi-agents-switch"
-              checked={multiAgents}
-              onChange={setMultiAgents}
-              disabled={booting}
-              aria-label="多专线协作"
-            />
-            <label htmlFor="multi-agents-switch" className="cursor-pointer select-none">
-              多专线协作
-            </label>
-          </div>
           <button
             type="button"
             disabled={booting || sessionId == null || pdfExporting}

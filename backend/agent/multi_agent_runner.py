@@ -255,6 +255,7 @@ async def stream_chat_multi_agent(
     skill_db_overrides: Optional[Dict[str, str]] = None,
     memory_block: Optional[str] = None,
     session_id: Optional[int] = None,
+    controlled_intent: Optional[Dict[str, Any]] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """
     Controlled multi-agent pattern:
@@ -281,7 +282,7 @@ async def stream_chat_multi_agent(
     all_skill_executions: List[Dict[str, Any]] = []
     summary_dependency_warnings: List[str] = []
     forced_followup_plan: Optional[Dict[str, Any]] = None
-    controlled_intent = classify_multi_agent_intent(messages)
+    controlled_intent = controlled_intent or classify_multi_agent_intent(messages)
     public_progress_emitted: set[str] = set()
     harness_state = HarnessState(
         trace_id=trace_id,

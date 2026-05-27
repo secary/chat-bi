@@ -12,6 +12,19 @@ export interface SseEvent {
   content: unknown;
 }
 
+export interface ThinkingDetail {
+  title: string;
+  language?: string;
+  content: string;
+}
+
+export type ThinkingStep =
+  | string
+  | {
+      message: string;
+      details?: ThinkingDetail[];
+    };
+
 export interface PlanSummary {
   metric: string;
   metric_code: string;
@@ -32,7 +45,10 @@ export interface ChatMessage {
   planSummary?: PlanSummary;
   analysisProposal?: AnalysisProposal;
   dashboardReady?: DashboardReady;
-  thinking?: string[];
+  thinking?: ThinkingStep[];
+  startedAt?: string;
+  completedAt?: string;
+  elapsedMs?: number;
   error?: string;
 }
 

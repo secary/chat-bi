@@ -608,7 +608,12 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           <span className="text-xs font-medium text-gray-500">ChatBI</span>
         </div>
 
-        <ThinkingBubble steps={message.thinking || []} />
+        <ThinkingBubble
+          completedAt={message.completedAt}
+          elapsedMs={message.elapsedMs}
+          startedAt={message.startedAt}
+          steps={message.thinking || []}
+        />
 
         {message.content && !hideContentBubble && (
           <div className="prose prose-sm max-w-none rounded-2xl rounded-tl-sm bg-surface px-5 py-3.5 text-sm leading-relaxed text-gray-800 shadow-card">

@@ -54,7 +54,11 @@ async def abort_chat(
 def _accumulate_assistant(acc: Dict[str, Any], event: Dict[str, Any]) -> None:
     et = event.get("type")
     if et == "thinking":
-        acc.setdefault("thinking", []).append(str(event.get("content") or ""))
+        content = event.get("content")
+        if isinstance(content, (dict, str)):
+            acc.setdefault("thinking", []).append(content)
+        else:
+            acc.setdefault("thinking", []).append(str(content or ""))
     elif et == "text":
         acc["content"] = acc.get("content", "") + str(event.get("content") or "")
     elif et == "chart":
@@ -69,6 +73,10 @@ def _accumulate_assistant(acc: Dict[str, Any], event: Dict[str, Any]) -> None:
         acc["dashboardReady"] = event.get("content")
     elif et == "error":
         acc["error"] = str(event.get("content") or "")
+    elif et == "done":
+        content = event.get("content")
+        if isinstance(content, dict) and content.get("elapsed_ms") is not None:
+            acc["elapsedMs"] = content["elapsed_ms"]
 
 
 def _assistant_payload(acc: Dict[str, Any]) -> Dict[str, Any]:
@@ -87,6 +95,8 @@ def _assistant_payload(acc: Dict[str, Any]) -> Dict[str, Any]:
         out["dashboardReady"] = acc["dashboardReady"]
     if acc.get("error"):
         out["error"] = acc["error"]
+    if acc.get("elapsedMs") is not None:
+        out["elapsedMs"] = acc["elapsedMs"]
     return out
 
 
@@ -196,6 +206,11 @@ async def chat(
                 if next_disconnected and not disconnected:
                     log_event(trace_id, "http.chat", "request.disconnected", level="WARN")
                 disconnected = next_disconnected
+                if event.get("type") == "done":
+                    event = {
+                        **event,
+                        "content": {"elapsed_ms": round((perf_counter() - started_at) * 1000, 2)},
+                    }
                 _accumulate_assistant(acc, event)
                 if not disconnected:
                     log_event(

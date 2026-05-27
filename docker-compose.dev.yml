@@ -64,7 +64,7 @@ services:
       - ./backend:/app/backend
       - ./skills:/app/skills
     command:
-      - uvicorn
+      - .venv/bin/uvicorn
       - backend.main:app
       - --host
       - 0.0.0.0

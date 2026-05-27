@@ -324,6 +324,65 @@ class ReactRunnerTest(unittest.TestCase):
 
         asyncio.run(run())
 
+    def test_subagent_stops_repeated_identical_skill_results(self):
+        repeated_call = {
+            "action": "call_skill",
+            "skill": "chatbi-semantic-query",
+            "skill_args": ["基于华东近3个月销售和毛利给经营建议"],
+            "thought": "继续查询",
+        }
+        script_result = {
+            "kind": "table",
+            "text": "查询完成：区域: 华东，毛利: 222700.00",
+            "data": {
+                "rows": [{"区域": "华东", "毛利": "222700.00"}],
+                "plan_summary": {
+                    "metric": "毛利",
+                    "dimensions": ["区域"],
+                    "time_filter": None,
+                },
+            },
+        }
+
+        async def run():
+            cfg = replace(settings, agent_react=True, agent_max_steps=6)
+            semantic_docs = [
+                doc
+                for doc in scan_skills_enabled(settings.skills_dir)
+                if doc.skill_dir.name == "chatbi-semantic-query"
+            ]
+            with patch("backend.agent.react_runner.settings", cfg):
+                with patch(
+                    "backend.agent.react_runner.call_llm_for_react_step",
+                    new_callable=AsyncMock,
+                ) as mock_llm:
+                    mock_llm.side_effect = [repeated_call, repeated_call]
+                    with patch("backend.agent.react_runner.run_script") as mock_run:
+                        mock_run.return_value = script_result
+                        events = await _collect(
+                            stream_chat_react(
+                                [
+                                    {
+                                        "role": "user",
+                                        "content": "基于华东近3个月销售和毛利给经营建议",
+                                    }
+                                ],
+                                trace_id="t-repeat-stop",
+                                subagent_react=True,
+                                specialist_agent_id="demo_query",
+                                skill_docs=semantic_docs,
+                                preferred_skill_slugs=["chatbi-semantic-query"],
+                            )
+                        )
+                        self.assertEqual(mock_run.call_count, 1)
+                        thinking = "\n".join(
+                            str(e.get("content")) for e in events if e.get("type") == "thinking"
+                        )
+                        self.assertIn("连续查询未获得新增信息", thinking)
+                        self.assertEqual(events[-1].get("type"), "done")
+
+        asyncio.run(run())
+
     def test_invalid_finish_json_falls_back_to_last_skill_result(self):
         first = {
             "action": "call_skill",

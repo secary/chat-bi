@@ -95,8 +95,8 @@ export function MultiAgentsAdminPage() {
         <div>
           <h2 className="text-lg font-semibold tracking-tight text-gray-900">多 Agents 管理</h2>
           <p className="mt-1 text-xs text-gray-500">
-            系统内部会自动决定多专线协作。这里仅保留安全运行时开关：专线启用状态、每轮最多子任务数、Manager 最大规划轮数。
-            技能清单、角色提示和策略边界改为只读观察，避免后台误操作直接影响路由与 Harness 决策。
+            系统内部会自动决定多专线协作。这里仅保留安全运行时开关：执行线启用状态、每轮最多子任务数、协同调度最多轮数。
+            技能清单、角色提示和策略边界改为只读观察，避免后台误操作直接影响路由与审计决策。
           </p>
         </div>
         <button
@@ -136,7 +136,7 @@ export function MultiAgentsAdminPage() {
               <span className="text-xs text-gray-400">（1–8）</span>
             </label>
             <label className="flex items-center gap-2 text-sm text-gray-700">
-              Manager 最多规划轮数
+              协同调度最多轮数
               <input
                 type="number"
                 min={1}
@@ -150,7 +150,7 @@ export function MultiAgentsAdminPage() {
                   );
                 }}
               />
-              <span className="text-xs text-gray-400">（1–8，&gt;1 时多轮规划）</span>
+              <span className="text-xs text-gray-400">（1–8，&gt;1 时可多轮调度）</span>
             </label>
           </div>
 
@@ -184,7 +184,7 @@ export function MultiAgentsAdminPage() {
                       </div>
                     </div>
                     <div className="block text-xs text-gray-500">
-                      专线状态
+                      执行线状态
                       <div className="mt-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
                         {meta.enabled ? '参与系统自动决策' : '已从运行时候选集中移除'}
                       </div>

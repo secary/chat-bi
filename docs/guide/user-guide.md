@@ -145,18 +145,18 @@
 **全局参数**
 
 - `max_agents_per_round`：每轮 Manager 下发的子任务条数上限（默认 4）。
-- `max_manager_rounds`：Manager 规划 LLM 最多轮数（管理页可配 1–8；仓库默认 5）。
+- `max_manager_rounds`：协同调度最多轮数（管理页可配 1–8；仓库默认 5）。
 
 **六条默认专线**（id → 职责摘要）
 
 | 专线 id | 标签 | 主要 Skill |
 |---------|------|------------|
-| `upload_analyst` | 上传与文件分析 | `chatbi-file-ingestion`、`chatbi-auto-analysis` |
-| `demo_query` | 演示库问数与澄清 | `chatbi-semantic-query`、`chatbi-database-overview`、`chatbi-semantic-processing`、`chatbi-metric-explainer` |
-| `period_compare` | 环比与经营对比 | `chatbi-comparison` |
-| `viz_board` | 图表与看板编排 | `chatbi-chart-recommendation`、`chatbi-dashboard-orchestration` |
-| `semantic_config` | 语义别名维护 | `chatbi-alias-manager` |
-| `business_advisor` | 经营决策建议 | `chatbi-decision-advisor` |
+| `upload_analyst` | A线 | `chatbi-file-ingestion`、`chatbi-auto-analysis` |
+| `demo_query` | B线 | `chatbi-semantic-query`、`chatbi-database-overview`、`chatbi-semantic-processing`、`chatbi-metric-explainer` |
+| `period_compare` | C线 | `chatbi-comparison` |
+| `viz_board` | D线 | `chatbi-chart-recommendation`、`chatbi-dashboard-orchestration` |
+| `semantic_config` | E线 | `chatbi-alias-manager` |
+| `business_advisor` | F线 | `chatbi-decision-advisor` |
 
 每条专线有独立的 `role_prompt`，限制模型不得越界调用其它专线 Skill。与「技能管理」配合：registry 中的 Skill 须已注册且未被禁用。
 

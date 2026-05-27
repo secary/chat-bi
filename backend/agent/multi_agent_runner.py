@@ -121,6 +121,28 @@ def _decision_audit_from_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
     return audit if isinstance(audit, dict) else {}
 
 
+def _filtered_progress_details(result: Optional[Dict[str, Any]]) -> List[Dict[str, str]]:
+    if not isinstance(result, dict):
+        return []
+    data = result.get("data")
+    if not isinstance(data, dict):
+        return []
+    details: List[Dict[str, str]] = []
+    sql = str(data.get("sql") or "").strip()
+    if sql:
+        details.append({"title": "SQL", "language": "sql", "content": sql})
+    plan_trace = data.get("plan_trace")
+    if isinstance(plan_trace, list):
+        for item in plan_trace:
+            text = str(item or "").strip()
+            if not text.startswith("生成 SQL："):
+                continue
+            trace_sql = text.removeprefix("生成 SQL：").strip()
+            if trace_sql and trace_sql != sql:
+                details.append({"title": "SQL", "language": "sql", "content": trace_sql})
+    return details[:3]
+
+
 def _dependency_warning_from_observation(observation: str) -> str:
     text = observation.strip()
     if not text:
@@ -269,11 +291,18 @@ async def stream_chat_multi_agent(
         mode="multi",
     )
 
-    def public_progress(key: str, content: str) -> Optional[Dict[str, str]]:
+    def public_progress(
+        key: str,
+        content: str,
+        details: Optional[List[Dict[str, str]]] = None,
+    ) -> Optional[Dict[str, Any]]:
         if key in public_progress_emitted:
             return None
         public_progress_emitted.add(key)
-        return {"type": "thinking", "content": content}
+        payload: Dict[str, Any] = {"message": content}
+        if details:
+            payload["details"] = details
+        return {"type": "thinking", "content": payload}
 
     event = public_progress("understand", "正在理解问题...")
     if event:
@@ -528,6 +557,15 @@ async def stream_chat_multi_agent(
                 harness_state.record_skill(lsn, lr)
             else:
                 harness_state.record_accept()
+            details = _filtered_progress_details(lr)
+            if details:
+                event = public_progress(
+                    f"detail-{rnd}-{orig_idx}",
+                    "已完成一步处理...",
+                    details,
+                )
+                if event:
+                    yield event
             result_kind = str(lr.get("kind") or "") if isinstance(lr, dict) else ""
             has_result = bool(executions) or isinstance(lr, dict)
             has_rows = _has_rows_result(lr)

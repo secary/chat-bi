@@ -111,7 +111,7 @@ def insert_message(
 
 def load_messages_ui(session_id: int) -> List[Dict[str, Any]]:
     rows = app_fetch_all(
-        f"SELECT id, role, content, payload_json FROM {CHAT_MESSAGE} "
+        f"SELECT id, role, content, payload_json, created_at FROM {CHAT_MESSAGE} "
         "WHERE session_id = %s ORDER BY id ASC",
         (session_id,),
     )
@@ -121,6 +121,7 @@ def load_messages_ui(session_id: int) -> List[Dict[str, Any]]:
             "id": str(row["id"]),
             "role": row["role"],
             "content": row["content"] or "",
+            "created_at": row.get("created_at"),
         }
         payload = row.get("payload_json")
         if isinstance(payload, str):

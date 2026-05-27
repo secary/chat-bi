@@ -14,7 +14,14 @@ class MultiAgentRunnerHarnessTest(unittest.TestCase):
                 sink["last_result"] = {
                     "kind": "table",
                     "text": "sales ok",
-                    "data": {"rows": [{"区域": "华东", "销售额": 100}]},
+                    "data": {
+                        "rows": [{"区域": "华东", "销售额": 100}],
+                        "sql": "SELECT SUM(sales_amount) FROM sales_order",
+                        "plan_trace": [
+                            "识别指标：销售额",
+                            "生成 SQL：SELECT SUM(sales_amount) FROM sales_order",
+                        ],
+                    },
                 }
                 sink["last_skill_name"] = "chatbi-semantic-query"
                 sink["skill_executions"] = [
@@ -104,14 +111,23 @@ class MultiAgentRunnerHarnessTest(unittest.TestCase):
             self.assertIn(("action_executing", "run_specialist"), harness_events)
             self.assertIn(("observation_built", "run_specialist"), harness_events)
             self.assertIn(("finish_emitted", "finish"), harness_events)
-            thinking = [
-                str(item.get("content") or "") for item in got if item.get("type") == "thinking"
+            thinking = [item.get("content") for item in got if item.get("type") == "thinking"]
+            messages = [
+                item.get("message") if isinstance(item, dict) else str(item) for item in thinking
             ]
-            self.assertFalse(any("开始查询" in item for item in thinking))
-            self.assertFalse(any("问数专线" in item for item in thinking))
-            self.assertIn("正在理解问题...", thinking)
-            self.assertIn("正在处理信息...", thinking)
-            self.assertIn("正在整理答案...", thinking)
+            self.assertFalse(any("开始查询" in item for item in messages))
+            self.assertFalse(any("问数专线" in item for item in messages))
+            self.assertIn("正在理解问题...", messages)
+            self.assertIn("正在处理信息...", messages)
+            self.assertIn("已完成一步处理...", messages)
+            self.assertIn("正在整理答案...", messages)
+            detail_steps = [
+                item for item in thinking if isinstance(item, dict) and item.get("details")
+            ]
+            self.assertEqual(len(detail_steps), 1)
+            self.assertEqual(detail_steps[0]["details"][0]["title"], "SQL")
+            self.assertEqual(detail_steps[0]["details"][0]["language"], "sql")
+            self.assertIn("SELECT SUM", detail_steps[0]["details"][0]["content"])
 
         import asyncio
 

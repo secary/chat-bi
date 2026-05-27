@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ChatMessage } from '../types/message';
+import type { ChatMessage, ThinkingStep } from '../types/message';
 import { getSessionMessagesApi, streamChat, abortChat, newTraceId } from '../api/client';
 import { isWaitingForAssistantMessage } from '../lib/chatPending';
 import { logger } from '../lib/logger';
@@ -11,6 +11,15 @@ const POLL_PENDING_MS = 1000;
 const POLL_PENDING_MAX_ATTEMPTS = 180;
 
 function mapRow(row: Record<string, unknown>): ChatMessage {
+  const hasAssistantOutput = Boolean(
+    row.role === 'assistant' &&
+      (row.content ||
+        row.chart ||
+        row.kpiCards ||
+        row.analysisProposal ||
+        row.dashboardReady ||
+        row.error),
+  );
   return {
     id: String(row.id),
     role: row.role as ChatMessage['role'],
@@ -21,8 +30,48 @@ function mapRow(row: Record<string, unknown>): ChatMessage {
     planSummary: row.planSummary as ChatMessage['planSummary'],
     analysisProposal: row.analysisProposal as ChatMessage['analysisProposal'],
     dashboardReady: row.dashboardReady as ChatMessage['dashboardReady'],
+    completedAt: hasAssistantOutput ? String(row.created_at || '') || undefined : undefined,
+    elapsedMs:
+      typeof row.elapsedMs === 'number'
+        ? row.elapsedMs
+        : Number.isFinite(Number(row.elapsedMs))
+          ? Number(row.elapsedMs)
+          : undefined,
     error: row.error as string | undefined,
   };
+}
+
+function eventElapsedMs(content: unknown): number | undefined {
+  if (!content || typeof content !== 'object') return undefined;
+  const raw = (content as Record<string, unknown>).elapsed_ms;
+  if (typeof raw === 'number') return raw;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function normalizeThinkingStep(value: unknown): ThinkingStep {
+  if (value && typeof value === 'object') {
+    const raw = value as Record<string, unknown>;
+    const message = String(raw.message ?? '').trim();
+    const rawDetails = Array.isArray(raw.details) ? raw.details : [];
+    const details = rawDetails
+      .map((item) => {
+        if (!item || typeof item !== 'object') return null;
+        const detail = item as Record<string, unknown>;
+        const content = String(detail.content ?? '').trim();
+        if (!content) return null;
+        return {
+          title: String(detail.title ?? '详情'),
+          language: detail.language ? String(detail.language) : undefined,
+          content,
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => Boolean(item));
+    if (message) {
+      return details.length ? { message, details } : message;
+    }
+  }
+  return String(value ?? '');
 }
 
 export interface UseChatReturn {
@@ -156,6 +205,7 @@ export function useChat(
         id: String(nextId++),
         role: 'assistant',
         content: '',
+        startedAt: new Date().toISOString(),
         thinking: [],
       };
 
@@ -197,7 +247,10 @@ export function useChat(
             const nextLast: ChatMessage = { ...last };
             switch (event.type) {
               case 'thinking':
-                nextLast.thinking = [...(last.thinking || []), String(event.content)];
+                nextLast.thinking = [
+                  ...(last.thinking || []),
+                  normalizeThinkingStep(event.content),
+                ];
                 break;
               case 'text':
                 nextLast.content = last.content
@@ -221,6 +274,14 @@ export function useChat(
                 break;
               case 'error':
                 nextLast.error = String(event.content);
+                break;
+              case 'done':
+                nextLast.completedAt = new Date().toISOString();
+                nextLast.elapsedMs =
+                  eventElapsedMs(event.content) ??
+                  (last.startedAt
+                    ? Date.now() - new Date(last.startedAt).getTime()
+                    : undefined);
                 break;
               default:
                 return prev;

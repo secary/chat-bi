@@ -14,6 +14,8 @@ SUMMARY_SYSTEM = """你是 ChatBI 的最终回答生成器：综合多个执行�
 
 规则：
 - 仅基于用户问题与 results[].observation 组织语言；禁止编造未出现的数字
+- 如果提供 fact_ledger，它是事实白名单：最终回答中的数字、对象、建议依据必须能回到 fact_ledger 或 results[].observation
+- 对没有事实依据的建议必须明确写成“暂无足够事实支撑”，不要补全或猜测
 - 同一结果的 observation 可能含多段「第 N 次 · skill」工具摘要，须全部纳入最终答复，禁止只写最后一段
 - 面向业务用户回答，不要暴露内部执行线、agent id、skill 名、handoff_instruction、Observation 等工程字段
 - 禁止输出“查询专线”“执行线”“专线”“agent”“skill”等内部链路说明
@@ -31,11 +33,13 @@ async def call_summarize_llm(
     user_question: str,
     blocks: List[Dict[str, str]],
     trace_id: str = "",
+    fact_ledger: str = "",
 ) -> Optional[Dict[str, Any]]:
     """Summarize result blocks without exposing internal route metadata."""
     body = json.dumps(
         {
             "user_question": user_question,
+            "fact_ledger": fact_ledger,
             "results": _public_result_blocks(blocks),
         },
         ensure_ascii=False,

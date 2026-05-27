@@ -24,6 +24,10 @@ from backend.agent.multi_agent_intent import (
 )
 from backend.agent.multi_agent_manager import validate_and_order_tasks
 from backend.agent.multi_agent_messages import build_subtask_messages
+from backend.agent.multi_agent_final_audit import (
+    audit_multi_final_synthesis,
+    build_factual_fallback,
+)
 from backend.agent.multi_agent_registry import (
     agent_label,
     agent_role_prompt,
@@ -712,11 +716,47 @@ async def stream_chat_multi_agent(
             harness_state,
             warnings=summary_dependency_warnings,
         )
+    final_audit = audit_multi_final_synthesis(
+        user_question=q,
+        blocks=all_blocks,
+        last_result=last_result,
+        last_skill_name=last_skill_name,
+        dependency_warnings=summary_dependency_warnings,
+    )
+    log_event(
+        trace_id,
+        "agent.harness",
+        "multi_final_audit",
+        payload={
+            "status": final_audit.status,
+            "issue_count": len(final_audit.issues),
+            "issues": final_audit.issues,
+            "has_fact_ledger": bool(final_audit.fact_ledger),
+        },
+        level="WARN" if final_audit.status != "ok" else "INFO",
+    )
+    if final_audit.should_block_summary:
+        yield {"type": "thinking", "content": "最终审计发现事实依据不足，已停止扩展汇总。"}
+        yield {"type": "text", "content": build_factual_fallback(final_audit)}
+        log_event(
+            trace_id,
+            "agent.multi",
+            "summary_blocked_by_final_audit",
+            payload={"issues": final_audit.issues},
+            level="WARN",
+        )
+        yield {"type": "done", "content": None}
+        return
     event = public_progress("summarize", "正在整理答案...")
     if event:
         yield event
     try:
-        synth = await call_summarize_llm(q, all_blocks, trace_id=trace_id)
+        synth = await call_summarize_llm(
+            q,
+            all_blocks,
+            trace_id=trace_id,
+            fact_ledger=final_audit.fact_ledger,
+        )
     except ChatAbortedError:
         log_event(trace_id, "agent.multi", "aborted", level="INFO")
         yield {"type": "thinking", "content": "用户中止了查询。"}

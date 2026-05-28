@@ -8,9 +8,9 @@ import {
 
 function toneCardClass(event: HarnessAuditEvent) {
   const tone = auditEventTone(event);
-  if (tone === 'critical') return 'rounded-lg border border-rose-200 bg-rose-50/70 p-3';
-  if (tone === 'warning') return 'rounded-lg border border-amber-200 bg-amber-50/70 p-3';
-  return 'rounded-lg border border-gray-200 bg-white p-3';
+  if (tone === 'critical') return 'rounded-2xl border border-rose-200 bg-rose-50/70 p-3 shadow-[0_10px_28px_rgba(15,23,42,0.04)]';
+  if (tone === 'warning') return 'rounded-2xl border border-amber-200 bg-amber-50/70 p-3 shadow-[0_10px_28px_rgba(15,23,42,0.04)]';
+  return 'rounded-2xl border border-gray-100 bg-white p-3 shadow-[0_10px_28px_rgba(15,23,42,0.04)]';
 }
 
 function toneBadgeClass(event: HarnessAuditEvent) {
@@ -43,18 +43,18 @@ export function HarnessDebugTimeline({
   const debugEvents = filterAuditEvents(events, eventQuery);
 
   return (
-    <section className="flex h-full min-h-[720px] flex-col rounded-2xl border border-sky-200/80 bg-[linear-gradient(180deg,rgba(239,246,255,0.95),rgba(255,255,255,0.98))] p-4 shadow-[0_18px_42px_-28px_rgba(37,99,235,0.35)]">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-sky-100 bg-white/75 px-4 py-3 backdrop-blur">
+    <section className="flex h-full min-h-[620px] flex-col rounded-2xl border border-gray-200 bg-white p-5 shadow-[0_16px_42px_rgba(15,23,42,0.06)]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-3">
         <div>
-          <p className="text-xs font-semibold tracking-[0.28em] text-sky-700">DEBUG 时间线</p>
+          <p className="text-sm font-semibold text-gray-900">Debug 时间线</p>
           <p className="mt-1 text-sm text-gray-600">快速筛查拒绝、空结果、依赖断点和决策审核事件。</p>
         </div>
         <button
           type="button"
           className={
             showDebug
-              ? 'rounded-xl border border-sky-500/40 bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-500'
-              : 'rounded-xl border border-sky-300 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-700 shadow-sm transition hover:bg-sky-100'
+              ? 'rounded-full bg-gray-900 px-3.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-gray-800'
+              : 'rounded-full border border-gray-200 bg-white px-3.5 py-1.5 text-xs text-gray-700 transition-colors hover:bg-gray-50'
           }
           onClick={onToggle}
         >
@@ -65,13 +65,13 @@ export function HarnessDebugTimeline({
       {showDebug ? (
         <div className="mt-4 flex min-h-0 flex-1 flex-col">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-white px-2.5 py-1 text-[11px] text-sky-700 shadow-sm">
+            <span className="rounded-full border border-gray-200 px-2.5 py-1 text-[11px] text-gray-600">
               当前显示 {debugEvents.length} / {events.length}
             </span>
           </div>
           <div className="mt-3">
             <input
-              className="w-full rounded-xl border border-sky-100 bg-white/90 px-3 py-2 text-sm shadow-sm outline-none transition placeholder:text-gray-400 focus:border-sky-300"
+              className="w-full rounded-full border border-transparent bg-gray-50 px-3.5 py-2 text-sm outline-none transition placeholder:text-gray-400 focus:border-accent focus:bg-white focus:ring-2 focus:ring-accent/30"
               placeholder="按 event_name / agent / skill / reason / payload 搜索"
               value={eventQuery}
               onChange={(e) => onQueryChange(e.target.value)}
@@ -145,11 +145,11 @@ export function HarnessDebugTimeline({
         </div>
       ) : (
         <div className="mt-4 flex min-h-0 flex-1 items-start">
-          <div className="w-full rounded-2xl border border-dashed border-sky-200 bg-white/65 p-4">
-          <p className="text-sm text-gray-600">点击右上角按钮展开完整 Debug 时间线。</p>
-          <p className="mt-1 text-xs text-gray-400">
-            适合排查 `policy_rejected`、`decision_content_audited`、空 observation 等细节。
-          </p>
+          <div className="w-full rounded-2xl border border-dashed border-gray-200 bg-gray-50/70 p-4">
+            <p className="text-sm text-gray-600">点击右上角按钮展开完整 Debug 时间线。</p>
+            <p className="mt-1 text-xs text-gray-400">
+              适合排查 `policy_rejected`、`decision_content_audited`、空 observation 等细节。
+            </p>
           </div>
         </div>
       )}

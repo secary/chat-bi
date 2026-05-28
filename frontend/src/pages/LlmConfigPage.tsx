@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  deleteLlmProfile,
   getLlmSettings,
   postLlmProfile,
   postLlmProfileTest,
@@ -11,6 +12,9 @@ import { logger } from '../lib/logger';
 import { LLM_PROVIDER_PRESETS } from '../lib/llmProviderPresets';
 
 type SaveState = 'idle' | 'saving' | 'testing' | 'success' | 'error';
+
+const CUSTOM_PROVIDER_ID = 'other';
+const PROVIDER_OPTIONS = [...LLM_PROVIDER_PRESETS, { id: CUSTOM_PROVIDER_ID, label: '其他' }];
 
 function findProfileForPreset(profiles: LlmProfilePublic[], model: string, apiBase: string) {
   const normalizedBase = apiBase.replace(/\/+$/, '');
@@ -40,19 +44,26 @@ export function LlmConfigPage() {
   const [view, setView] = useState<LlmSettingsView | null>(null);
   const [providerId, setProviderId] = useState(LLM_PROVIDER_PRESETS[0]?.id ?? '');
   const [displayName, setDisplayName] = useState('');
+  const [customModel, setCustomModel] = useState('');
+  const [customApiBase, setCustomApiBase] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [state, setState] = useState<SaveState>('idle');
   const [message, setMessage] = useState('');
   const [busyProfileId, setBusyProfileId] = useState<number | null>(null);
+  const [deletingProfileId, setDeletingProfileId] = useState<number | null>(null);
 
   const profiles = view?.profiles ?? [];
   const preset = useMemo(
-    () => LLM_PROVIDER_PRESETS.find((item) => item.id === providerId) ?? LLM_PROVIDER_PRESETS[0],
+    () => LLM_PROVIDER_PRESETS.find((item) => item.id === providerId) ?? null,
     [providerId],
   );
-  const effectiveSource = view?.effective_source === 'saved_settings' ? '管理页配置' : '环境变量';
+  const customProviderSelected = providerId === CUSTOM_PROVIDER_ID;
+  const providerLabel = preset?.label || '其他';
+  const selectedModel = customProviderSelected ? customModel.trim() : preset?.model || '';
+  const selectedApiBase = customProviderSelected ? customApiBase.trim() : preset?.apiBase || '';
   const activeProfile = profiles.find((profile) => profile.id === view?.active_profile_id);
   const activeStatus = activeProfile?.health_status || 'unknown';
+  const activeModel = activeProfile?.model || view?.effective_model || '未配置';
 
   useEffect(() => {
     let cancelled = false;
@@ -80,20 +91,20 @@ export function LlmConfigPage() {
   };
 
   const saveAndEnable = async () => {
-    if (!preset || !apiKey.trim()) {
+    if (!selectedModel || !selectedApiBase || !apiKey.trim()) {
       setState('error');
-      setMessage('请选择厂商并填写 API Key。');
+      setMessage(customProviderSelected ? '请填写模型、Base URL 和 API Key。' : '请选择厂商并填写 API Key。');
       return;
     }
     setState('saving');
     setMessage('正在保存并测试连接...');
     try {
       const latest = await refreshView();
-      const existing = findProfileForPreset(latest.profiles ?? [], preset.model, preset.apiBase);
+      const existing = findProfileForPreset(latest.profiles ?? [], selectedModel, selectedApiBase);
       const payload = {
-        display_name: displayName.trim() || preset.label,
-        model: preset.model,
-        api_base: preset.apiBase,
+        display_name: displayName.trim() || `${providerLabel} 默认模型`,
+        model: selectedModel,
+        api_base: selectedApiBase,
         api_key: apiKey.trim(),
       };
       const profileId = existing
@@ -149,6 +160,28 @@ export function LlmConfigPage() {
     }
   };
 
+  const removeProfile = async (profile: LlmProfilePublic) => {
+    if (profile.id === view?.active_profile_id && profiles.length <= 1) {
+      setState('error');
+      setMessage('当前配置是唯一可用模型，不能删除。');
+      return;
+    }
+    if (!window.confirm(`删除模型“${profileLabel(profile)}”？`)) return;
+    try {
+      setDeletingProfileId(profile.id);
+      await deleteLlmProfile(profile.id);
+      await refreshView();
+      setState('success');
+      setMessage(`${profileLabel(profile)} 已删除。`);
+    } catch (error) {
+      logger.error('delete llm profile', error);
+      setState('error');
+      setMessage(error instanceof Error ? error.message : '删除失败，请稍后重试。');
+    } finally {
+      setDeletingProfileId(null);
+    }
+  };
+
   return (
     <div className="h-full overflow-auto px-6 py-6 lg:px-8">
       <div className="mx-auto max-w-3xl">
@@ -165,7 +198,7 @@ export function LlmConfigPage() {
                 {activeProfile ? profileLabel(activeProfile) : view?.effective_model || '未配置'}
               </div>
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
-                <span>来源：{effectiveSource}</span>
+                <span>模型：{activeModel}</span>
                 <span>API Key：{view?.effective_api_key_set ? '已配置' : '未配置'}</span>
               </div>
             </div>
@@ -182,28 +215,43 @@ export function LlmConfigPage() {
               {profiles.map((profile) => {
                 const active = profile.id === view?.active_profile_id;
                 const busy = busyProfileId === profile.id;
+                const deleting = deletingProfileId === profile.id;
+                const actionsDisabled = busyProfileId !== null || deletingProfileId !== null;
+                const deleteDisabled = actionsDisabled || (active && profiles.length <= 1);
                 return (
                   <div
                     key={profile.id}
                     className={
-                      'flex items-center gap-2 rounded-lg border px-2.5 py-2 text-sm ' +
+                      'flex min-w-[220px] flex-col gap-2 rounded-lg border px-2.5 py-2 text-sm ' +
                       (active ? 'border-accent bg-accent-light text-accent' : 'border-gray-200 bg-white text-gray-700')
                     }
                   >
-                    <button type="button" onClick={() => void activateProfile(profile)} className="max-w-[180px] truncate font-medium">
-                      {profileLabel(profile)}
-                    </button>
-                    <span className={`rounded-full border px-1.5 py-0.5 text-[10px] ${statusClass(profile.health_status || 'unknown')}`}>
-                      {statusText(profile.health_status || 'unknown')}
-                    </span>
-                    <button
-                      type="button"
-                      disabled={busyProfileId !== null}
-                      onClick={() => void testProfile(profile)}
-                      className="rounded border border-gray-200 bg-white px-2 py-0.5 text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-50"
-                    >
-                      {busy ? '测试中…' : '测试'}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button type="button" onClick={() => void activateProfile(profile)} className="min-w-0 flex-1 truncate text-left font-medium">
+                        {profileLabel(profile)}
+                      </button>
+                      <span className={`shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] ${statusClass(profile.health_status || 'unknown')}`}>
+                        {statusText(profile.health_status || 'unknown')}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={actionsDisabled}
+                        onClick={() => void testProfile(profile)}
+                        className="shrink-0 rounded border border-gray-200 bg-white px-2 py-0.5 text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        {busy ? '测试中…' : '测试'}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={deleteDisabled}
+                        onClick={() => void removeProfile(profile)}
+                        className="shrink-0 rounded border border-red-100 bg-white px-2 py-0.5 text-xs text-red-600 hover:bg-red-50 disabled:opacity-50"
+                        title={active && profiles.length <= 1 ? '当前配置是唯一可用模型，不能删除' : '删除模型'}
+                      >
+                        {deleting ? '删除中…' : '删除'}
+                      </button>
+                    </div>
+                    <div className="truncate text-xs text-gray-500">模型：{profile.model}</div>
                   </div>
                 );
               })}
@@ -216,7 +264,7 @@ export function LlmConfigPage() {
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-900">选择厂商</label>
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {LLM_PROVIDER_PRESETS.map((item) => {
+                {PROVIDER_OPTIONS.map((item) => {
                   const selected = item.id === providerId;
                   return (
                     <button
@@ -247,9 +295,40 @@ export function LlmConfigPage() {
                 className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm transition-all focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
                 value={displayName}
                 onChange={(event) => setDisplayName(event.target.value)}
-                placeholder={preset ? `${preset.label} 默认模型` : '便于识别，例如：生产 MiniMax'}
+                placeholder={`${providerLabel} 默认模型`}
               />
             </label>
+
+            {customProviderSelected ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="block text-sm font-medium text-gray-900">
+                  模型
+                  <input
+                    className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm transition-all focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+                    value={customModel}
+                    onChange={(event) => {
+                      setCustomModel(event.target.value);
+                      setState('idle');
+                      setMessage('');
+                    }}
+                    placeholder="例如：openai/gpt-4o-mini"
+                  />
+                </label>
+                <label className="block text-sm font-medium text-gray-900">
+                  Base URL
+                  <input
+                    className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm transition-all focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+                    value={customApiBase}
+                    onChange={(event) => {
+                      setCustomApiBase(event.target.value);
+                      setState('idle');
+                      setMessage('');
+                    }}
+                    placeholder="例如：https://api.example.com/v1"
+                  />
+                </label>
+              </div>
+            ) : null}
 
             <label className="block text-sm font-medium text-gray-900">
               API Key

@@ -72,7 +72,7 @@ uv sync
 | `auth-memory` | 鉴权、token、免登录、记忆开关 |
 | `dashboard` | Dashboard 聚合和图表渲染 |
 | `data-sources` | 外部库 SQL、数据库概览、文件导入 |
-| `upload-vision` | 上传上下文、文件解析、视觉抽取 |
+| `upload` | 上传上下文、文件解析 |
 | `report` | PDF 报告 |
 
 便捷别名：
@@ -152,10 +152,9 @@ uv sync
 - `test_kpi_renderer.py::*`：KPI 卡片字段不匹配时回落到 default，字段精确命中时展示对应值。
 - `test_executor_file_ingestion_args.py::*`：文件导入执行参数优先提取上传路径，并可回退到最近一次用户上传文件。
 
-### Upload / Vision / Report
+### Upload / Report
 
-- `test_vision_extract.py::*`：Vision 抽取空结果归一化、行数截断。
-- `test_vision_llm_runtime.py::*`：视觉门禁（环境禁用、无 DB 时 `CHATBI_VISION_ALLOW_ENV_MAIN`）、无能力时 enrich 短路。
+- `test_upload_context.py::*`：上传文件路径上下文注入与后续追问路由保护。
 - `test_report_pdf.py::*`：PDF HTML 文档、chart base64、WeasyPrint 成功路径、ReportLab fallback、CJK 字体优先、LLM 摘要 mock。
 
 ## 迁移方向
@@ -170,7 +169,7 @@ tests/admin/
 tests/auth_memory/
 tests/dashboard/
 tests/data_sources/
-tests/upload_vision/
+tests/upload/
 tests/report/
 ```
 

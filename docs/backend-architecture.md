@@ -175,14 +175,7 @@ executor.run_script(skill_doc, args, trace_id, skill_db_overrides)
 | `pdf_summary.py` | LLM 会话摘要 |
 | `pdf_chart_png.py` | ECharts option → PNG |
 
-### 2.7 Vision (vision/)
-
-| 文件 | 职责 |
-|------|------|
-| `chart_table_extract.py` | 多模态表格抽取；`enrich_last_user_message_with_vision()` |
-| `vision_llm_runtime.py` | 选用 `supports_vision` 的 Profile 或专用视觉配置 |
-
-### 2.8 其他服务
+### 2.7 其他服务
 
 | 文件 | 职责 |
 |------|------|
@@ -221,8 +214,6 @@ resolve_skill_db_env(db_connection_id)
 format_memory_for_prompt(user_id)          # CHATBI_MEMORY_DISABLED 可跳过
     ▼
 get_session_for_user → insert_message(user)
-    ▼
-enrich_last_user_message_with_vision
     ▼
 augment_messages_for_upload_followup
     ▼
@@ -277,7 +268,7 @@ chatbi_admin_llm_settings
 
 chatbi_admin_llm_model_profile
   id, display_name, model, api_base, api_key, sort_order,
-  supports_vision, health_status, ...
+  health_status, ...
 
 chatbi_admin_skill_registry
   skill_slug, enabled

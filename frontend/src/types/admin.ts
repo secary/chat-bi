@@ -95,7 +95,6 @@ export interface LlmProfilePublic {
   api_base: string | null;
   api_key_set: boolean;
   sort_order: number;
-  supports_vision: boolean;
   health_status: string;
   health_detail: string | null;
   health_checked_at: string | null;
@@ -108,9 +107,6 @@ export interface LlmSettingsView {
   api_base: string | null;
   api_key_set: boolean;
   active_profile_id?: number | null;
-  vision_profile_id?: number | null;
-  vision_extract_enabled?: boolean;
-  vision_disabled_by_env?: boolean;
   updated_at: string | null;
   profiles?: LlmProfilePublic[];
   effective_model?: string | null;

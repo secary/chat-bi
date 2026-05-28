@@ -23,17 +23,10 @@ def _upload_context(content: str, uploads: Any) -> str:
         if not server_path:
             continue
         filename = str(item.get("filename") or Path(server_path).name)
-        suffix = Path(filename).suffix.lower()
-        kind = "图像" if suffix in {".png", ".jpg", ".jpeg", ".webp"} else "数据文件"
-        if kind == "图像":
-            lines.append(
-                f"- {kind}：{filename}；路径：{server_path}；如问题涉及图像，请读取图像并纳入分析。"
-            )
-        else:
-            lines.append(
-                f"- {kind}：{filename}；路径：{server_path}；如问题涉及文件，先校验结构；"
-                "符合现有业务表就直接分析，不符合就按通用表分析。"
-            )
+        lines.append(
+            f"- 数据文件：{filename}；路径：{server_path}；如问题涉及文件，先校验结构；"
+            "符合现有业务表就直接分析，不符合就按通用表分析。"
+        )
     if len(lines) == 1:
         return content
     return "\n".join(lines) + "\n\n" + content

@@ -100,7 +100,7 @@ export function ChatInput({ onSend, onAbort, loading, disabled = false }: ChatIn
         <input
           ref={fileInputRef}
           type="file"
-          accept=".csv,.xlsx,.xlsm,.png,.jpg,.jpeg,.webp"
+          accept=".csv,.xlsx,.xlsm"
           className="hidden"
           onChange={(e) => {
             handleFiles(e.target.files);
@@ -112,7 +112,7 @@ export function ChatInput({ onSend, onAbort, loading, disabled = false }: ChatIn
           disabled={loading || uploading || disabled}
           onClick={() => fileInputRef.current?.click()}
           className="h-11 shrink-0 rounded-xl border border-gray-200 bg-white px-4 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50 disabled:bg-gray-100"
-          title="上传 CSV、Excel 或图像"
+          title="上传 CSV 或 Excel"
         >
           {uploading ? '上传中' : '附件'}
         </button>
@@ -121,7 +121,7 @@ export function ChatInput({ onSend, onAbort, loading, disabled = false }: ChatIn
           type="text"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          placeholder={pendingUpload ? '针对已上传附件输入你的问题...' : '输入业务问题，或拖入 CSV/Excel/图像...'}
+          placeholder={pendingUpload ? '针对已上传附件输入你的问题...' : '输入业务问题，或拖入 CSV/Excel...'}
           disabled={loading || uploading || disabled}
           className="h-11 min-w-0 flex-1 rounded-xl border border-gray-200 bg-surface px-4 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-50 disabled:bg-gray-100"
         />
@@ -148,7 +148,7 @@ export function ChatInput({ onSend, onAbort, loading, disabled = false }: ChatIn
             ? '松开即可上传文件'
             : pendingUpload
               ? '附件会随下一条消息一起发送'
-              : '支持 CSV、XLSX、XLSM 与 PNG/JPG/WebP，可直接拖到输入框区域')}
+              : '支持 CSV、XLSX、XLSM，可直接拖到输入框区域')}
       </div>
     </form>
   );

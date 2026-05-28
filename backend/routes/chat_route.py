@@ -26,7 +26,6 @@ from backend.session_repo import (
 )
 from backend.agent.abort_state import clear_abort, get_abort_event, is_aborted
 from backend.trace import log_event
-from backend.vision.chart_table_extract import enrich_last_user_message_with_vision
 
 router = APIRouter()
 
@@ -123,15 +122,10 @@ def _message_with_upload_context(message: str, uploads: List[dict]) -> str:
         if not server_path:
             continue
         filename = str(item.get("filename") or server_path.rsplit("/", 1)[-1])
-        if re.search(r"\.(?:png|jpg|jpeg|webp)$", filename, re.IGNORECASE):
-            lines.append(
-                f"- 图像：{filename}；路径：{server_path}；如问题涉及图像，请读取图像并纳入分析。"
-            )
-        else:
-            lines.append(
-                f"- 数据文件：{filename}；路径：{server_path}；如问题涉及文件，先校验结构；"
-                "符合现有业务表就直接分析，不符合就按通用表分析。"
-            )
+        lines.append(
+            f"- 数据文件：{filename}；路径：{server_path}；如问题涉及文件，先校验结构；"
+            "符合现有业务表就直接分析，不符合就按通用表分析。"
+        )
     if len(lines) == 1:
         return message
     return "\n".join(lines) + "\n\n" + message
@@ -197,7 +191,6 @@ async def chat(
         },
     )
 
-    # Vision enrichment moved into event_gen() to allow sending thinking event before LLM call
     messages = augment_messages_for_upload_followup(messages)
 
     async def event_gen() -> AsyncGenerator[dict, None]:
@@ -205,20 +198,6 @@ async def chat(
         acc: Dict[str, Any] = {"content": "", "thinking": []}
         disconnected = False
         nonlocal messages
-
-        # --- Vision enrichment with early thinking event ---
-        if messages and messages[-1].get("role") == "user":
-            last_content = messages[-1].get("content") or ""
-            if re.search(r"[^\s]+\.(?:png|jpg|jpeg|webp)", last_content, re.IGNORECASE):
-                yield {
-                    "event": "message",
-                    "data": json.dumps(
-                        {"type": "thinking", "content": "正在读取上传的图像..."},
-                        ensure_ascii=False,
-                    ),
-                }
-                messages = await enrich_last_user_message_with_vision(messages, trace_id)
-        # --- End vision enrichment ---
 
         try:
             # call llm to get response.

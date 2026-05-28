@@ -20,7 +20,6 @@ class LlmProfileCreate(BaseModel):
     model: str = Field(..., max_length=255)
     api_base: Optional[str] = Field(default=None, max_length=512)
     api_key: Optional[str] = Field(default=None, max_length=512)
-    supports_vision: bool = False
 
 
 class LlmProfileUpdate(BaseModel):
@@ -28,7 +27,6 @@ class LlmProfileUpdate(BaseModel):
     model: Optional[str] = Field(default=None, max_length=255)
     api_base: Optional[str] = Field(default=None, max_length=512)
     api_key: Optional[str] = Field(default=None, max_length=512)
-    supports_vision: Optional[bool] = None
 
 
 class ReorderBody(BaseModel):
@@ -50,7 +48,6 @@ def create_llm_profile(body: LlmProfileCreate, request: Request) -> dict:
         m,
         body.api_base,
         body.api_key,
-        supports_vision=bool(body.supports_vision),
     )
     rows = llm_profile_repo.list_ordered()
     if len(rows) == 1:
@@ -82,7 +79,6 @@ def update_llm_profile(profile_id: int, body: LlmProfileUpdate, request: Request
         model=data.get("model"),
         api_base=data.get("api_base"),
         api_key=data.get("api_key"),
-        supports_vision=data.get("supports_vision") if "supports_vision" in data else None,
     )
     row = llm_profile_repo.get_by_id(profile_id)
     log_event(

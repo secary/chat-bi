@@ -29,6 +29,8 @@ csv
 *.jpg
 *.jpeg
 *.png
+!frontend/public/logo/
+!frontend/public/logo/*.png
 
 __pycache__
 demo

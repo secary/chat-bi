@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react';
 import { newTraceId, uploadFile } from '../api/client';
+import type { UploadedFile } from '../types/message';
 
 interface ChatInputProps {
-  onSend: (text: string, traceId?: string) => void;
+  onSend: (text: string, traceId?: string, uploads?: UploadedFile[]) => void;
   onAbort?: () => void;
   loading: boolean;
   disabled?: boolean;
@@ -14,6 +15,7 @@ export function ChatInput({ onSend, onAbort, loading, disabled = false }: ChatIn
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [pendingTraceId, setPendingTraceId] = useState<string>();
+  const [pendingUpload, setPendingUpload] = useState<UploadedFile>();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -23,9 +25,10 @@ export function ChatInput({ onSend, onAbort, loading, disabled = false }: ChatIn
       return;
     }
     if (message.trim() && !loading && !uploading && !disabled) {
-      onSend(message, pendingTraceId);
+      onSend(message.trim(), pendingTraceId, pendingUpload ? [pendingUpload] : undefined);
       setMessage('');
       setPendingTraceId(undefined);
+      setPendingUpload(undefined);
     }
   };
 
@@ -36,11 +39,7 @@ export function ChatInput({ onSend, onAbort, loading, disabled = false }: ChatIn
     const traceId = newTraceId();
     try {
       const uploaded = await uploadFile(file, traceId);
-      const isImage = /\.(png|jpg|jpeg|webp)$/i.test(file.name);
-      const prompt = isImage
-        ? `请读取我上传的图像 ${uploaded.server_path}，纳入分析`
-        : `请读取我上传的文件 ${uploaded.server_path}，先校验结构；如果符合现有业务表就直接分析，不符合就按通用表分析`;
-      setMessage((current) => (current.trim() ? `${current.trim()}\n${prompt}` : prompt));
+      setPendingUpload(uploaded);
       setPendingTraceId(uploaded.trace_id || traceId);
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : String(err));
@@ -77,6 +76,26 @@ export function ChatInput({ onSend, onAbort, loading, disabled = false }: ChatIn
         dragging ? 'border-accent bg-accent-light' : 'border-gray-200 bg-surface'
       }`}
     >
+      {pendingUpload ? (
+        <div className="mb-3 flex min-w-0 items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+          <div className="min-w-0">
+            <span className="font-medium">已上传</span>
+            <span className="ml-2 inline-block max-w-full truncate align-bottom">
+              {pendingUpload.filename}
+            </span>
+          </div>
+          <button
+            type="button"
+            className="shrink-0 rounded-lg border border-emerald-200 bg-white px-2 py-1 text-emerald-800 transition-colors hover:bg-emerald-100"
+            onClick={() => {
+              setPendingUpload(undefined);
+              setPendingTraceId(undefined);
+            }}
+          >
+            移除
+          </button>
+        </div>
+      ) : null}
       <div className="flex items-center gap-2">
         <input
           ref={fileInputRef}
@@ -102,7 +121,7 @@ export function ChatInput({ onSend, onAbort, loading, disabled = false }: ChatIn
           type="text"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          placeholder="输入业务问题，或拖入 CSV/Excel/图像..."
+          placeholder={pendingUpload ? '针对已上传附件输入你的问题...' : '输入业务问题，或拖入 CSV/Excel/图像...'}
           disabled={loading || uploading || disabled}
           className="h-11 min-w-0 flex-1 rounded-xl border border-gray-200 bg-surface px-4 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:opacity-50 disabled:bg-gray-100"
         />
@@ -127,7 +146,9 @@ export function ChatInput({ onSend, onAbort, loading, disabled = false }: ChatIn
         {uploadError ||
           (dragging
             ? '松开即可上传文件'
-            : '支持 CSV、XLSX、XLSM 与 PNG/JPG/WebP，可直接拖到输入框区域')}
+            : pendingUpload
+              ? '附件会随下一条消息一起发送'
+              : '支持 CSV、XLSX、XLSM 与 PNG/JPG/WebP，可直接拖到输入框区域')}
       </div>
     </form>
   );

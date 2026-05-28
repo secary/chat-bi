@@ -337,7 +337,8 @@ class MultiAgentRunnerHarnessTest(unittest.TestCase):
             texts = [
                 str(event.get("content") or "") for event in got if event.get("type") == "text"
             ]
-            self.assertTrue(any("未通过最终事实审计" in text for text in texts))
+            self.assertTrue(any("未通过事实审计" in text for text in texts))
+            self.assertFalse(any('"rows"' in text for text in texts))
             final_audits = [
                 item
                 for item in events
@@ -423,7 +424,8 @@ class MultiAgentRunnerHarnessTest(unittest.TestCase):
             texts = [
                 str(event.get("content") or "") for event in got if event.get("type") == "text"
             ]
-            self.assertTrue(any("未通过最终事实审计" in text for text in texts))
+            self.assertTrue(any("未通过事实审计" in text for text in texts))
+            self.assertFalse(any('"rows"' in text for text in texts))
             claim_audits = [
                 item
                 for item in events

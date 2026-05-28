@@ -165,14 +165,13 @@ def build_factual_fallback(audit: FinalAudit) -> str:
     issue_lines = "\n".join(f"- {issue['message']}" for issue in audit.issues)
     if audit.fact_ledger:
         return (
-            "本轮多专线结果未通过最终事实审计，因此先不生成新的经营建议或扩展解读。\n\n"
+            "本轮回答的部分数字未通过事实审计，因此先不生成新的经营建议或扩展解读。\n\n"
             "审计发现：\n"
             f"{issue_lines}\n\n"
-            "已确认的事实依据：\n"
-            f"{audit.fact_ledger}"
+            "已确认：本轮已读取并处理上传文件。你可以继续指定要分析的指标、字段、分组维度或时间范围，我会基于文件数据重新计算。"
         )
     return (
-        "本轮多专线结果未通过最终事实审计，因此先不生成经营建议。\n\n"
+        "本轮回答未通过事实审计，因此先不生成经营建议。\n\n"
         "审计发现：\n"
         f"{issue_lines}\n\n"
         "当前没有取得可用于支撑建议的结构化事实，请先补充查询指标、时间范围或区域。"

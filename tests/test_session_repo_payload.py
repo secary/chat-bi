@@ -65,6 +65,34 @@ class SessionRepoPayloadUiTest(unittest.TestCase):
         self.assertIn("planSummary", out[0])
         self.assertIn("analysisProposal", out[0])
 
+    def test_user_upload_payload_is_ui_metadata_and_llm_context(self) -> None:
+        fake_rows = [
+            {
+                "id": 3,
+                "role": "user",
+                "content": "帮我分析逾期分布",
+                "payload_json": {
+                    "uploads": [
+                        {
+                            "filename": "loans.csv",
+                            "server_path": "/tmp/chatbi-uploads/abc_loans.csv",
+                            "size": 123,
+                            "trace_id": "trace-1",
+                        }
+                    ]
+                },
+            }
+        ]
+        with patch("backend.session_repo.app_fetch_all", return_value=fake_rows):
+            ui_rows = load_messages_ui(11)
+        self.assertEqual(ui_rows[0]["content"], "帮我分析逾期分布")
+        self.assertEqual(ui_rows[0]["uploads"][0]["filename"], "loans.csv")
+
+        with patch("backend.session_repo.app_fetch_all", return_value=fake_rows):
+            llm_rows = list_messages_for_llm(11)
+        self.assertIn("/tmp/chatbi-uploads/abc_loans.csv", llm_rows[0]["content"])
+        self.assertIn("帮我分析逾期分布", llm_rows[0]["content"])
+
 
 if __name__ == "__main__":
     unittest.main()

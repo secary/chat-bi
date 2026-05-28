@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ChatMessage, ThinkingStep } from '../types/message';
+import type { ChatMessage, ThinkingStep, UploadedFile } from '../types/message';
 import { getSessionMessagesApi, streamChat, abortChat, newTraceId } from '../api/client';
 import { isWaitingForAssistantMessage } from '../lib/chatPending';
 import { logger } from '../lib/logger';
@@ -24,6 +24,7 @@ function mapRow(row: Record<string, unknown>): ChatMessage {
     id: String(row.id),
     role: row.role as ChatMessage['role'],
     content: String(row.content ?? ''),
+    uploads: Array.isArray(row.uploads) ? (row.uploads as UploadedFile[]) : undefined,
     thinking: row.thinking as string[] | undefined,
     chart: row.chart as Record<string, unknown> | undefined,
     kpiCards: row.kpiCards as ChatMessage['kpiCards'],
@@ -81,7 +82,7 @@ export interface UseChatReturn {
   assistantPending: boolean;
   currentTraceId: string | null;
   lastTraceId: string | null;
-  sendMessage: (text: string, traceId?: string) => Promise<void>;
+  sendMessage: (text: string, traceId?: string, uploads?: UploadedFile[]) => Promise<void>;
   abort: () => void;
 }
 
@@ -187,7 +188,7 @@ export function useChat(
   }, [sessionId, assistantPending]);
 
   const sendMessage = useCallback(
-    async (text: string, traceId?: string) => {
+    async (text: string, traceId?: string, uploads?: UploadedFile[]) => {
       if (!text.trim() || loading || streamingRef.current || sessionId == null) {
         return;
       }
@@ -197,6 +198,7 @@ export function useChat(
         id: String(nextId++),
         role: 'user',
         content: text,
+        uploads,
       };
       const assistantMsg: ChatMessage = {
         id: String(nextId++),
@@ -229,6 +231,7 @@ export function useChat(
           {
             message: text,
             history,
+            uploads,
             session_id: sessionId,
             db_connection_id: dbConnectionId ?? undefined,
             multi_agents: 'auto',

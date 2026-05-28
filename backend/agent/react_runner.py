@@ -893,12 +893,23 @@ async def stream_chat_react(
                 cl = (result.get("data") or {}).get("column_labels")
                 if isinstance(cl, dict):
                     last_ingestion_column_labels = cl
-                if latest_proposal and _is_confirmation_request(user_text) and last_ingestion_rows:
+                should_continue_auto = (
+                    latest_proposal is not None and _is_confirmation_request(user_text)
+                ) or (
+                    latest_proposal is None
+                    and _is_auto_analysis_request(user_text)
+                    and not _is_confirmation_request(user_text)
+                )
+                if should_continue_auto and last_ingestion_rows:
                     auto_doc = find_skill(skills, "chatbi-auto-analysis")
                     if auto_doc:
+                        if latest_proposal and _is_confirmation_request(user_text):
+                            progress_text = "已恢复上传文件数据，继续执行采纳指标分析..."
+                        else:
+                            progress_text = "已读取上传文件，继续生成结构化分析建议..."
                         yield {
                             "type": "thinking",
-                            "content": "已恢复上传文件数据，继续执行采纳指标分析...",
+                            "content": progress_text,
                         }
                         skill_name = "chatbi-auto-analysis"
                         auto_args = _auto_analysis_args(
@@ -917,7 +928,11 @@ async def stream_chat_react(
                                 skill_name,
                                 auto_doc,
                                 agent_id=specialist_agent_id,
-                                extra={"args": auto_args, "resumed_after_ingestion": True},
+                                extra={
+                                    "args": auto_args,
+                                    "resumed_after_ingestion": latest_proposal is not None,
+                                    "continued_after_ingestion": latest_proposal is None,
+                                },
                             ),
                         )
                         result = run_script(

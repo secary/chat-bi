@@ -608,6 +608,17 @@ class ReactRunnerTest(unittest.TestCase):
                 "rows": [{"门店": "南京东路店", "城市": "上海"}],
             },
         }
+        auto_result = {
+            "kind": "auto_analysis",
+            "text": "请确认是否采纳以下指标。",
+            "data": {
+                "status": "need_confirmation",
+                "analysis_proposal": {
+                    "markdown": "### 建议指标\n- 逾期贷款分布",
+                    "proposed_metrics": [],
+                },
+            },
+        }
 
         async def run():
             cfg = replace(settings, agent_react=True, agent_max_steps=6)
@@ -621,6 +632,8 @@ class ReactRunnerTest(unittest.TestCase):
 
                     def _run_script(skill_doc, args, **kwargs):
                         seen.append((skill_doc.name, args))
+                        if skill_doc.name == "chatbi-auto-analysis":
+                            return auto_result
                         return file_result
 
                     with patch("backend.agent.react_runner.run_script", side_effect=_run_script):
@@ -635,26 +648,19 @@ class ReactRunnerTest(unittest.TestCase):
                                 trace_id="t8",
                             )
                         )
+                        self.assertEqual(seen[0][0], "chatbi-file-ingestion")
                         self.assertEqual(
-                            seen,
+                            seen[0][1],
                             [
-                                (
-                                    "chatbi-file-ingestion",
-                                    [
-                                        "/tmp/chatbi-uploads/sample.csv",
-                                        "--question",
-                                        "请读取我上传的文件 /tmp/chatbi-uploads/sample.csv 并分析逾期贷款分布",
-                                        "--include-rows",
-                                    ],
-                                )
+                                "/tmp/chatbi-uploads/sample.csv",
+                                "--question",
+                                "请读取我上传的文件 /tmp/chatbi-uploads/sample.csv 并分析逾期贷款分布",
+                                "--include-rows",
                             ],
                         )
-                        thinking = " ".join(
-                            event.get("content", "")
-                            for event in events
-                            if event.get("type") == "thinking"
-                        )
-                        self.assertIn("文件已解析完成，正在整理结果", thinking)
+                        self.assertEqual(seen[1][0], "chatbi-auto-analysis")
+                        self.assertEqual(seen[1][1][0], "--input-file")
+                        self.assertTrue(any(e.get("type") == "analysis_proposal" for e in events))
                         self.assertEqual(events[-1].get("type"), "done")
 
         asyncio.run(run())
@@ -730,7 +736,7 @@ class ReactRunnerTest(unittest.TestCase):
                                 trace_id="t9",
                             )
                         )
-                        self.assertEqual(mock_llm.await_count, 2)
+                        self.assertEqual(mock_llm.await_count, 1)
                         self.assertTrue([e for e in events if e.get("type") == "analysis_proposal"])
                         self.assertEqual(events[-1].get("type"), "done")
 

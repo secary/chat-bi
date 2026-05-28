@@ -3,10 +3,40 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from backend.db_tables import CHAT_MESSAGE, CHAT_SESSION
 from backend.db_mysql import app_connection, app_execute, app_fetch_all, app_fetch_one
+
+
+def _upload_context(content: str, uploads: Any) -> str:
+    if not isinstance(uploads, list) or not uploads:
+        return content
+    lines = [
+        "[ChatBI 附件上下文：用户已上传以下附件。若当前问题涉及附件内容，必须优先使用这些路径处理；不要把路径暴露给用户。]"
+    ]
+    for item in uploads:
+        if not isinstance(item, dict):
+            continue
+        server_path = str(item.get("server_path") or "").strip()
+        if not server_path:
+            continue
+        filename = str(item.get("filename") or Path(server_path).name)
+        suffix = Path(filename).suffix.lower()
+        kind = "图像" if suffix in {".png", ".jpg", ".jpeg", ".webp"} else "数据文件"
+        if kind == "图像":
+            lines.append(
+                f"- {kind}：{filename}；路径：{server_path}；如问题涉及图像，请读取图像并纳入分析。"
+            )
+        else:
+            lines.append(
+                f"- {kind}：{filename}；路径：{server_path}；如问题涉及文件，先校验结构；"
+                "符合现有业务表就直接分析，不符合就按通用表分析。"
+            )
+    if len(lines) == 1:
+        return content
+    return "\n".join(lines) + "\n\n" + content
 
 
 def create_session(user_id: int, title: str = "新对话") -> int:
@@ -77,6 +107,7 @@ def list_messages_for_llm(session_id: int, max_messages: int = 20) -> List[Dict[
             except json.JSONDecodeError:
                 payload = None
         if isinstance(payload, dict):
+            item["content"] = _upload_context(item["content"], payload.get("uploads"))
             if isinstance(payload.get("analysisProposal"), dict):
                 item["analysisProposal"] = payload["analysisProposal"]
             if isinstance(payload.get("dashboardReady"), dict):
@@ -138,6 +169,7 @@ def load_messages_ui(session_id: int) -> List[Dict[str, Any]]:
                 "analysisProposal",
                 "dashboardReady",
                 "error",
+                "uploads",
             ):
                 if key in payload:
                     entry[key] = payload[key]

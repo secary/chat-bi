@@ -47,18 +47,20 @@ async def stream_result_events(
         if thinking:
             yield {"type": "thinking", "content": thinking}
 
+    # if result has data.rows, use it to fill the chart and kpi graph.
+    analysis_proposal = data.get("analysis_proposal") if isinstance(data, dict) else None
+    dashboard_middleware = data.get("dashboard_middleware") if isinstance(data, dict) else None
+
     visual_only = bool(result.get("charts")) or bool(result.get("kpis"))
     text = result.get("text") or ("" if visual_only else fallback_text(skill_name, result))
+    text = _text_without_structured_markdown(text, analysis_proposal, dashboard_middleware)
     if text:
         yield {"type": "text", "content": text}
 
-    # if result has data.rows, use it to fill the chart and kpi graph.
     if plan_summary:
         yield {"type": "plan_summary", "content": plan_summary}
-    analysis_proposal = data.get("analysis_proposal") if isinstance(data, dict) else None
     if isinstance(analysis_proposal, dict):
         yield {"type": "analysis_proposal", "content": analysis_proposal}
-    dashboard_middleware = data.get("dashboard_middleware") if isinstance(data, dict) else None
     if isinstance(dashboard_middleware, dict):
         yield {"type": "dashboard_ready", "content": dashboard_middleware}
         return  # charts and kpis are bundled inside the dashboard card
@@ -100,6 +102,23 @@ def _can_build_plan_kpis(rows: List[Dict[str, str]]) -> bool:
     first row, otherwise dimension values like "华东" can leak into the cards.
     """
     return len(rows) == 1
+
+
+def _text_without_structured_markdown(
+    text: str,
+    analysis_proposal: Any,
+    dashboard_middleware: Any,
+) -> str:
+    cleaned = str(text or "").strip()
+    for structured in (analysis_proposal, dashboard_middleware):
+        if not isinstance(structured, dict):
+            continue
+        markdown = str(structured.get("markdown") or "").strip()
+        if not markdown or markdown not in cleaned:
+            continue
+        before = cleaned.split(markdown, 1)[0].strip()
+        return before
+    return cleaned
 
 
 """

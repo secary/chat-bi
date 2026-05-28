@@ -3,7 +3,6 @@ import { AuthProvider } from './contexts/AuthContext';
 import { AppLayout } from './components/AppLayout';
 import { RequireAuth } from './components/RequireAuth';
 import { ChatPage } from './pages/ChatPage';
-import { DashboardPage } from './pages/DashboardPage';
 import { SkillAdminPage } from './pages/SkillAdminPage';
 import { DataSourcesPage } from './pages/DataSourcesPage';
 import { LlmConfigPage } from './pages/LlmConfigPage';
@@ -20,7 +19,7 @@ export default function App() {
           <Route element={<RequireAuth />}>
             <Route element={<AppLayout />}>
               <Route path="/" element={<ChatPage />} />
-              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/dashboard" element={<Navigate to="/" replace />} />
               <Route path="/audits" element={<HarnessAuditPage />} />
               <Route path="/harness-audits" element={<Navigate to="/audits" replace />} />
               <Route path="/multi-agents" element={<Navigate to="/audits" replace />} />

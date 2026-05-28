@@ -13,7 +13,6 @@ import type {
   SessionListApi,
 } from '../types/admin';
 import type { AppUser, AppUserRow } from '../types/auth';
-import type { DashboardOverview } from '../types/dashboard';
 import { authEnabled } from '../lib/authFlags';
 
 export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
@@ -191,10 +190,6 @@ export async function abortChat(traceId: string): Promise<void> {
   if (!response.ok) {
     throw new Error(`中止请求失败: ${response.status}`);
   }
-}
-
-export async function getDashboardOverview(): Promise<DashboardOverview> {
-  return requestJson<DashboardOverview>('/dashboard/overview');
 }
 
 export async function listSessionsApi(): Promise<SessionListApi> {

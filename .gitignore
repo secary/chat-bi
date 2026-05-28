@@ -12,7 +12,7 @@ output
 .venv
 .envrc
 .env
-.env.dev
+.env.dev*
 .env.*·
 !.env.example
 *.session.sql

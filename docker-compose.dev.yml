@@ -2,9 +2,12 @@ name: chatbi-dev
 
 services:
   demo-mysql:
-    image: mysql:8.0
+    image: ${MYSQL_IMAGE:-mysql:8.0}
     container_name: chatbi-dev-mysql
     restart: unless-stopped
+    env_file:
+      - path: .env.dev
+        required: false
     environment:
       MYSQL_ROOT_PASSWORD: root123456
       MYSQL_DATABASE: chatbi_demo
@@ -21,9 +24,12 @@ services:
       - --collation-server=utf8mb4_unicode_ci
 
   log-mysql:
-    image: mysql:8.0
+    image: ${MYSQL_IMAGE:-mysql:8.0}
     container_name: chatbi-dev-mysql-log
     restart: unless-stopped
+    env_file:
+      - path: .env.dev
+        required: false
     environment:
       MYSQL_ROOT_PASSWORD: root123456
       MYSQL_DATABASE: chatbi_local_logs
@@ -43,6 +49,11 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
+      args:
+        PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.11-slim}
+        DEBIAN_MIRROR: ${DEBIAN_MIRROR:-http://deb.debian.org/debian}
+        DEBIAN_SECURITY_MIRROR: ${DEBIAN_SECURITY_MIRROR:-http://deb.debian.org/debian-security}
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
     container_name: chatbi-dev-backend
     restart: unless-stopped
     env_file:
@@ -83,8 +94,15 @@ services:
     build:
       context: ./frontend
       target: dev
+      args:
+        NODE_IMAGE: ${NODE_IMAGE:-node:22-alpine}
+        NGINX_IMAGE: ${NGINX_IMAGE:-nginx:1.27-alpine}
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org}
     container_name: chatbi-dev-frontend
     restart: unless-stopped
+    env_file:
+      - path: .env.dev
+        required: false
     environment:
       CHOKIDAR_USEPOLLING: "true"
       VITE_PROXY_TARGET: http://backend:8000

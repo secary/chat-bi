@@ -6,11 +6,7 @@ import { ChatComposerDock } from '../components/ChatComposerDock';
 import { MessageBubble } from '../components/MessageBubble';
 import { ChatWelcomeHero } from '../components/ChatWelcomeHero';
 import { shouldShowChatWelcomeView } from '../lib/chatWelcomeView';
-import {
-  createSessionApi,
-  downloadSessionReportPdf,
-  listSessionsApi,
-} from '../api/client';
+import { createSessionApi, listSessionsApi } from '../api/client';
 import type { SessionRow } from '../types/admin';
 import { logger } from '../lib/logger';
 import {
@@ -27,7 +23,6 @@ export function ChatPage() {
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [booting, setBooting] = useState(true);
-  const [pdfExporting, setPdfExporting] = useState(false);
 
   const { messages, loading, assistantPending, currentTraceId, lastTraceId, sendMessage, abort } =
     useChat(sessionId);
@@ -82,24 +77,6 @@ export function ChatPage() {
     }
   };
 
-  const exportPdf = async () => {
-    if (sessionId == null || pdfExporting) return;
-    setPdfExporting(true);
-    try {
-      const blob = await downloadSessionReportPdf(sessionId);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `chatbi-session-${sessionId}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      logger.error('export pdf', e);
-    } finally {
-      setPdfExporting(false);
-    }
-  };
-
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col bg-white">
       <header className="flex flex-wrap items-center gap-3 border-b border-gray-100 bg-white px-6 py-3">
@@ -110,14 +87,6 @@ export function ChatPage() {
           className="rounded-full bg-gray-900 px-3.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
         >
           新对话
-        </button>
-        <button
-          type="button"
-          disabled={booting || sessionId == null || pdfExporting}
-          onClick={() => void exportPdf()}
-          className="rounded-full border border-gray-200 bg-white px-3.5 py-1.5 text-xs text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
-        >
-          {pdfExporting ? '导出中…' : '导出 PDF 报告'}
         </button>
         {user?.role === 'admin' && inspectableTraceId ? (
           <div className="ml-auto flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs text-gray-600">

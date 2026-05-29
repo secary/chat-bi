@@ -171,9 +171,6 @@ executor.run_script(skill_doc, args, trace_id, skill_db_overrides)
 
 | 文件 | 职责 |
 |------|------|
-| `pdf_report.py` | 会话 → HTML → PDF（WeasyPrint / ReportLab 兜底） |
-| `pdf_summary.py` | LLM 会话摘要 |
-| `pdf_chart_png.py` | ECharts option → PNG |
 
 ### 2.7 其他服务
 

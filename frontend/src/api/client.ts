@@ -1,8 +1,6 @@
 import type { ChatRequest, SseEvent, UploadedFile } from '../types/message';
 import type {
   AdminSkillRow,
-  CurrentDbConnectionView,
-  DbConnectionRow,
   SkillAuditRow,
   LlmProfilePublic,
   LlmSettingsView,
@@ -338,55 +336,6 @@ export async function createSkillApi(slug: string, markdown = ''): Promise<void>
 
 export async function deleteSkillApi(slug: string): Promise<void> {
   await requestJson(`/admin/skills/${encodeURIComponent(slug)}`, { method: 'DELETE' });
-}
-
-export async function listDbConnections(): Promise<DbConnectionRow[]> {
-  return requestJson<DbConnectionRow[]>('/admin/db-connections');
-}
-
-export async function getCurrentDbConnection(): Promise<CurrentDbConnectionView> {
-  return requestJson<CurrentDbConnectionView>('/admin/db-connections/current');
-}
-
-export async function createDbConnectionApi(payload: {
-  name: string;
-  host: string;
-  port: number;
-  username: string;
-  password: string;
-  database_name: string;
-  is_default: boolean;
-}): Promise<void> {
-  await requestJson('/admin/db-connections', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
-}
-
-export async function updateDbConnectionApi(
-  id: number,
-  payload: {
-    name: string;
-    host: string;
-    port: number;
-    username: string;
-    password?: string | null;
-    database_name: string;
-    is_default: boolean;
-  },
-): Promise<void> {
-  await requestJson(`/admin/db-connections/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(payload),
-  });
-}
-
-export async function deleteDbConnectionApi(id: number): Promise<void> {
-  await requestJson(`/admin/db-connections/${id}`, { method: 'DELETE' });
-}
-
-export async function testDbConnectionApi(id: number): Promise<void> {
-  await requestJson(`/admin/db-connections/${id}/test`, { method: 'POST' });
 }
 
 export async function getLlmSettings(): Promise<LlmSettingsView> {

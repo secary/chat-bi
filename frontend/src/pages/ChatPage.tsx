@@ -26,12 +26,11 @@ export function ChatPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [sessionId, setSessionId] = useState<number | null>(null);
-  const [dbConnId, setDbConnId] = useState<number | null>(null);
   const [booting, setBooting] = useState(true);
   const [pdfExporting, setPdfExporting] = useState(false);
 
   const { messages, loading, assistantPending, currentTraceId, lastTraceId, sendMessage, abort } =
-    useChat(sessionId, dbConnId);
+    useChat(sessionId);
   const inputBusy = loading || assistantPending;
   const showWelcome = shouldShowChatWelcomeView(booting, messages.length);
   const inspectableTraceId = currentTraceId || lastTraceId;
@@ -120,16 +119,6 @@ export function ChatPage() {
         >
           {pdfExporting ? '导出中…' : '导出 PDF 报告'}
         </button>
-        <label className="flex items-center gap-2 text-xs text-gray-600">
-          数据源连接 ID（可选）
-          <input
-            type="number"
-            className="w-24 rounded-full border border-gray-200 px-3 py-1.5 text-xs transition-all focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
-            placeholder="默认"
-            value={dbConnId ?? ''}
-            onChange={(e) => setDbConnId(e.target.value === '' ? null : Number(e.target.value))}
-          />
-        </label>
         {user?.role === 'admin' && inspectableTraceId ? (
           <div className="ml-auto flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs text-gray-600">
             <span className="text-gray-400">{currentTraceId ? '当前 trace' : '最近 trace'}</span>

@@ -44,9 +44,6 @@ export function AppLayout() {
               <NavLink to="/skills" className={linkCls}>
                 技能接入
               </NavLink>
-              <NavLink to="/data-sources" className={linkCls}>
-                数据源管理
-              </NavLink>
               <NavLink to="/llm" className={linkCls}>
                 LLM配置
               </NavLink>

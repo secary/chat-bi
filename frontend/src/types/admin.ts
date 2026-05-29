@@ -40,28 +40,6 @@ export interface SkillAuditRow {
   required_context_count: number;
 }
 
-export interface DbConnectionRow {
-  id: number;
-  name: string;
-  host: string;
-  port: number;
-  username: string;
-  database_name: string;
-  is_default: number | boolean;
-  created_at: string;
-}
-
-export interface CurrentDbConnectionView {
-  source: 'saved_default' | 'env';
-  id: number | null;
-  name: string;
-  host: string;
-  port: number;
-  username: string;
-  database_name: string;
-  is_default: boolean;
-}
-
 /** 多专线（Multi-Agent）registry 与 PUT /admin/multi-agents 请求体 */
 export interface MultiAgentLineEntry {
   enabled: boolean;

@@ -4,7 +4,6 @@ import { AppLayout } from './components/AppLayout';
 import { RequireAuth } from './components/RequireAuth';
 import { ChatPage } from './pages/ChatPage';
 import { SkillAdminPage } from './pages/SkillAdminPage';
-import { DataSourcesPage } from './pages/DataSourcesPage';
 import { LlmConfigPage } from './pages/LlmConfigPage';
 import { LoginPage } from './pages/LoginPage';
 import { UserAdminPage } from './pages/UserAdminPage';
@@ -24,7 +23,7 @@ export default function App() {
               <Route path="/harness-audits" element={<Navigate to="/audits" replace />} />
               <Route path="/multi-agents" element={<Navigate to="/audits" replace />} />
               <Route path="/skills" element={<SkillAdminPage />} />
-              <Route path="/data-sources" element={<DataSourcesPage />} />
+              <Route path="/data-sources" element={<Navigate to="/" replace />} />
               <Route path="/llm" element={<LlmConfigPage />} />
               <Route path="/users" element={<UserAdminPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />

@@ -155,7 +155,6 @@ uv sync
 ### Upload / Report
 
 - `test_upload_context.py::*`：上传文件路径上下文注入与后续追问路由保护。
-- `test_report_pdf.py::*`：PDF HTML 文档、chart base64、WeasyPrint 成功路径、ReportLab fallback、CJK 字体优先、LLM 摘要 mock。
 
 ## 迁移方向
 

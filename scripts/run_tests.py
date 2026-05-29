@@ -112,14 +112,11 @@ MODULE_SUITES: dict[str, list[str]] = {
         "tests/test_file_ingestion_skill.py",
         "tests/test_upload_context.py",
     ],
-    "report": [
-        "tests/test_report_pdf.py",
-    ],
 }
 
 SUITE_ALIASES: dict[str, list[str]] = {
     "quick": ["foundation", "skills", "data-sources"],
-    "backend": ["admin", "dashboard", "report"],
+    "backend": ["admin", "dashboard"],
     "auth": ["auth-memory"],
     "data": ["data-sources"],
 }

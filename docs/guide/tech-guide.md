@@ -9,6 +9,12 @@
 后端统一入口为 [`backend/agent/runner.py`](../../backend/agent/runner.py) 中的 `stream_chat`：
 
 ```text
+multi_agents == "auto"（前端默认）
+  → decide_execution_mode(messages)
+    ├─ mode == "ask"    → 返回澄清问题
+    ├─ mode == "multi"  → stream_chat_multi_agent（多专线编排）
+    └─ mode == "single" → 单 Agent
+
 multi_agents == True
   → stream_chat_multi_agent（多专线编排）
 
@@ -21,11 +27,16 @@ multi_agents == False 且 CHATBI_AGENT_REACT 非关闭
 
 环境变量：`CHATBI_AGENT_REACT` 默认开启（`0`/`false`/`no`/`off` 走 Legacy）；`CHATBI_AGENT_MAX_STEPS` 控制 ReAct 最大轮数（默认 `8`，至少 2 才能完成「call_skill + finish」）。
 
+当前前端聊天页固定发送 `multi_agents="auto"`；是否进入多专线，不再由用户在聊天页手动开关，而是由 [`execution_decider.py`](../../backend/agent/execution_decider.py) 根据本轮消息自动判断。
+
 ---
 
 ## 2. 「单 Agent」模式：ReAct 与 Legacy
 
-「单 Agent」指前端 **未开启多专线**（`multi_agents=false`）：同一套启用 Skill 列表，由一条管线完成本轮回答。
+「单 Agent」指本轮请求最终被路由到 **single**：同一套启用 Skill 列表，由一条管线完成本轮回答。来源可能是：
+
+- 显式传入 `multi_agents=false` 或 `"single"`
+- `multi_agents="auto"` 时，`decide_execution_mode()` 判定当前问题适合单 Agent
 
 ### 2.1 ReAct（默认）
 
@@ -55,6 +66,8 @@ multi_agents == False 且 CHATBI_AGENT_REACT 非关闭
 
 ### 3.1 流程概览
 
+进入多专线的前提：本轮请求显式 `multi_agents=true`，或 `multi_agents="auto"` 且 [`decide_execution_mode()`](../../backend/agent/execution_decider.py) 返回 `mode="multi"`。
+
 1. **Manager 规划（可多轮）**：`call_manager_plan_llm` 读 [`skills/_agents/registry.yaml`](../../skills/_agents/registry.yaml)；每轮 JSON 含 `user_intent_summary`、`decomposition_reason`、`tasks`、`finalize_after_this_batch`（缺省 true）。第 2 轮起附带已完成子任务 digest。上限：`max_manager_rounds`（registry / 管理页 1–8）与 `max_agents_per_round`（每轮子任务数）。
 2. **子任务执行**：拓扑序 → `build_subtask_messages` → `stream_specialist(..., subagent_mode=True)`；子任务流式循环内轮询中止（§9）。
 3. **汇总**：`blocks` 累积；若中间命中 `chatbi-auto-analysis` 结构化中间件可短路；否则 [`call_summarize_llm`](../../backend/agent/multi_agent_summarize.py)。
@@ -81,6 +94,29 @@ Manager 提示会注入**上传路径、采纳、上传提案**等会话线索�
 | System 前缀 | memory（可选） | memory + 专线 `role_prompt` |
 | LLM 次数 | ReAct 多轮或 Legacy | Manager 多轮 + 子管线 + 汇总 |
 | 图表/KPI | 最后 Skill + plan | 常继承最后子任务 `last_result`，汇总覆盖 text |
+
+### 3.4 `auto` 智能路由决策
+
+[`decide_execution_mode()`](../../backend/agent/execution_decider.py) 当前采用受控规则：
+
+| 输入特征 | mode | route / 结果 |
+|----------|------|--------------|
+| 空消息 | `ask` | 要求用户先补充问题 |
+| 寒暄、感谢等可跳过 Skill 的消息 | `single` | 直接走单 Agent 文本回复 |
+| 纯问数，如“查华东销售额” | `single` | 保留受控 route，如 `demo_query`，但不进入多专线 |
+| 纯建议、缺少事实范围，如“给我经营建议” | `ask` | 返回澄清，要求补充指标、时间、区域等 |
+| 复合目标：问数 + 建议 / 图表 / 上传分析 / 跨期 | `multi` | 进入多专线，按 `route_sequence` 顺序执行 |
+| 未命中结构化路由 | `single` | 降级为单 Agent |
+
+`route_sequence` 来自 [`multi_agent_intent.py`](../../backend/agent/multi_agent_intent.py) 的受控意图分类，当前主要包括：
+
+- `query_only` → `["demo_query"]`
+- `query_then_decide` → `["demo_query", "business_advisor"]`
+- `query_then_viz` → `["demo_query", "viz_board"]`
+- `query_then_decide_then_viz` → `["demo_query", "business_advisor", "viz_board"]`
+- `upload_then_analyze` → `["upload_analyst"]`
+- `upload_then_viz` → `["upload_analyst", "viz_board"]`
+- `period_compare` → `["period_compare"]`
 
 ---
 

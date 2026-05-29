@@ -24,6 +24,11 @@ from backend.agent.multi_agent_intent import (
 )
 from backend.agent.multi_agent_manager import validate_and_order_tasks
 from backend.agent.multi_agent_messages import build_subtask_messages
+from backend.agent.execution_audit import (
+    audit_summary_against_fact_ledger,
+    audit_multi_final_synthesis,
+    build_factual_fallback,
+)
 from backend.agent.multi_agent_registry import (
     agent_label,
     agent_role_prompt,
@@ -255,6 +260,7 @@ async def stream_chat_multi_agent(
     skill_db_overrides: Optional[Dict[str, str]] = None,
     memory_block: Optional[str] = None,
     session_id: Optional[int] = None,
+    controlled_intent: Optional[Dict[str, Any]] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """
     Controlled multi-agent pattern:
@@ -281,7 +287,7 @@ async def stream_chat_multi_agent(
     all_skill_executions: List[Dict[str, Any]] = []
     summary_dependency_warnings: List[str] = []
     forced_followup_plan: Optional[Dict[str, Any]] = None
-    controlled_intent = classify_multi_agent_intent(messages)
+    controlled_intent = controlled_intent or classify_multi_agent_intent(messages)
     public_progress_emitted: set[str] = set()
     harness_state = HarnessState(
         trace_id=trace_id,
@@ -711,11 +717,47 @@ async def stream_chat_multi_agent(
             harness_state,
             warnings=summary_dependency_warnings,
         )
+    final_audit = audit_multi_final_synthesis(
+        user_question=q,
+        blocks=all_blocks,
+        last_result=last_result,
+        last_skill_name=last_skill_name,
+        dependency_warnings=summary_dependency_warnings,
+    )
+    log_event(
+        trace_id,
+        "agent.harness",
+        "multi_final_audit",
+        payload={
+            "status": final_audit.status,
+            "issue_count": len(final_audit.issues),
+            "issues": final_audit.issues,
+            "has_fact_ledger": bool(final_audit.fact_ledger),
+        },
+        level="WARN" if final_audit.status != "ok" else "INFO",
+    )
+    if final_audit.should_block_summary:
+        yield {"type": "thinking", "content": "最终审计发现事实依据不足，已停止扩展汇总。"}
+        yield {"type": "text", "content": build_factual_fallback(final_audit)}
+        log_event(
+            trace_id,
+            "agent.multi",
+            "summary_blocked_by_final_audit",
+            payload={"issues": final_audit.issues},
+            level="WARN",
+        )
+        yield {"type": "done", "content": None}
+        return
     event = public_progress("summarize", "正在整理答案...")
     if event:
         yield event
     try:
-        synth = await call_summarize_llm(q, all_blocks, trace_id=trace_id)
+        synth = await call_summarize_llm(
+            q,
+            all_blocks,
+            trace_id=trace_id,
+            fact_ledger=final_audit.fact_ledger,
+        )
     except ChatAbortedError:
         log_event(trace_id, "agent.multi", "aborted", level="INFO")
         yield {"type": "thinking", "content": "用户中止了查询。"}
@@ -727,6 +769,33 @@ async def stream_chat_multi_agent(
             "content": "汇总阶段未能生成回答，请重试或关闭多专线模式。",
         }
         log_event(trace_id, "agent.multi", "summary_empty", level="WARN")
+        yield {"type": "done", "content": None}
+        return
+    summary_audit = audit_summary_against_fact_ledger(
+        summary_text=str(synth.get("text") or ""),
+        fact_ledger=final_audit.fact_ledger,
+    )
+    log_event(
+        trace_id,
+        "agent.harness",
+        "multi_summary_claim_audit",
+        payload={
+            "status": summary_audit.status,
+            "issue_count": len(summary_audit.issues),
+            "issues": summary_audit.issues,
+        },
+        level="WARN" if summary_audit.status != "ok" else "INFO",
+    )
+    if summary_audit.should_block_summary:
+        yield {"type": "thinking", "content": "最终回答未通过事实收束审计，已降级为事实摘要。"}
+        yield {"type": "text", "content": build_factual_fallback(summary_audit)}
+        log_event(
+            trace_id,
+            "agent.multi",
+            "summary_blocked_by_claim_audit",
+            payload={"issues": summary_audit.issues},
+            level="WARN",
+        )
         yield {"type": "done", "content": None}
         return
 

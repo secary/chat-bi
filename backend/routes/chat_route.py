@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import re
 from time import perf_counter
-from typing import Any, AsyncGenerator, Dict, List, Optional
+from typing import Any, AsyncGenerator, Dict, List, Literal, Optional, Union
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -26,7 +26,6 @@ from backend.session_repo import (
 )
 from backend.agent.abort_state import clear_abort, get_abort_event, is_aborted
 from backend.trace import log_event
-from backend.vision.chart_table_extract import enrich_last_user_message_with_vision
 
 router = APIRouter()
 
@@ -34,9 +33,10 @@ router = APIRouter()
 class ChatRequest(BaseModel):
     message: str
     history: List[dict] = Field(default_factory=list)
+    uploads: List[dict] = Field(default_factory=list)
     session_id: Optional[int] = None
     db_connection_id: Optional[int] = None
-    multi_agents: bool = False
+    multi_agents: Union[bool, Literal["auto", "single"]] = "auto"
 
 
 @router.post("/abort")
@@ -111,6 +111,26 @@ def _next_disconnect_state(disconnected: bool, request_disconnected: bool) -> bo
     return request_disconnected
 
 
+def _message_with_upload_context(message: str, uploads: List[dict]) -> str:
+    if not uploads:
+        return message
+    lines = [
+        "[ChatBI 附件上下文：用户已上传以下附件。若当前问题涉及附件内容，必须优先使用这些路径处理；不要把路径暴露给用户。]"
+    ]
+    for item in uploads:
+        server_path = str(item.get("server_path") or "").strip()
+        if not server_path:
+            continue
+        filename = str(item.get("filename") or server_path.rsplit("/", 1)[-1])
+        lines.append(
+            f"- 数据文件：{filename}；路径：{server_path}；如问题涉及文件，先校验结构；"
+            "符合现有业务表就直接分析，不符合就按通用表分析。"
+        )
+    if len(lines) == 1:
+        return message
+    return "\n".join(lines) + "\n\n" + message
+
+
 @router.post("/chat")
 async def chat(
     req: ChatRequest,
@@ -132,10 +152,12 @@ async def chat(
         if not sess:
             raise HTTPException(status_code=404, detail="会话不存在")
         prior = list_messages_for_llm(req.session_id)
-        messages = prior + [{"role": "user", "content": req.message}]
+        user_content_for_agent = _message_with_upload_context(req.message, req.uploads)
+        messages = prior + [{"role": "user", "content": user_content_for_agent}]
         persist_sid = req.session_id
         try:
-            insert_message(persist_sid, "user", req.message)
+            user_payload = {"uploads": req.uploads} if req.uploads else None
+            insert_message(persist_sid, "user", req.message, user_payload)
             update_session_title(
                 persist_sid,
                 int(user["id"]),
@@ -150,9 +172,10 @@ async def chat(
                 level="WARN",
             )
     else:
+        user_content_for_agent = _message_with_upload_context(req.message, req.uploads)
         messages = [
             *req.history,
-            {"role": "user", "content": req.message},
+            {"role": "user", "content": user_content_for_agent},
         ]
 
     log_event(
@@ -163,11 +186,11 @@ async def chat(
             "message_length": len(req.message),
             "history_count": len(req.history),
             "session_id": req.session_id,
+            "upload_count": len(req.uploads),
             "multi_agents": req.multi_agents,
         },
     )
 
-    # Vision enrichment moved into event_gen() to allow sending thinking event before LLM call
     messages = augment_messages_for_upload_followup(messages)
 
     async def event_gen() -> AsyncGenerator[dict, None]:
@@ -175,20 +198,6 @@ async def chat(
         acc: Dict[str, Any] = {"content": "", "thinking": []}
         disconnected = False
         nonlocal messages
-
-        # --- Vision enrichment with early thinking event ---
-        if messages and messages[-1].get("role") == "user":
-            last_content = messages[-1].get("content") or ""
-            if re.search(r"[^\s]+\.(?:png|jpg|jpeg|webp)", last_content, re.IGNORECASE):
-                yield {
-                    "event": "message",
-                    "data": json.dumps(
-                        {"type": "thinking", "content": "正在读取上传的图像..."},
-                        ensure_ascii=False,
-                    ),
-                }
-                messages = await enrich_last_user_message_with_vision(messages, trace_id)
-        # --- End vision enrichment ---
 
         try:
             # call llm to get response.

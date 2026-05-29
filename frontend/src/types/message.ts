@@ -40,6 +40,7 @@ export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  uploads?: UploadedFile[];
   chart?: Record<string, unknown>;
   kpiCards?: KpiCard[];
   planSummary?: PlanSummary;
@@ -114,9 +115,10 @@ export interface ChatRequest {
     analysisProposal?: AnalysisProposal;
     dashboardReady?: DashboardReady;
   }>;
+  uploads?: UploadedFile[];
   session_id?: number;
   db_connection_id?: number;
-  multi_agents?: boolean;
+  multi_agents?: boolean | 'auto' | 'single';
 }
 
 export interface UploadedFile {

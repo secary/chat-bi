@@ -1,7 +1,13 @@
 from __future__ import annotations
 
-from typing import Any, AsyncGenerator, Dict, List, Optional
+from typing import Any, AsyncGenerator, Dict, List, Optional, Union
 
+from backend.agent.execution_audit import (
+    RemediationAction,
+    audit_single_result_for_remediation,
+    chart_recommendation_args,
+)
+from backend.agent.execution_decider import ExecutionDecision, decide_execution_mode
 from backend.agent.executor import (
     find_skill,
     latest_user_content,
@@ -21,6 +27,7 @@ from backend.agent.prompt_builder import (
 from backend.agent.prompt_subagent import build_system_prompt_for_subagent
 from backend.agent.query_decision import is_query_plus_decision_text
 from backend.agent.react_runner import stream_chat_react
+from backend.agent.react_followup import run_decision_followup
 from backend.config import settings
 from backend.trace import log_event
 
@@ -98,16 +105,209 @@ stream_chat_legacy is not in use by default. It is not ReAct mode.
 """
 
 
+async def _stream_ask_for_clarification(
+    decision: ExecutionDecision,
+    trace_id: str = "",
+) -> AsyncGenerator[Dict[str, Any], None]:
+    log_event(
+        trace_id,
+        "agent.harness",
+        "execution_decision_ask",
+        payload={
+            "mode": decision.mode,
+            "reason": decision.reason,
+            "route_sequence": decision.route_sequence,
+            "confidence": decision.confidence,
+            "risk_flags": decision.risk_flags,
+        },
+    )
+    yield {"type": "thinking", "content": "正在确认最稳妥的处理方式..."}
+    yield {
+        "type": "text",
+        "content": "我可以给经营建议，但需要先有明确事实范围。请补充要分析的指标、时间或区域，例如“基于华东近3个月销售和毛利给经营建议”。",
+    }
+    yield {"type": "done", "content": None}
+
+
+async def _stream_remediation_action(
+    action: RemediationAction,
+    messages: List[Dict[str, str]],
+    last_result: Dict[str, Any],
+    trace_id: str,
+    skill_db_overrides: Optional[Dict[str, str]],
+) -> AsyncGenerator[Dict[str, Any], None]:
+    skills = scan_skills_enabled(settings.skills_dir)
+    skill_doc = find_skill(skills, action.skill)
+    if not skill_doc:
+        log_event(
+            trace_id,
+            "agent.harness",
+            "post_audit_remediation_skipped",
+            payload={"skill": action.skill, "reason": "skill_missing"},
+            level="WARN",
+        )
+        return
+
+    user_text = latest_user_content(messages)
+    log_event(
+        trace_id,
+        "agent.harness",
+        "post_audit_remediation_started",
+        payload={"skill": action.skill, "reason": action.reason},
+    )
+    yield {"type": "thinking", "content": f"后审计发现输出不完整，正在补充：{action.reason}"}
+
+    if action.skill == "chatbi-decision-advisor":
+        followup_events, result, _ = run_decision_followup(
+            skill_doc,
+            messages,
+            user_text,
+            trace_id,
+            skill_db_overrides,
+        )
+        for event in followup_events:
+            yield event
+    elif action.skill == "chatbi-chart-recommendation":
+        args = chart_recommendation_args(user_text, last_result)
+        log_event(
+            trace_id,
+            "agent.skill",
+            "started",
+            payload={"skill": action.skill, "args": args, "agent_id": "post_audit"},
+        )
+        result = run_script(
+            skill_doc,
+            args,
+            trace_id=trace_id,
+            skill_db_overrides=skill_db_overrides,
+        )
+        log_event(
+            trace_id,
+            "agent.skill",
+            "completed",
+            payload={
+                "skill": action.skill,
+                "agent_id": "post_audit",
+                **skill_result_log_payload(result),
+            },
+        )
+    else:
+        return
+
+    async for event in stream_result_events(action.skill, {}, result):
+        yield event
+    log_event(
+        trace_id,
+        "agent.harness",
+        "post_audit_remediation_completed",
+        payload={"skill": action.skill},
+    )
+
+
+async def _stream_single_with_post_audit(
+    messages: List[Dict[str, str]],
+    trace_id: str,
+    skill_db_overrides: Optional[Dict[str, str]],
+    memory_block: Optional[str],
+    session_id: Optional[int],
+) -> AsyncGenerator[Dict[str, Any], None]:
+    result_sink: Dict[str, Any] = {}
+    emitted_types: List[str] = []
+    pending_done: Optional[Dict[str, Any]] = None
+
+    source = (
+        stream_chat_react(
+            messages,
+            trace_id=trace_id,
+            skill_db_overrides=skill_db_overrides,
+            memory_block=memory_block,
+            result_sink=result_sink,
+            session_id=session_id,
+        )
+        if settings.agent_react
+        else _stream_chat_legacy(
+            messages,
+            trace_id=trace_id,
+            skill_db_overrides=skill_db_overrides,
+            memory_block=memory_block,
+            result_sink=result_sink,
+        )
+    )
+    async for event in source:
+        event_type = str(event.get("type") or "")
+        if event_type == "done":
+            pending_done = event
+            continue
+        if event_type:
+            emitted_types.append(event_type)
+        yield event
+
+    last_result = result_sink.get("last_result")
+    last_skill_name = result_sink.get("last_skill_name")
+    actions = audit_single_result_for_remediation(
+        messages,
+        last_result if isinstance(last_result, dict) else None,
+        last_skill_name if isinstance(last_skill_name, str) else None,
+        emitted_types,
+    )
+    if actions:
+        log_event(
+            trace_id,
+            "agent.harness",
+            "post_audit_remediation_selected",
+            payload={
+                "skills": [action.skill for action in actions],
+                "reasons": [action.reason for action in actions],
+            },
+        )
+    for action in actions:
+        if not isinstance(last_result, dict):
+            break
+        async for event in _stream_remediation_action(
+            action,
+            messages,
+            last_result,
+            trace_id,
+            skill_db_overrides,
+        ):
+            yield event
+
+    yield pending_done or {"type": "done", "content": None}
+
+
 async def stream_chat(
     messages: List[Dict[str, str]],
     trace_id: str = "",
     skill_db_overrides: Optional[Dict[str, str]] = None,
     memory_block: Optional[str] = None,
-    multi_agents: bool = False,
+    multi_agents: Union[bool, str] = "auto",
     session_id: Optional[int] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """Agent entry point: routes to multi-agent, ReAct, or legacy execution mode."""
-    if multi_agents:
+    force_multi = multi_agents is True
+    force_single = isinstance(multi_agents, str) and multi_agents == "single"
+    decision: Optional[ExecutionDecision] = None
+    if not force_multi and not force_single:
+        decision = decide_execution_mode(messages)
+        log_event(
+            trace_id,
+            "agent.harness",
+            "execution_decision_selected",
+            payload={
+                "mode": decision.mode,
+                "reason": decision.reason,
+                "route_sequence": decision.route_sequence,
+                "confidence": decision.confidence,
+                "risk_flags": decision.risk_flags,
+            },
+        )
+        if decision.mode == "ask":
+            async for event in _stream_ask_for_clarification(decision, trace_id=trace_id):
+                yield event
+            return
+        force_multi = decision.mode == "multi"
+
+    if force_multi:
         from backend.agent.multi_agent_runner import stream_chat_multi_agent
 
         async for event in stream_chat_multi_agent(
@@ -116,26 +316,17 @@ async def stream_chat(
             skill_db_overrides=skill_db_overrides,
             memory_block=memory_block,
             session_id=session_id,
+            controlled_intent=decision.intent if decision else None,
         ):
             yield event
         return
 
-    if settings.agent_react:
-        async for event in stream_chat_react(
-            messages,
-            trace_id=trace_id,
-            skill_db_overrides=skill_db_overrides,
-            memory_block=memory_block,
-            session_id=session_id,
-        ):
-            yield event
-        return
-
-    async for event in _stream_chat_legacy(
+    async for event in _stream_single_with_post_audit(
         messages,
         trace_id=trace_id,
         skill_db_overrides=skill_db_overrides,
         memory_block=memory_block,
+        session_id=session_id,
     ):
         yield event
 

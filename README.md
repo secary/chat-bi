@@ -97,6 +97,7 @@ open http://localhost:5174
 - 修改 Dockerfile 或系统依赖：需要重新 `--build`。
 - 修改 `database/init.sql`：已有 `mysql-data-dev` named volume 不会自动重放，需 `docker compose --env-file .env.dev -f docker-compose.dev.yml down -v` 后再启动。
 - 容器名前缀为 `chatbi-dev-*`，可以和生产式本地运行并存。
+- 默认镜像和依赖源由 `docker-compose.dev.yml` / Dockerfile 的 fallback 决定，未配置时走官方源；如果 Docker Hub、PyPI 或 npm 超时，可在本机 `.env.dev` 设置 `MYSQL_IMAGE`、`PYTHON_IMAGE`、`NODE_IMAGE`、`NGINX_IMAGE`、`DEBIAN_MIRROR`、`PIP_INDEX_URL`、`NPM_REGISTRY` 等变量切换到国内源。
 
 ### 方式 B：宿主机启动前后端
 

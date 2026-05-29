@@ -15,7 +15,7 @@
 | Agent / SSE                 | ✅ 完成     | Legacy + ReAct；支持 chart/kpi/text/error/done SSE                                                    |
 | 前端对话 / 图表 / KPI       | ✅ 完成     | React 19 + ECharts 6                                                                                  |
 | 会话 / 鉴权 / 记忆 / 管理页 | ✅ 完成     | 用户、数据源、LLM、多 Agents 管理                                                                     |
-| 上传 / Vision / PDF         | ✅ 完成     | 文件分析、图像抽取门禁、PDF 降级导出                                                                  |
+| 上传 / PDF                  | ✅ 完成     | 文件分析、PDF 降级导出                                                                                |
 | 自动化测试 / CI             | ✅ 完成     | `scripts/run_tests.py` 分套件；GitHub Actions 已配置                                                  |
 | 端到端在线验收              | 🔄 按需执行 | 依赖本地数据库、后端和 LLM 可用                                                                       |
 
@@ -47,19 +47,19 @@
 
 ## 活跃 Gap
 
-| 编号 | Gap                                                                                               | 下一步                                                                                             |
-| ---- | ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| G1   | 首次切到双实例拓扑时，旧 named volume / 宿主机目录不会自动迁移或重放初始化 SQL | 如需拿到纯净演示库与纯日志库，执行对应 compose 的 `down -v` 后再重新 `up -d --build` |
-| G3   | 在线 E2E 不进默认 CI，依赖 LLM / DB / 后端运行状态                                                | 后端和 LLM 可用时跑 `python scripts/e2e_smoke.py --cases S1,S4,E1` 或按需全量                      |
-| G4   | 上传文件复杂跨字段分析 / 风控建议仍偏轻量规则                                                     | 如要增强，新增上传数据分析或风控建议 Skill，不复用演示库 decision-advisor                          |
-| G5   | `docs/architecture/README.md` 等专题文档可能仍滞后于 guide / backend-architecture                 | 改动相关模块时顺手同步；主用户/技术文档在 `docs/guide/`，后端专题见 `docs/backend-architecture.md` |
+| 编号 | Gap                                                                               | 下一步                                                                                             |
+| ---- | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| G1   | 首次切到双实例拓扑时，旧 named volume / 宿主机目录不会自动迁移或重放初始化 SQL    | 如需拿到纯净演示库与纯日志库，执行对应 compose 的 `down -v` 后再重新 `up -d --build`               |
+| G3   | 在线 E2E 不进默认 CI，依赖 LLM / DB / 后端运行状态                                | 后端和 LLM 可用时跑 `python scripts/e2e_smoke.py --cases S1,S4,E1` 或按需全量                      |
+| G4   | 上传文件复杂跨字段分析 / 风控建议仍偏轻量规则                                     | 如要增强，新增上传数据分析或风控建议 Skill，不复用演示库 decision-advisor                          |
+| G5   | `docs/architecture/README.md` 等专题文档可能仍滞后于 guide / backend-architecture | 改动相关模块时顺手同步；主用户/技术文档在 `docs/guide/`，后端专题见 `docs/backend-architecture.md` |
 
 ## 最近变更
 
-| 轮次 | 完成内容                                                                                                                                                                                                                                                                                                                                                                                                                              | 验证                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 201  | 将处理进度完成态从完成时钟时间改为链路耗时：后端 `done` SSE 附带 `elapsed_ms` 并持久化到消息 payload，前端处理态旁实时读秒，结束后冻结显示“已处理完毕 · 耗时 X秒” | `PYTHONPATH=. .venv/bin/python scripts/format_code.py backend/routes/chat_route.py backend/session_repo.py`；`PYTHONPATH=. .venv/bin/python -m pytest tests/test_session_repo_payload.py -q`；`cd frontend && npm run lint` |
-| 200  | 补齐前端处理进度完成态：`useChat` 处理 `done` SSE 并记录完成时间，`ThinkingBubble` 在流结束后停止闪烁并显示“已处理完毕 · HH:mm:ss”；历史消息接口同步返回 `created_at`，避免答案已出现但进度仍停在处理中 | `PYTHONPATH=. .venv/bin/python scripts/format_code.py backend/session_repo.py`；`PYTHONPATH=. .venv/bin/python -m pytest tests/test_session_repo_payload.py -q`；`cd frontend && npm run lint` |
-| 199  | 精简前端处理进度视觉：单条队列状态去掉左侧圆形序号，仅保留闪烁状态文案与可展开详情，降低加载态噪音 | `cd frontend && npm run lint` |
-| 198  | 将前端处理进度从滚动窗口调整为单条队列状态：`ThinkingBubble` 一次只展示当前进度，文字闪烁提示处理中，并按步骤队列逐条推进到最新状态 | `cd frontend && npm run lint` |
-| 197  | 将前端处理进度组件改为真正的滚动窗口：`ThinkingBubble` 不再只截取最近 6 条，而是保留完整进度列表、固定窗口高度、允许向上回看历史，并在新步骤到来或重新展开时自动滚动到最新状态 | `cd frontend && npm run lint` |
+| 轮次 | 完成内容                                                                                                                                                 | 验证                                                                                                                                                                                      |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 219  | 删除独立仪表盘页面：移除侧栏入口、页面组件、前端 dashboard API 封装与图表工具测试；`/dashboard` 现在重定向回对话首页，并同步用户指南                  | `PYTHONPATH=. .venv/bin/python scripts/format_code.py frontend/src/App.tsx frontend/src/components/AppLayout.tsx frontend/src/api/client.ts`；`cd frontend && npm run lint`；`cd frontend && npm run build` |
+| 218  | 将审计页与技能接入页收敛到聊天工作台 UI 风格：采用聊天输入区式软阴影工具栏、圆润白色面板、浅色高光列表项，并弱化审计 Debug 时间线的强装饰样式          | `PYTHONPATH=. .venv/bin/python scripts/format_code.py frontend/src/pages/HarnessAuditPage.tsx frontend/src/pages/SkillAdminPage.tsx frontend/src/components/HarnessDebugTimeline.tsx frontend/src/components/HarnessBusinessFlowCard.tsx`；`cd frontend && npm run lint`；`cd frontend && npm run build` |
+| 217  | LLM 配置页厂商选择新增“其他”选项；选中后需手动填写模型与 Base URL，再配合 API Key 测试并启用                                                            | `PYTHONPATH=. .venv/bin/python scripts/format_code.py frontend/src/pages/LlmConfigPage.tsx`；`cd frontend && npm run lint`；`cd frontend && npm run build`                               |
+| 216  | LLM 配置页已保存模型卡片补充模型参数展示，备注名、状态、测试/删除操作与真实模型名分层呈现                                                               | `PYTHONPATH=. .venv/bin/python scripts/format_code.py frontend/src/pages/LlmConfigPage.tsx`；`cd frontend && npm run lint`；`cd frontend && npm run build`                               |
+| 215  | LLM 配置页已保存模型卡片新增删除操作；删除前确认，删除中禁用操作，当前配置且唯一模型时禁止删除并提示                                                    | `PYTHONPATH=. .venv/bin/python scripts/format_code.py frontend/src/pages/LlmConfigPage.tsx`；`cd frontend && npm run lint`；`cd frontend && npm run build`                               |

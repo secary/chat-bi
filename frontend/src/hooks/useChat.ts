@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ChatMessage, ThinkingStep } from '../types/message';
+import type { ChatMessage, ThinkingStep, UploadedFile } from '../types/message';
 import { getSessionMessagesApi, streamChat, abortChat, newTraceId } from '../api/client';
 import { isWaitingForAssistantMessage } from '../lib/chatPending';
 import { logger } from '../lib/logger';
@@ -24,6 +24,7 @@ function mapRow(row: Record<string, unknown>): ChatMessage {
     id: String(row.id),
     role: row.role as ChatMessage['role'],
     content: String(row.content ?? ''),
+    uploads: Array.isArray(row.uploads) ? (row.uploads as UploadedFile[]) : undefined,
     thinking: row.thinking as string[] | undefined,
     chart: row.chart as Record<string, unknown> | undefined,
     kpiCards: row.kpiCards as ChatMessage['kpiCards'],
@@ -81,16 +82,13 @@ export interface UseChatReturn {
   assistantPending: boolean;
   currentTraceId: string | null;
   lastTraceId: string | null;
-  sendMessage: (text: string, traceId?: string) => Promise<void>;
+  sendMessage: (text: string, traceId?: string, uploads?: UploadedFile[]) => Promise<void>;
   abort: () => void;
 }
-
-const MULTI_AGENTS_KEY = 'chatbi_multi_agents';
 
 export function useChat(
   sessionId: number | null,
   dbConnectionId: number | null,
-  multiAgents: boolean,
 ): UseChatReturn {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
@@ -190,7 +188,7 @@ export function useChat(
   }, [sessionId, assistantPending]);
 
   const sendMessage = useCallback(
-    async (text: string, traceId?: string) => {
+    async (text: string, traceId?: string, uploads?: UploadedFile[]) => {
       if (!text.trim() || loading || streamingRef.current || sessionId == null) {
         return;
       }
@@ -200,6 +198,7 @@ export function useChat(
         id: String(nextId++),
         role: 'user',
         content: text,
+        uploads,
       };
       const assistantMsg: ChatMessage = {
         id: String(nextId++),
@@ -232,9 +231,10 @@ export function useChat(
           {
             message: text,
             history,
+            uploads,
             session_id: sessionId,
             db_connection_id: dbConnectionId ?? undefined,
-            multi_agents: multiAgents,
+            multi_agents: 'auto',
           },
           traceIdToUse,
           { signal: ac.signal },
@@ -319,7 +319,7 @@ export function useChat(
         setCurrentTraceId(null);
       }
     },
-    [loading, sessionId, dbConnectionId, multiAgents],
+    [loading, sessionId, dbConnectionId],
   );
 
   const abort = useCallback(() => {
@@ -331,40 +331,4 @@ export function useChat(
   }, []);
 
   return { messages, loading, assistantPending, currentTraceId, lastTraceId, sendMessage, abort };
-}
-
-export function readMultiAgentsPreference(): boolean {
-  try {
-    return localStorage.getItem(MULTI_AGENTS_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
-export function writeMultiAgentsPreference(value: boolean): void {
-  try {
-    localStorage.setItem(MULTI_AGENTS_KEY, value ? '1' : '0');
-  } catch {
-    /* ignore */
-  }
-}
-
-const SIDEBAR_OPEN_KEY = 'chatbi_sidebar_open';
-
-export function readSidebarOpenPreference(): boolean {
-  try {
-    const v = localStorage.getItem(SIDEBAR_OPEN_KEY);
-    if (v === null) return true;
-    return v === '1';
-  } catch {
-    return true;
-  }
-}
-
-export function writeSidebarOpenPreference(value: boolean): void {
-  try {
-    localStorage.setItem(SIDEBAR_OPEN_KEY, value ? '1' : '0');
-  } catch {
-    /* ignore */
-  }
 }

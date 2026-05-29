@@ -33,10 +33,6 @@ ALLOWED_UPLOAD_SUFFIXES = {
     ".csv",
     ".xlsx",
     ".xlsm",
-    ".png",
-    ".jpg",
-    ".jpeg",
-    ".webp",
 }
 
 app.add_middleware(
@@ -101,7 +97,7 @@ async def upload(
         )
         raise HTTPException(
             status_code=400,
-            detail="不支持的文件类型（允许 CSV、Excel 或 PNG/JPG/WebP 图像）",
+            detail="不支持的文件类型（允许 CSV 或 Excel）",
         )
 
     safe_stem = re.sub(r"[^0-9A-Za-z._-]+", "_", Path(original_name).stem).strip("._")

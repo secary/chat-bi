@@ -13,7 +13,6 @@ import type {
   SessionListApi,
 } from '../types/admin';
 import type { AppUser, AppUserRow } from '../types/auth';
-import type { DashboardOverview } from '../types/dashboard';
 import { authEnabled } from '../lib/authFlags';
 
 export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
@@ -191,10 +190,6 @@ export async function abortChat(traceId: string): Promise<void> {
   if (!response.ok) {
     throw new Error(`中止请求失败: ${response.status}`);
   }
-}
-
-export async function getDashboardOverview(): Promise<DashboardOverview> {
-  return requestJson<DashboardOverview>('/dashboard/overview');
 }
 
 export async function listSessionsApi(): Promise<SessionListApi> {
@@ -402,7 +397,6 @@ export async function putLlmSettings(payload: {
   model?: string | null;
   api_base?: string | null;
   api_key?: string | null;
-  vision_profile_id?: number | null;
 }): Promise<LlmSettingsView> {
   return requestJson<LlmSettingsView>('/admin/llm-settings', {
     method: 'PUT',
@@ -415,7 +409,6 @@ export async function postLlmProfile(payload: {
   model: string;
   api_base?: string | null;
   api_key?: string | null;
-  supports_vision?: boolean;
 }): Promise<{ profile: LlmProfilePublic }> {
   return requestJson<{ profile: LlmProfilePublic }>('/admin/llm-profiles', {
     method: 'POST',
@@ -430,7 +423,6 @@ export async function putLlmProfile(
     model?: string | null;
     api_base?: string | null;
     api_key?: string | null;
-    supports_vision?: boolean;
   },
 ): Promise<{ profile: LlmProfilePublic }> {
   return requestJson<{ profile: LlmProfilePublic }>(`/admin/llm-profiles/${id}`, {

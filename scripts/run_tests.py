@@ -59,6 +59,7 @@ MODULE_SUITES: dict[str, list[str]] = {
         "tests/test_chat_route_disconnect.py",
         "tests/test_data_source_intent.py",
         "tests/test_decision_content_audit.py",
+        "tests/test_execution_decider.py",
         "tests/test_harness_audit.py",
         "tests/test_harness_policy.py",
         "tests/test_multi_agent_registry.py",
@@ -66,7 +67,6 @@ MODULE_SUITES: dict[str, list[str]] = {
         "tests/test_multi_agent_intent.py",
         "tests/test_multi_agent_runner.py",
         "tests/test_multi_agent_summarize.py",
-        "tests/test_multi_agent_router.py",
         "tests/test_observation.py",
         "tests/test_planner_parse_json.py",
         "tests/test_query_advice_dimension_flow.py",
@@ -108,11 +108,9 @@ MODULE_SUITES: dict[str, list[str]] = {
         "tests/test_executor_file_ingestion_args.py",
         "tests/test_file_ingestion_skill.py",
     ],
-    "upload-vision": [
+    "upload": [
         "tests/test_file_ingestion_skill.py",
         "tests/test_upload_context.py",
-        "tests/test_vision_extract.py",
-        "tests/test_vision_llm_runtime.py",
     ],
     "report": [
         "tests/test_report_pdf.py",

@@ -103,7 +103,6 @@ Manager 提示会注入**上传路径、采纳、上传提案**等会话线索�
 
 - 有 `session_id`：[`list_messages_for_llm`](../../backend/session_repo.py) + 本轮用户句。
 - 无 session：请求体 `history` + `message`。
-- **Vision**：[`enrich_last_user_message_with_vision`](../../backend/vision/chart_table_extract.py)。
 - **上传跟进**：[`augment_messages_for_upload_followup`](../../backend/agent/upload_context.py)。
 
 ReAct / Manager 在送入 Planner 前还会经 **context_window** 压缩（§4.4），避免无关历史干扰 Skill 选用。

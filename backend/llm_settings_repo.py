@@ -11,7 +11,7 @@ from backend.db_mysql import admin_execute, admin_fetch_one
 def get_row() -> Optional[Dict[str, Any]]:
     try:
         return admin_fetch_one(
-            "SELECT id, model, api_base, api_key, active_profile_id, vision_profile_id, updated_at "
+            "SELECT id, model, api_base, api_key, active_profile_id, updated_at "
             f"FROM {LLM_SETTINGS} WHERE id = 1"
         )
     except Exception:
@@ -60,7 +60,6 @@ def public_view(row: Optional[Dict[str, Any]]) -> Dict[str, Any]:
             "api_base": None,
             "api_key_set": False,
             "active_profile_id": None,
-            "vision_profile_id": None,
             "updated_at": None,
         }
     has_key = bool(row.get("api_key"))
@@ -69,14 +68,5 @@ def public_view(row: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         "api_base": row.get("api_base"),
         "api_key_set": has_key,
         "active_profile_id": row.get("active_profile_id"),
-        "vision_profile_id": row.get("vision_profile_id"),
         "updated_at": row.get("updated_at"),
     }
-
-
-def set_vision_profile_id(profile_id: Optional[int]) -> None:
-    """Set optional dedicated vision LLM profile (FK); None clears."""
-    admin_execute(
-        f"UPDATE {LLM_SETTINGS} SET vision_profile_id = %s WHERE id = 1",
-        (profile_id,),
-    )

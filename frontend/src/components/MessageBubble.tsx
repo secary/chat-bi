@@ -575,6 +575,19 @@ export function MessageBubble({ message }: MessageBubbleProps) {
     return (
       <div className="mb-4 flex justify-end animate-fade-in">
         <div className="max-w-[80%] rounded-2xl rounded-br-sm bg-accent px-4 py-3 text-sm text-white leading-relaxed">
+          {message.uploads?.length ? (
+            <div className="mb-2 space-y-1">
+              {message.uploads.map((upload) => (
+                <div
+                  key={`${upload.trace_id}-${upload.server_path}`}
+                  className="rounded-lg bg-white/15 px-3 py-2 text-xs text-white/95"
+                >
+                  <span className="font-medium">已上传附件</span>
+                  <span className="ml-2 break-all">{upload.filename}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
           {message.content}
         </div>
       </div>

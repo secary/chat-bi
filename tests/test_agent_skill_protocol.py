@@ -124,7 +124,7 @@ class SkillProtocolTest(unittest.TestCase):
     def test_streams_auto_analysis_middleware_events(self):
         result = {
             "kind": "auto_analysis",
-            "text": "## 上传表分析建议",
+            "text": "已读取 loan.csv，共 1910 行。\n\n建议采纳",
             "data": {
                 "analysis_proposal": {"markdown": "建议采纳", "proposed_metrics": []},
                 "dashboard_middleware": {"markdown": "看板已生成", "widgets": []},
@@ -137,7 +137,7 @@ class SkillProtocolTest(unittest.TestCase):
             ]
 
         events = asyncio.run(collect())
-        self.assertEqual(events[0]["type"], "text")
+        self.assertEqual(events[0], {"type": "text", "content": "已读取 loan.csv，共 1910 行。"})
         self.assertTrue(any(event["type"] == "analysis_proposal" for event in events))
         self.assertTrue(any(event["type"] == "dashboard_ready" for event in events))
 

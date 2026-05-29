@@ -24,7 +24,7 @@ from backend.agent.multi_agent_registry import (
 from backend.agent.planner import parse_json_object
 from backend.agent.abort_async import ChatAbortedError, await_with_abort
 from backend.agent.data_source_intent import DataSourceIntent, resolve_data_source
-from backend.agent.upload_path_detect import has_upload_file_reference
+from backend.agent.data_source_intent import has_upload_file_reference
 from backend.llm_runtime import chatbi_acompletion
 from backend.trace import log_event
 

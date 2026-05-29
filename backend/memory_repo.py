@@ -11,7 +11,6 @@ from backend.db_mysql import app_connection, app_execute, app_fetch_all, app_fet
 _UPLOAD_PATH_RE = re.compile(r"/tmp/chatbi-uploads/[A-Za-z0-9._-]+", re.IGNORECASE)
 _NOISE_MARKERS = (
     "请读取我上传的文件",
-    "请读取我上传的图像",
     "按数据库表结构校验",
     "chatbi-file-ingestion",
     "基于这个文件",

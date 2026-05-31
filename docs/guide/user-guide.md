@@ -59,7 +59,7 @@
 
 ## 4. 登录、角色与鉴权开关
 
-- **默认管理员**（`database/init.sql` 首次初始化后）：用户名 `admin`，密码 `admin123`。对外演示前**务必改密**，并通过「用户管理」创建业务账号。
+- **默认管理员**：后端启动时按 `.env` / `.env.dev` 中的 `CHATBI_DEFAULT_ADMIN_USERNAME`、`CHATBI_DEFAULT_ADMIN_PASSWORD` 自动写入。对外演示前**务必改密**，并通过「用户管理」创建业务账号。
 - **角色**：普通用户与 **admin**。侧栏中「多 Agents 管理、技能管理、数据源、LLM、用户管理」仅 **admin** 可见。
 - **开发 compose 默认关登录**：`docker-compose.dev.yml` 设置 `CHATBI_AUTH_ENABLED=false`，界面可能提示「开发环境：用户登录已关闭」，接口以种子用户身份运行。生产式 `docker-compose.yml` 应开启 JWT（`CHATBI_JWT_SECRET` 等，见 `.env.example`）。
 - 前端是否展示登录页还受 `VITE_AUTH_ENABLED` 影响（与后端开关需一致）。

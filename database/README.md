@@ -5,7 +5,7 @@
 - `init.sql`
   - 主初始化脚本。
   - 创建并填充 `chatbi_demo`（业务 + 语义层 + 应用前缀表 + 管理前缀表）。
-  - 默认写入演示管理员：`admin` / `admin123`。
+  - 默认管理员由后端启动时按 `CHATBI_DEFAULT_ADMIN_*` 环境变量幂等写入。
 - `init_log.sql`
   - 独立日志库初始化脚本。
   - 仅创建 `chatbi_local_logs.chatbi_logs_trace_log`。

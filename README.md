@@ -44,7 +44,7 @@ docker compose up -d --build
 - 业务库 MySQL：`127.0.0.1:3307`
 - 日志库 MySQL：`127.0.0.1:33067`
 
-默认管理员账号在数据库首次初始化后可用：
+默认管理员账号会在后端启动时按 `.env` 自动写入：
 
 - 用户名：`admin`
 - 密码：`admin123`
@@ -208,9 +208,6 @@ chat-bi/
 
 | 变量 | 说明 |
 | --- | --- |
-| `LLM_MODEL` | LiteLLM 模型名 |
-| `OPENAI_API_KEY` | 模型 API Key |
-| `API_BASE` | OpenAI-compatible Base URL |
 | `CHATBI_DB_HOST/PORT/NAME/USER/PASSWORD` | 业务库连接 |
 | `CHATBI_LOG_DB_HOST/PORT/NAME/USER/PASSWORD` | 日志库连接 |
 | `CHATBI_AGENT_REACT` | `1` 启用 ReAct，多轮 Skill 调度 |
@@ -218,8 +215,11 @@ chat-bi/
 | `CHATBI_AUTH_ENABLED` | 是否开启登录 |
 | `CHATBI_MEMORY_DISABLED` | 是否关闭记忆 |
 | `CHATBI_JWT_SECRET` | JWT 密钥 |
+| `CHATBI_DEFAULT_ADMIN_USERNAME/PASSWORD` | 首次启动时自动写入的默认管理员 |
 
 完整示例见 [`.env.example`](.env.example)。
+
+LLM 配置默认不写入 `.env`；优先在管理页维护。如需通过环境变量临时覆盖，可使用 `LLM_MODEL`、`OPENAI_API_KEY`、`API_BASE`。
 
 ## 测试
 

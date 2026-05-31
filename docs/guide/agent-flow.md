@@ -86,6 +86,8 @@ flowchart LR
 
 当前聊天页默认把请求发给后端 `multi_agents="auto"`，由后端根据本轮消息决定走单 Agent、多专线，还是先追问澄清。
 
+如果需要看工程侧的完整判定表，包括 `decision.mode`、`route_sequence`、`ask` 与 `fallback_single` 的触发点，请直接看 [tech-guide.md §3.5](./tech-guide.md)。
+
 ---
 
 ## 5. 用户侧能看到什么

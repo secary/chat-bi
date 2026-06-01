@@ -73,7 +73,7 @@ export function ThinkingBubble({
         className="flex items-center gap-1 text-sm text-gray-500 transition-colors hover:text-gray-700"
       >
         <span className="text-xs">{collapsed ? '▶' : '▼'}</span>
-        <span>处理进度 ({steps.length})</span>
+        <span>处理进度</span>
       </button>
       {!collapsed && (
         <div

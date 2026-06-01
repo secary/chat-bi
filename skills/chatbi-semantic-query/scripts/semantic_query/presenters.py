@@ -96,7 +96,7 @@ def infer_chart_plan(question: str, rows: Sequence[Dict[str, str]]) -> Optional[
     if len(rows) == 1 and len(metrics) == 1:
         return None
 
-    if any(word in question for word in ["占比", "构成", "贡献", "比例", "份额"]):
+    if any(word in question for word in ["饼图", "占比", "构成", "贡献", "比例", "份额"]):
         chart_type = "pie"
     elif any(word in question for word in ["趋势", "变化", "按月", "时间"]) or dimension in (
         "月份",

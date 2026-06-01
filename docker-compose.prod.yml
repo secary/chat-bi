@@ -31,7 +31,7 @@ services:
       MYSQL_PASSWORD: demo_pass
       TZ: Asia/Shanghai
     ports:
-      - "33067:3306"
+      - "33061:3306"
     volumes:
       - ./database/mysql-data-log:/var/lib/mysql
       - ./database/init_log.sql:/docker-entrypoint-initdb.d/init.sql:ro

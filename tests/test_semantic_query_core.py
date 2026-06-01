@@ -98,6 +98,37 @@ def test_make_plan_keeps_generic_fallback_dimension_words():
     assert plan.dimensions[0].name == "月份"
 
 
+def test_make_plan_defaults_month_dimension_for_multi_month_chart_request():
+    plan = make_plan("查2-3月华东销售额并画图", StubDb())
+
+    assert plan.dimensions[0].name == "月份"
+    assert "DATE_FORMAT(`order_date`, '%Y-%m') AS `月份`" in plan.sql
+    assert "GROUP BY DATE_FORMAT(`order_date`, '%Y-%m')" in plan.sql
+
+
+def test_make_plan_groups_month_list_detail_by_month():
+    plan = make_plan("1月、2月、3月、4月各自的销售额明细", StubDb())
+
+    assert plan.dimensions[0].name == "月份"
+    assert "`order_date` >= '2026-01-01' AND `order_date` < '2026-05-01'" in plan.sql
+    assert "GROUP BY DATE_FORMAT(`order_date`, '%Y-%m')" in plan.sql
+
+
+def test_make_plan_groups_every_month_detail_by_month():
+    plan = make_plan("华东1-4月每月销售额明细", StubDb())
+
+    assert plan.dimensions[0].name == "月份"
+    assert "`region` = '华东'" in plan.sql
+    assert "GROUP BY DATE_FORMAT(`order_date`, '%Y-%m')" in plan.sql
+
+
+def test_make_plan_keeps_single_value_for_multi_month_plain_summary():
+    plan = make_plan("查2-3月华东销售额", StubDb())
+
+    assert plan.dimensions == []
+    assert "GROUP BY" not in plan.sql
+
+
 def test_pick_metric_prefers_rate_metric_when_multiple_metrics_match():
     metrics = {
         "销售额": type("MetricObj", (), {"name": "销售额"})(),
@@ -154,6 +185,19 @@ def test_build_json_payload_keeps_chart_plan_for_trend_rows():
     assert payload["kind"] == "table"
     assert payload["chart_plan"]["chart_type"] == "line"
     assert payload["chart_plan"]["dimension"] == "月份"
+
+
+def test_build_json_payload_honors_pie_chart_request():
+    payload = build_json_payload(
+        "2-3月华东销售额并画饼图",
+        "SELECT ...",
+        [
+            {"月份": "2026-02", "销售额": "150000.00"},
+            {"月份": "2026-03", "销售额": "163000.00"},
+        ],
+    )
+
+    assert payload["chart_plan"]["chart_type"] == "pie"
 
 
 def test_build_json_payload_builds_kpi_for_single_rate_metric():

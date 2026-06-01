@@ -439,6 +439,97 @@ class MultiAgentRunnerHarnessTest(unittest.TestCase):
 
         asyncio.run(_run())
 
+    def test_multi_agent_preserves_chart_when_summary_claim_is_blocked(self) -> None:
+        async def _run() -> None:
+            async def fake_specialist(*args, **kwargs):
+                sink = kwargs["result_sink"]
+                sink["last_result"] = {
+                    "kind": "table",
+                    "text": "query ok",
+                    "data": {
+                        "rows": [
+                            {"月份": "2026-02", "销售额": "150000"},
+                            {"月份": "2026-03", "销售额": "163000"},
+                        ]
+                    },
+                    "chart_plan": {
+                        "chart_type": "bar",
+                        "title": "2-3月华东销售额",
+                        "dimension": "月份",
+                        "metrics": ["销售额"],
+                    },
+                }
+                sink["last_skill_name"] = "chatbi-semantic-query"
+                sink["skill_executions"] = [
+                    {
+                        "skill": "chatbi-semantic-query",
+                        "result": sink["last_result"],
+                        "observation": "2026-02 销售额 150000；2026-03 销售额 163000。",
+                        "step": 1,
+                    }
+                ]
+                yield {"type": "thinking", "content": "处理中"}
+
+            summarize = AsyncMock(return_value={"text": "华东销售额增长 999%。"})
+            events = []
+            with (
+                patch(
+                    "backend.agent.multi_agent_runner.validate_and_order_tasks",
+                    return_value=[
+                        (
+                            0,
+                            {
+                                "agent_id": "demo_query",
+                                "handoff_instruction": "查询华东销售额",
+                                "depends_on": None,
+                            },
+                        )
+                    ],
+                ),
+                patch(
+                    "backend.agent.multi_agent_runner.skills_for_agent", return_value=[MagicMock()]
+                ),
+                patch("backend.agent.multi_agent_runner.agent_label", return_value="问数专线"),
+                patch(
+                    "backend.agent.multi_agent_runner.agent_role_prompt",
+                    return_value="你是问数专线",
+                ),
+                patch(
+                    "backend.agent.multi_agent_runner.stream_specialist",
+                    side_effect=fake_specialist,
+                ),
+                patch("backend.agent.multi_agent_runner.call_summarize_llm", summarize),
+                patch("backend.agent.abort_state.is_aborted", return_value=False),
+                patch(
+                    "backend.agent.multi_agent_runner.log_event",
+                    side_effect=lambda trace_id, span_name, event_name, **kwargs: events.append(
+                        {
+                            "trace_id": trace_id,
+                            "span_name": span_name,
+                            "event_name": event_name,
+                            "payload": kwargs.get("payload") or {},
+                        }
+                    ),
+                ),
+            ):
+                got = []
+                async for event in stream_chat_multi_agent(
+                    [{"role": "user", "content": "查2-3月华东销售额"}],
+                    trace_id="t-claim-audit-chart-preserved",
+                ):
+                    got.append(event)
+
+            self.assertTrue(any(event.get("type") == "chart" for event in got))
+            self.assertTrue(
+                any(
+                    item["event_name"] == "summary_text_blocked_visual_preserved" for item in events
+                )
+            )
+
+        import asyncio
+
+        asyncio.run(_run())
+
     def test_multi_agent_passes_dependency_result_into_business_advisor(self) -> None:
         async def _run() -> None:
             captured = {}

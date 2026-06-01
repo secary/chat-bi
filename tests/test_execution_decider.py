@@ -5,7 +5,12 @@ from dataclasses import replace
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from backend.agent.execution_audit import audit_single_result_for_remediation
+from backend.agent.execution_audit import (
+    FinalAudit,
+    audit_single_result_for_remediation,
+    audit_summary_against_fact_ledger,
+    build_factual_fallback,
+)
 from backend.agent.execution_decider import decide_execution_mode
 from backend.agent.runner import stream_chat
 from backend.config import settings
@@ -147,6 +152,32 @@ class ExecutionDeciderTest(unittest.TestCase):
         )
 
         self.assertEqual([action.skill for action in actions], ["chatbi-decision-advisor"])
+
+    def test_summary_audit_ignores_month_range_numbers(self) -> None:
+        audit = audit_summary_against_fact_ledger(
+            summary_text="1-4月华东销售额趋势已生成饼图。",
+            fact_ledger="- 事实 1: 华东销售额为 613000 元。",
+        )
+
+        self.assertEqual(audit.status, "ok")
+
+    def test_factual_fallback_does_not_assume_upload_file(self) -> None:
+        text = build_factual_fallback(
+            FinalAudit(
+                status="error",
+                issues=[
+                    {
+                        "code": "SUMMARY_NUMERIC_CLAIM_NOT_IN_FACT_LEDGER",
+                        "level": "error",
+                        "message": "最终汇总出现事实账本中不存在的数字：999。",
+                    }
+                ],
+                fact_ledger="- 事实 1: 华东销售额为 613000 元。",
+            )
+        )
+
+        self.assertIn("结构化结果", text)
+        self.assertNotIn("上传文件", text)
 
     def test_stream_chat_single_post_audit_appends_decision_remediation(self) -> None:
         async def run() -> None:

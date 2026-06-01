@@ -90,6 +90,7 @@ MODULE_SUITES: dict[str, list[str]] = {
     ],
     "auth-memory": [
         "tests/test_auth_deps_disabled.py",
+        "tests/test_default_admin_seed.py",
         "tests/test_auth_password.py",
         "tests/test_auth_tokens.py",
         "tests/test_memory_repo_prompts.py",

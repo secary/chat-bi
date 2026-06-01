@@ -3,7 +3,9 @@
 ## 近期优先
 
 - [ ] 梳理单 agent 与多 agent 的智能路由决策路径。
+- [ ] 复盘 workflow 多任务链路：确认 route_sequence 切线、子任务依赖、specialist ReAct 执行、汇总审计与 fallback 的端到端行为。
 - [ ] 补齐多 agent 路由场景覆盖。
+- [ ] 优化记忆管理与会话管理：梳理摘要刷新、长期偏好合并、会话恢复、pending assistant 与多轮上下文边界。
 - [ ] 优化后端 Skill 脚本与执行链路。
 - [ ] 提升测试框架自动化程度。
 - [ ] 将测试框架与 harness 能力进一步集成。

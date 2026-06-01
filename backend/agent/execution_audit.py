@@ -168,7 +168,7 @@ def build_factual_fallback(audit: FinalAudit) -> str:
             "本轮回答的部分数字未通过事实审计，因此先不生成新的经营建议或扩展解读。\n\n"
             "审计发现：\n"
             f"{issue_lines}\n\n"
-            "已确认：本轮已读取并处理上传文件。你可以继续指定要分析的指标、字段、分组维度或时间范围，我会基于文件数据重新计算。"
+            "已确认：本轮已有可审计的结构化结果。你可以继续指定要分析的指标、字段、分组维度或时间范围，我会基于本轮结果重新整理。"
         )
     return (
         "本轮回答未通过事实审计，因此先不生成经营建议。\n\n"
@@ -266,8 +266,11 @@ def _looks_like_advice(text: str) -> bool:
 
 def _normalized_numbers(text: str) -> set[str]:
     numbers: set[str] = set()
-    for match in _NUMBER_RE.findall(text or ""):
-        token = match.replace(",", "")
+    source = text or ""
+    for match in _NUMBER_RE.finditer(source):
+        if _is_temporal_number_context(source, match.start(), match.end()):
+            continue
+        token = match.group(0).replace(",", "")
         if token.endswith("%"):
             core = token[:-1]
             suffix = "%"
@@ -278,6 +281,19 @@ def _normalized_numbers(text: str) -> set[str]:
             core = core.rstrip("0").rstrip(".")
         numbers.add(f"{core}{suffix}")
     return numbers
+
+
+def _is_temporal_number_context(text: str, start: int, end: int) -> bool:
+    before = text[max(0, start - 4) : start]
+    after = text[end : min(len(text), end + 4)]
+    window = text[max(0, start - 4) : min(len(text), end + 4)]
+    if after.startswith(("月", "月份", "年")):
+        return True
+    if before.endswith(("年", "第")) and after.startswith(("月", "季度", "季")):
+        return True
+    if "月" in window and any(sep in window for sep in ("-", "—", "至", "到", "、", ",")):
+        return True
+    return False
 
 
 def _clean_observation(text: str) -> str:

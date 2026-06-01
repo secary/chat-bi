@@ -9,6 +9,12 @@
 后端统一入口为 [`backend/agent/runner.py`](../../backend/agent/runner.py) 中的 `stream_chat`：
 
 ```text
+multi_agents == "auto"（前端默认）
+  → decide_execution_mode(messages)
+    ├─ mode == "ask"    → 返回澄清问题
+    ├─ mode == "multi"  → stream_chat_multi_agent（多专线编排）
+    └─ mode == "single" → 单 Agent
+
 multi_agents == True
   → stream_chat_multi_agent（多专线编排）
 
@@ -21,11 +27,16 @@ multi_agents == False 且 CHATBI_AGENT_REACT 非关闭
 
 环境变量：`CHATBI_AGENT_REACT` 默认开启（`0`/`false`/`no`/`off` 走 Legacy）；`CHATBI_AGENT_MAX_STEPS` 控制 ReAct 最大轮数（默认 `8`，至少 2 才能完成「call_skill + finish」）。
 
+当前前端聊天页固定发送 `multi_agents="auto"`；是否进入多专线，不再由用户在聊天页手动开关，而是由 [`execution_decider.py`](../../backend/agent/execution_decider.py) 根据本轮消息自动判断。
+
 ---
 
 ## 2. 「单 Agent」模式：ReAct 与 Legacy
 
-「单 Agent」指前端 **未开启多专线**（`multi_agents=false`）：同一套启用 Skill 列表，由一条管线完成本轮回答。
+「单 Agent」指本轮请求最终被路由到 **single**：同一套启用 Skill 列表，由一条管线完成本轮回答。来源可能是：
+
+- 显式传入 `multi_agents=false` 或 `"single"`
+- `multi_agents="auto"` 时，`decide_execution_mode()` 判定当前问题适合单 Agent
 
 ### 2.1 ReAct（默认）
 
@@ -55,6 +66,8 @@ multi_agents == False 且 CHATBI_AGENT_REACT 非关闭
 
 ### 3.1 流程概览
 
+进入多专线的前提：本轮请求显式 `multi_agents=true`，或 `multi_agents="auto"` 且 [`decide_execution_mode()`](../../backend/agent/execution_decider.py) 返回 `mode="multi"`。
+
 1. **Manager 规划（可多轮）**：`call_manager_plan_llm` 读 [`skills/_agents/registry.yaml`](../../skills/_agents/registry.yaml)；每轮 JSON 含 `user_intent_summary`、`decomposition_reason`、`tasks`、`finalize_after_this_batch`（缺省 true）。第 2 轮起附带已完成子任务 digest。上限：`max_manager_rounds`（registry / 管理页 1–8）与 `max_agents_per_round`（每轮子任务数）。
 2. **子任务执行**：拓扑序 → `build_subtask_messages` → `stream_specialist(..., subagent_mode=True)`；子任务流式循环内轮询中止（§9）。
 3. **汇总**：`blocks` 累积；若中间命中 `chatbi-auto-analysis` 结构化中间件可短路；否则 [`call_summarize_llm`](../../backend/agent/multi_agent_summarize.py)。
@@ -81,6 +94,69 @@ Manager 提示会注入**上传路径、采纳、上传提案**等会话线索�
 | System 前缀 | memory（可选） | memory + 专线 `role_prompt` |
 | LLM 次数 | ReAct 多轮或 Legacy | Manager 多轮 + 子管线 + 汇总 |
 | 图表/KPI | 最后 Skill + plan | 常继承最后子任务 `last_result`，汇总覆盖 text |
+
+### 3.4 `auto` 智能路由决策
+
+[`decide_execution_mode()`](../../backend/agent/execution_decider.py) 当前采用受控规则：
+
+| 输入特征 | mode | route / 结果 |
+|----------|------|--------------|
+| 空消息 | `ask` | 要求用户先补充问题 |
+| 寒暄、感谢等可跳过 Skill 的消息 | `single` | 直接走单 Agent 文本回复 |
+| 纯问数，如“查华东销售额” | `single` | 保留受控 route，如 `demo_query`，但不进入多专线 |
+| 纯图表建议、缺少数据目标，如“建议用柱状图还是折线图” | `single` | 不强行查询演示库，由单 Agent 解释或追问 |
+| 纯建议、缺少事实范围，如“给我经营建议” | `ask` | 返回澄清，要求补充指标、时间、区域等 |
+| 复合目标：问数 + 建议 / 问数 + 图表 / 上传分析 / 跨期 | `multi` | 进入多专线，按 `route_sequence` 顺序执行 |
+| 未命中结构化路由 | `single` | 降级为单 Agent |
+
+`route_sequence` 来自 [`multi_agent_intent.py`](../../backend/agent/multi_agent_intent.py) 的受控意图分类，当前主要包括：
+
+- `query_only` → `["demo_query"]`
+- `query_then_decide` → `["demo_query", "business_advisor"]`
+- `query_then_viz` → `["demo_query", "viz_board"]`
+- `query_then_decide_then_viz` → `["demo_query", "business_advisor", "viz_board"]`
+- `upload_then_analyze` → `["upload_analyst"]`
+- `upload_then_viz` → `["upload_analyst", "viz_board"]`
+- `period_compare` → `["period_compare"]`
+
+### 3.5 统一决策路径总表
+
+下面这张表把当前分散在 `execution_decider.py`、`multi_agent_intent.py`、`multi_agent_runner.py` 的规则收敛到一处，按“输入特征 → `decision.mode` → `route_sequence` → 执行去向 / fallback”阅读即可。
+
+| 输入特征 | `intent_type` / 路由信号 | `decision.mode` | `route_sequence` | 实际执行去向 | `ask` / fallback |
+|----------|--------------------------|-----------------|------------------|--------------|------------------|
+| 空消息 | 无 | `ask` | `[]` | 不进入单 Agent / 多专线；直接由 `runner._stream_ask_for_clarification()` 返回澄清 | 提示用户先补充问题 |
+| 寒暄、感谢、无需 Skill 的短消息 | `should_skip_skill_for_message == true` | `single` | `[]` | `stream_chat_react()` 或 `_stream_chat_legacy()`，通常直接文字回复 | 无 |
+| 未命中受控业务路由 | `classify_multi_agent_intent() == None` | `single` | `[]` | 单 Agent 执行 | 记录 `intent_unmatched` 风险标记 |
+| 纯图表建议但没有数据目标，如“建议用柱状图还是折线图” | `classify_multi_agent_intent() == None` | `single` | `[]` | 单 Agent 执行；不强行补 `demo_query` | 无 |
+| 纯问数，如“查华东销售额” | `query_only` | `single` | `["demo_query"]` | 单 Agent 执行；`route_sequence` 只作为审计 / 理解线索保留 | 无 |
+| 只要建议但没事实范围，如“给我经营建议” | `routes == ["business_advisor"]` | `ask` | `["business_advisor"]` | 不进入多专线 | 返回澄清，要求补充指标、时间、区域等事实范围 |
+| 问数后给建议 | `query_then_decide` | `multi` | `["demo_query", "business_advisor"]` | 第 1 轮 `build_initial_plan_from_intent()` 先派 `demo_query`；后续 `build_next_plan_from_intent()` 切到 `business_advisor` | 若首轮任务校验失败，回退单 Agent；若最终无 `all_blocks`，也回退单 Agent |
+| 问数后出图 | `query_then_viz` | `multi` | `["demo_query", "viz_board"]` | 先问数，再切图表 / 看板专线 | 同上 |
+| 问数后给建议再出图 | `query_then_decide_then_viz` | `multi` | `["demo_query", "business_advisor", "viz_board"]` | 每轮完成一个 route，直到 `_route_objective_completed()` 判断全部 route 已完成 | 同上 |
+| 上传文件后分析 | `upload_then_analyze` | `multi` | `["upload_analyst"]` | 直接进入上传分析专线 | 若中途命中 auto-analysis 结构化中间件，可短路直接出结果 |
+| 上传文件后分析再出图 | `upload_then_viz` | `multi` | `["upload_analyst", "viz_board"]` | 先上传分析，再切换到图表 / 看板专线 | 同上 |
+| 跨期对比，如环比 / 同比 | `period_compare` | `multi` | `["period_compare"]` | 直接进入跨期对比专线 | 若校验失败或无 block，回退单 Agent |
+
+#### 决策链路对应实现
+
+1. **判模式**：[`decide_execution_mode()`](../../backend/agent/execution_decider.py) 决定 `single` / `multi` / `ask`。
+2. **判 route**：[`classify_multi_agent_intent()`](../../backend/agent/multi_agent_intent.py) 产出 `intent_type`、`current_route`、`route_sequence`。
+3. **首轮任务**：[`build_initial_plan_from_intent()`](../../backend/agent/multi_agent_intent.py) 把 `route_sequence[0]` 转成第 1 轮任务。
+4. **后续切线**：[`build_next_plan_from_intent()`](../../backend/agent/multi_agent_intent.py) 根据 `completed_agents` 依次切到下一条专线；切线时 [`multi_agent_runner.py`](../../backend/agent/multi_agent_runner.py) 会记录 `route_transition_selected`。
+5. **完成判定**：[`_route_objective_completed()`](../../backend/agent/multi_agent_runner.py) 判断受控 `route_sequence` 是否全部完成；完成时记录 `route_objective_completed`。
+6. **失败与回退**：
+   - 首轮 `validate_and_order_tasks()` 失败：立即 `fallback_single`
+   - 多轮执行后 `all_blocks` 仍为空：`fallback_single`
+   - 纯建议但无事实：不回退，直接 `ask`
+
+#### 读日志时最有用的事件
+
+- `agent.harness.execution_decision_selected`：本轮为什么被判到 `single` / `multi` / `ask`
+- `agent.harness.route_intent_classified`：命中了哪个 `intent_type` 与 `route_sequence`
+- `agent.harness.route_transition_selected`：多专线从上一条 route 切到下一条 route
+- `agent.harness.route_objective_completed`：受控 route 序列已经跑完
+- `agent.multi.fallback_single`：多专线未形成有效任务或无有效 block，降级为单 Agent
 
 ---
 

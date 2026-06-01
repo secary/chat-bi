@@ -265,14 +265,7 @@ CREATE TABLE chatbi_app_user (
   UNIQUE KEY uq_app_user_username (username)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 默认管理员 admin / admin123（部署后请修改）
-INSERT INTO chatbi_app_user (username, password_hash, role, is_active)
-VALUES (
-  'admin',
-  '$2b$12$iXi5Jzd4MR2HPoWaaai6pOmuDcivD9AF05G.knPmpp7Gp5drrSVYG',
-  'admin',
-  1
-);
+-- 默认管理员由后端启动时按 CHATBI_DEFAULT_ADMIN_* 环境变量幂等写入。
 
 CREATE TABLE chatbi_app_chat_session (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,

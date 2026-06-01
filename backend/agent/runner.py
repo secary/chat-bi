@@ -105,6 +105,15 @@ stream_chat_legacy is not in use by default. It is not ReAct mode.
 """
 
 
+def _clarification_text(decision: ExecutionDecision) -> str:
+    flags = set(decision.risk_flags)
+    if "empty_message" in flags:
+        return "请先输入你想分析的问题，例如“查华东近3个月销售额”或“基于华东近3个月销售和毛利给经营建议”。"
+    if "decision_without_facts" in flags or decision.route_sequence == ["business_advisor"]:
+        return "我可以给经营建议，但需要先有明确事实范围。请补充要分析的指标、时间或区域，例如“基于华东近3个月销售和毛利给经营建议”。"
+    return decision.reason or "我还需要更多信息才能继续，请补充要分析的指标、时间、区域或数据范围。"
+
+
 async def _stream_ask_for_clarification(
     decision: ExecutionDecision,
     trace_id: str = "",
@@ -122,10 +131,7 @@ async def _stream_ask_for_clarification(
         },
     )
     yield {"type": "thinking", "content": "正在确认最稳妥的处理方式..."}
-    yield {
-        "type": "text",
-        "content": "我可以给经营建议，但需要先有明确事实范围。请补充要分析的指标、时间或区域，例如“基于华东近3个月销售和毛利给经营建议”。",
-    }
+    yield {"type": "text", "content": _clarification_text(decision)}
     yield {"type": "done", "content": None}
 
 
@@ -285,7 +291,9 @@ async def stream_chat(
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """Agent entry point: routes to multi-agent, ReAct, or legacy execution mode."""
     force_multi = multi_agents is True
-    force_single = isinstance(multi_agents, str) and multi_agents == "single"
+    force_single = multi_agents is False or (
+        isinstance(multi_agents, str) and multi_agents == "single"
+    )
     decision: Optional[ExecutionDecision] = None
     if not force_multi and not force_single:
         decision = decide_execution_mode(messages)

@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 import uuid
 from pathlib import Path
+from time import sleep
 from time import perf_counter
 
 from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
@@ -11,6 +12,7 @@ from pydantic import BaseModel
 
 from backend.env_loader import load_project_env
 from backend.auth_deps import get_current_user, require_admin
+from backend.default_admin_seed import seed_default_admin
 from backend.http_utils import request_trace_id
 from backend.routes.admin_db_route import router as admin_db_router
 from backend.routes.admin_harness_audit_route import router as admin_harness_audit_router
@@ -56,6 +58,14 @@ app.include_router(admin_harness_audit_router, dependencies=[Depends(require_adm
 app.include_router(admin_skills_router, dependencies=[Depends(require_admin)])
 app.include_router(admin_multi_agents_router, dependencies=[Depends(require_admin)])
 app.include_router(admin_users_router)
+
+
+@app.on_event("startup")
+def seed_configured_default_admin() -> None:
+    for attempt in range(5):
+        if seed_default_admin() != "failed":
+            return
+        sleep(min(attempt + 1, 3))
 
 
 class UploadResult(BaseModel):

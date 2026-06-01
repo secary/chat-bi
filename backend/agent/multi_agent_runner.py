@@ -80,6 +80,20 @@ def _has_structured_auto_analysis(result: Optional[Dict[str, Any]]) -> bool:
     )
 
 
+def _has_streamable_visual(result: Optional[Dict[str, Any]]) -> bool:
+    if not isinstance(result, dict):
+        return False
+    data = result.get("data")
+    return bool(
+        result.get("chart_plan")
+        or result.get("charts")
+        or result.get("kpis")
+        or result.get("dashboardReady")
+        or result.get("dashboard_ready")
+        or (isinstance(data, dict) and data.get("dashboard_middleware"))
+    )
+
+
 def _has_rows_result(result: Optional[Dict[str, Any]]) -> bool:
     if not isinstance(result, dict):
         return False
@@ -771,6 +785,17 @@ async def stream_chat_multi_agent(
         log_event(trace_id, "agent.multi", "summary_empty", level="WARN")
         yield {"type": "done", "content": None}
         return
+    skill_label = last_skill_name or "chatbi-semantic-query"
+    merged = merge_results_for_finish(
+        all_skill_executions,
+        synth,
+        last_skill_name,
+    )
+    if not all_skill_executions and isinstance(last_result, dict):
+        merged = dict(last_result)
+        if synth.get("text"):
+            merged["text"] = synth["text"]
+
     summary_audit = audit_summary_against_fact_ledger(
         summary_text=str(synth.get("text") or ""),
         fact_ledger=final_audit.fact_ledger,
@@ -787,8 +812,30 @@ async def stream_chat_multi_agent(
         level="WARN" if summary_audit.status != "ok" else "INFO",
     )
     if summary_audit.should_block_summary:
+        fallback_text = build_factual_fallback(summary_audit)
+        if _has_streamable_visual(merged):
+            yield {"type": "thinking", "content": "最终回答未通过事实收束审计，已保留可审计图表。"}
+            safe_plan = dict(synth)
+            safe_plan["text"] = fallback_text
+            merged["text"] = fallback_text
+            async for event in stream_result_events(
+                skill_label,
+                safe_plan,
+                merged,
+                include_thinking=False,
+            ):
+                yield event
+            log_event(
+                trace_id,
+                "agent.multi",
+                "summary_text_blocked_visual_preserved",
+                payload={"issues": summary_audit.issues},
+                level="WARN",
+            )
+            yield {"type": "done", "content": None}
+            return
         yield {"type": "thinking", "content": "最终回答未通过事实收束审计，已降级为事实摘要。"}
-        yield {"type": "text", "content": build_factual_fallback(summary_audit)}
+        yield {"type": "text", "content": fallback_text}
         log_event(
             trace_id,
             "agent.multi",
@@ -798,17 +845,6 @@ async def stream_chat_multi_agent(
         )
         yield {"type": "done", "content": None}
         return
-
-    skill_label = last_skill_name or "chatbi-semantic-query"
-    merged = merge_results_for_finish(
-        all_skill_executions,
-        synth,
-        last_skill_name,
-    )
-    if not all_skill_executions and isinstance(last_result, dict):
-        merged = dict(last_result)
-        if synth.get("text"):
-            merged["text"] = synth["text"]
 
     async for event in stream_result_events(skill_label, synth, merged, include_thinking=False):
         yield event

@@ -121,6 +121,18 @@ class Settings:
     auth_dev_user_id: int = field(
         default_factory=lambda: max(1, int(os.getenv("CHATBI_AUTH_DEV_USER_ID", "1")))
     )
+    default_admin_username: str = field(
+        default_factory=lambda: os.getenv("CHATBI_DEFAULT_ADMIN_USERNAME", "admin").strip()
+    )
+    default_admin_password: str = field(
+        default_factory=lambda: os.getenv("CHATBI_DEFAULT_ADMIN_PASSWORD", "admin123")
+    )
+    default_admin_reset_password: bool = field(
+        default_factory=lambda: (
+            os.getenv("CHATBI_DEFAULT_ADMIN_RESET_PASSWORD", "0").strip().lower()
+            in ("1", "true", "yes", "on")
+        )
+    )
 
     project_root: Path = _PROJECT_ROOT
     skills_dir: Path = field(init=False)

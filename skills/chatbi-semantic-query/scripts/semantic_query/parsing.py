@@ -1,4 +1,5 @@
-'''Extract natural language query components into structured information.'''
+"""Extract natural language query components into structured information."""
+
 from __future__ import annotations
 
 import os
@@ -15,7 +16,19 @@ DEFAULT_YEAR = int(os.getenv("CHATBI_DEFAULT_YEAR", "2026"))
 # Keep only generic language fallbacks here so the semantic layer remains
 # data-driven and most new wording can be added without code changes.
 FALLBACK_DIMENSION_SYNONYMS = {
-    "月份": ["时间", "按月", "趋势", "发生时间", "统计时间"],
+    "月份": [
+        "时间",
+        "按月",
+        "每月",
+        "每个月",
+        "各月",
+        "逐月",
+        "月度",
+        "月份明细",
+        "趋势",
+        "发生时间",
+        "统计时间",
+    ],
     "区域": ["各区域", "区域对比", "所属区域"],
     "部门": ["负责部门", "销售部门"],
     "产品类别": ["服务类别"],
@@ -163,6 +176,16 @@ def month_bounds(year: int, start_month: int, end_month: int) -> tuple[str, str]
     return f"{year}-{start_month:02d}-01", end
 
 
+def month_list_bounds(question: str, default_year: int) -> Optional[tuple[str, str]]:
+    month_tokens = re.findall(r"(?<!年)(\d{1,2})\s*月", question)
+    if len(month_tokens) < 2:
+        return None
+    if not re.search(r"\d{1,2}\s*月\s*(?:、|,|，|和|与)\s*\d{1,2}\s*月", question):
+        return None
+    months = [int(item) for item in month_tokens]
+    return month_bounds(default_year, min(months), max(months))
+
+
 def default_year_for_table(db: MysqlCli, table: str) -> int:
     date_field = "order_date" if table == "sales_order" else "stat_month"
     sql = (
@@ -178,6 +201,15 @@ def parse_time_filter(
     question: str, table: str, default_year: int = DEFAULT_YEAR
 ) -> Optional[TimeFilter]:
     date_field = "order_date" if table == "sales_order" else "stat_month"
+    explicit_month_list_bounds = month_list_bounds(question, default_year)
+    if explicit_month_list_bounds is not None:
+        start, end = explicit_month_list_bounds
+        return (
+            date_field,
+            f"{quote_ident(date_field)} >= {quote_literal(start)} AND "
+            f"{quote_ident(date_field)} < {quote_literal(end)}",
+        )
+
     patterns = [
         (
             r"(20\d{2})\s*年\s*(\d{1,2})\s*月?\s*(?:-|到|至|~)\s*(\d{1,2})\s*月",

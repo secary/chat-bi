@@ -46,6 +46,8 @@ services:
     container_name: chatbi-prod-backend
     restart: unless-stopped
     env_file:
+      - path: .env.prod
+        required: false
       - path: .env
         required: false
     environment:

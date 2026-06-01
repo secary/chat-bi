@@ -30,6 +30,16 @@ _VIZ_KEYWORDS = (
     "dashboard",
 )
 
+_VISUAL_METHOD_ADVICE_MARKERS = (
+    "建议用",
+    "推荐用",
+    "适合用",
+    "用什么图",
+    "什么图表",
+    "哪种图",
+    "哪类图",
+)
+
 _COMPARE_KEYWORDS = ("环比", "同比", "比上月", "较上月", "对比")
 
 _QUERY_KEYWORDS = (
@@ -160,11 +170,19 @@ def _contains_any(text: str, keywords: tuple[str, ...]) -> bool:
 def _wants_decision(text: str, *, wants_query: bool, wants_viz: bool) -> bool:
     if _contains_any(text, _DECISION_STRONG_KEYWORDS):
         return True
+    if wants_viz and _is_visual_method_advice(text):
+        return False
     if _DECISION_ADVICE_KEYWORD not in text:
         return False
     if wants_viz and not wants_query:
         return False
     return True
+
+
+def _is_visual_method_advice(text: str) -> bool:
+    if not text:
+        return False
+    return _contains_any(text, _VISUAL_METHOD_ADVICE_MARKERS) and _contains_any(text, _VIZ_KEYWORDS)
 
 
 def _intent_type(routes: List[str], *, wants_decision: bool, wants_viz: bool) -> str:

@@ -61,6 +61,14 @@ class MultiAgentIntentTest(unittest.TestCase):
         self.assertEqual(intent["intent_type"], "query_then_viz")
         self.assertEqual(route_sequence_from_intent(intent), ["demo_query", "viz_board"])
 
+    def test_query_with_visual_method_advice_does_not_add_business_advisor(self) -> None:
+        intent = classify_multi_agent_intent(
+            [{"role": "user", "content": "查华东销售额，建议用柱状图还是折线图"}]
+        )
+        assert intent is not None
+        self.assertEqual(intent["intent_type"], "query_then_viz")
+        self.assertEqual(route_sequence_from_intent(intent), ["demo_query", "viz_board"])
+
     def test_builds_initial_and_next_route_plans(self) -> None:
         intent = classify_multi_agent_intent(
             [{"role": "user", "content": "先查询华东销售额，再给经营建议"}]

@@ -47,6 +47,14 @@ class ExecutionDeciderTest(unittest.TestCase):
         self.assertEqual(decision.route_sequence, [])
         self.assertIn("intent_unmatched", decision.risk_flags)
 
+    def test_query_with_visual_method_advice_does_not_route_business_advisor(self) -> None:
+        decision = decide_execution_mode(
+            [{"role": "user", "content": "查华东销售额，建议用柱状图还是折线图"}]
+        )
+
+        self.assertEqual(decision.mode, "multi")
+        self.assertEqual(decision.route_sequence, ["demo_query", "viz_board"])
+
     def test_stream_chat_empty_message_asks_for_question(self) -> None:
         async def run() -> None:
             got = []

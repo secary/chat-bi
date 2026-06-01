@@ -67,12 +67,12 @@ def classify_multi_agent_intent(messages: List[Dict[str, str]]) -> Optional[Dict
         routes.append("upload_analyst")
     elif wants_compare:
         routes.append("period_compare")
-    elif wants_query or wants_viz:
+    elif wants_query:
         routes.append("demo_query")
 
     if wants_decision and "business_advisor" not in routes:
         routes.append("business_advisor")
-    if wants_viz and "viz_board" not in routes:
+    if wants_viz and routes and "viz_board" not in routes:
         routes.append("viz_board")
 
     if not routes:

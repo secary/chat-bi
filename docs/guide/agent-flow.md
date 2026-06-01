@@ -72,7 +72,7 @@ flowchart TB
 flowchart LR
     Q[用户提问] --> SW{后端智能路由}
     SW -->|简单问数 / 闲聊| ONE[一个 Agent 包办]
-    SW -->|问数+建议 / 图表 / 上传分析 / 跨期| MULTI[协调者 + 多个专线 Agent]
+    SW -->|问数+建议 / 问数+图表 / 上传分析 / 跨期| MULTI[协调者 + 多个专线 Agent]
     SW -->|纯建议但缺事实| ASK[先追问范围]
     ONE --> ANS[回答]
     MULTI --> ANS

@@ -46,9 +46,16 @@ class MultiAgentIntentTest(unittest.TestCase):
         self.assertEqual(intent["current_route"], "demo_query")
         self.assertEqual(route_sequence_from_intent(intent), ["demo_query"])
 
-    def test_chart_advice_does_not_route_to_business_advisor(self) -> None:
+    def test_chart_advice_without_data_need_does_not_force_query_route(self) -> None:
         intent = classify_multi_agent_intent(
             [{"role": "user", "content": "建议用柱状图还是折线图"}]
+        )
+
+        self.assertIsNone(intent)
+
+    def test_query_with_chart_still_routes_query_then_viz(self) -> None:
+        intent = classify_multi_agent_intent(
+            [{"role": "user", "content": "查华东销售额并画柱状图"}]
         )
         assert intent is not None
         self.assertEqual(intent["intent_type"], "query_then_viz")

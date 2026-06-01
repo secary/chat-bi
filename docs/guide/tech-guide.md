@@ -104,8 +104,9 @@ Manager 提示会注入**上传路径、采纳、上传提案**等会话线索�
 | 空消息 | `ask` | 要求用户先补充问题 |
 | 寒暄、感谢等可跳过 Skill 的消息 | `single` | 直接走单 Agent 文本回复 |
 | 纯问数，如“查华东销售额” | `single` | 保留受控 route，如 `demo_query`，但不进入多专线 |
+| 纯图表建议、缺少数据目标，如“建议用柱状图还是折线图” | `single` | 不强行查询演示库，由单 Agent 解释或追问 |
 | 纯建议、缺少事实范围，如“给我经营建议” | `ask` | 返回澄清，要求补充指标、时间、区域等 |
-| 复合目标：问数 + 建议 / 图表 / 上传分析 / 跨期 | `multi` | 进入多专线，按 `route_sequence` 顺序执行 |
+| 复合目标：问数 + 建议 / 问数 + 图表 / 上传分析 / 跨期 | `multi` | 进入多专线，按 `route_sequence` 顺序执行 |
 | 未命中结构化路由 | `single` | 降级为单 Agent |
 
 `route_sequence` 来自 [`multi_agent_intent.py`](../../backend/agent/multi_agent_intent.py) 的受控意图分类，当前主要包括：
@@ -127,6 +128,7 @@ Manager 提示会注入**上传路径、采纳、上传提案**等会话线索�
 | 空消息 | 无 | `ask` | `[]` | 不进入单 Agent / 多专线；直接由 `runner._stream_ask_for_clarification()` 返回澄清 | 提示用户先补充问题 |
 | 寒暄、感谢、无需 Skill 的短消息 | `should_skip_skill_for_message == true` | `single` | `[]` | `stream_chat_react()` 或 `_stream_chat_legacy()`，通常直接文字回复 | 无 |
 | 未命中受控业务路由 | `classify_multi_agent_intent() == None` | `single` | `[]` | 单 Agent 执行 | 记录 `intent_unmatched` 风险标记 |
+| 纯图表建议但没有数据目标，如“建议用柱状图还是折线图” | `classify_multi_agent_intent() == None` | `single` | `[]` | 单 Agent 执行；不强行补 `demo_query` | 无 |
 | 纯问数，如“查华东销售额” | `query_only` | `single` | `["demo_query"]` | 单 Agent 执行；`route_sequence` 只作为审计 / 理解线索保留 | 无 |
 | 只要建议但没事实范围，如“给我经营建议” | `routes == ["business_advisor"]` | `ask` | `["business_advisor"]` | 不进入多专线 | 返回澄清，要求补充指标、时间、区域等事实范围 |
 | 问数后给建议 | `query_then_decide` | `multi` | `["demo_query", "business_advisor"]` | 第 1 轮 `build_initial_plan_from_intent()` 先派 `demo_query`；后续 `build_next_plan_from_intent()` 切到 `business_advisor` | 若首轮任务校验失败，回退单 Agent；若最终无 `all_blocks`，也回退单 Agent |

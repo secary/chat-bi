@@ -34,7 +34,7 @@
 
 ```bash
 cp .env.example .env
-docker compose -f docker-compose.prod.yml up -d --build
+bash scripts/launch.sh
 ```
 
 访问地址：
@@ -48,6 +48,8 @@ docker compose -f docker-compose.prod.yml up -d --build
 - 密码：`admin123`
 
 生产式本地使用一体镜像 `chatbi-app`：容器内同时运行 nginx 和 FastAPI，nginx 通过同源 `/api` 反代到本容器内的后端进程。
+如需只启动不打开浏览器，可运行 `bash scripts/launch.sh --no-open`；如需跳过重建镜像，可加 `--no-build`。
+脚本默认会先运行 `bash scripts/bootstrap_dev.sh` 做本地自检；如需跳过可加 `--skip-bootstrap`。
 
 ### 2. 开发热更新
 
@@ -213,6 +215,7 @@ chat-bi/
 | --- | --- |
 | `CHATBI_DB_HOST/PORT/NAME/USER/PASSWORD` | 业务库连接 |
 | `CHATBI_LOG_DB_NAME` | 可选日志库名；默认复用 `CHATBI_DB_NAME` |
+| `LLM_MODEL/API_BASE/OPENAI_API_KEY` | LiteLLM 模型配置；`.env.example` 默认用本地 Ollama 占位 |
 | `CHATBI_AGENT_REACT` | `1` 启用 ReAct，多轮 Skill 调度 |
 | `CHATBI_AGENT_MAX_STEPS` | 单轮消息最大 Agent 步数 |
 | `CHATBI_AUTH_ENABLED` | 是否开启登录 |
@@ -222,7 +225,7 @@ chat-bi/
 
 完整示例见 [`.env.example`](.env.example)。
 
-LLM 配置默认不写入 `.env`；优先在管理页维护。如需通过环境变量临时覆盖，可使用 `LLM_MODEL`、`OPENAI_API_KEY`、`API_BASE`。
+LLM 配置可通过 `.env` 提供启动占位，也可在管理页维护；运行时以管理页激活的 Profile 优先。
 
 ## 测试
 

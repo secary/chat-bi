@@ -34,7 +34,7 @@ VS Code 工作区也已启用保存时自动格式化：Python 走 Black，前�
 
 ## E2E 烟雾测试
 
-E2E smoke 用于后端和 LLM 已运行时的链路验收，不放进默认 CI。它会直接请求 `/chat` SSE，验证典型问法的 Skill 路由、图表事件和边界场景。
+E2E smoke 用于开发应用和 LLM 已运行时的链路验收，不放进默认 CI。它会直接请求 `/chat` SSE，验证典型问法的 Skill 路由、图表事件和边界场景。
 
 ```bash
 docker compose -f docker-compose.dev.yml up -d

@@ -5,7 +5,7 @@
 ## 一键自动运行
 
 ```bash
-# 启动后端
+# 启动开发应用
 docker compose -f docker-compose.dev.yml up -d
 
 # 运行全部用例（需 LLM API Key 已配置）

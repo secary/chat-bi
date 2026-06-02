@@ -47,8 +47,8 @@
 
 **启动方式**请优先参考 [README.md](../../README.md)：
 
-- **Docker 全栈（生产式本地）**：MySQL 宿主机 **3307**；前端 **5173**。
-- **Docker 开发热更新**：MySQL 宿主机 **33067**；前端 **5174**；后端 **8001**。`docker-compose.dev.yml` 中 `chatbi-db` 使用 Docker named volume 保存 `chatbi_demo`。
+- **Docker 全栈（生产式本地）**：`chatbi-app` 暴露应用端口 **5173**；MySQL 宿主机 **3307**。
+- **Docker 开发热更新**：`chatbi-app-dev` 同时承载 Vite 与 FastAPI reload；前端 **5174**，后端调试端口 **8001**，MySQL 宿主机 **33067**。`docker-compose.dev.yml` 中 `chatbi-db-dev` 使用 Docker named volume 保存 `chatbi_demo`。
 - **宿主机开发**：本地运行后端与前端，MySQL 仍建议用 Docker。
 
 宿主机 `.env` / `.env.dev` 默认只需要配置 `CHATBI_DB_*`；日志表默认写入同一个 `CHATBI_DB_NAME`。

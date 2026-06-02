@@ -34,13 +34,12 @@
 
 ```bash
 cp .env.example .env
-docker compose up -d --build
+docker compose -f docker-compose.prod.yml up -d --build
 ```
 
 访问地址：
 
-- 前端：`http://localhost:5173`
-- 后端：`http://localhost:8000`
+- 应用：`http://localhost:5173`（前端静态资源 + 同源 `/api`）
 - MySQL：`127.0.0.1:3307`（`chatbi_demo` 包含业务、应用、管理与日志表）
 
 默认管理员账号会在后端启动时按 `.env` 自动写入：
@@ -48,7 +47,7 @@ docker compose up -d --build
 - 用户名：`admin`
 - 密码：`admin123`
 
-前端生产镜像固定通过同源 `/api` 访问后端，不再依赖根目录 `.env` 中的前端 API 地址。
+生产式本地使用一体镜像 `chatbi-app`：容器内同时运行 nginx 和 FastAPI，nginx 通过同源 `/api` 反代到本容器内的后端进程。
 
 ### 2. 开发热更新
 
@@ -69,6 +68,8 @@ docker compose --env-file .env.dev -f docker-compose.dev.yml up -d --build
 - 前端：`http://localhost:5174`
 - 后端：`http://localhost:8001`
 - MySQL：`127.0.0.1:33067`（`chatbi_demo` 包含业务、应用、管理与日志表）
+
+开发态使用一体开发容器 `chatbi-app-dev`：容器内同时运行 Vite dev server 和 FastAPI reload server，并通过 bind mount 保持前后端热更新。
 
 开发 compose 默认关闭登录：
 
@@ -161,9 +162,15 @@ chat-bi/
 ├── AGENTS.md
 ├── README.md
 ├── TODO.md
+├── Dockerfile
 ├── docker-compose.yml
 ├── docker-compose.dev.yml
+├── docker-compose.prod.yml
 ├── pyproject.toml
+├── deploy/
+│   ├── docker-entrypoint.dev.sh
+│   ├── docker-entrypoint.prod.sh
+│   └── nginx.app.conf
 ├── scripts/
 │   ├── bootstrap_dev.sh
 │   ├── run_tests.py

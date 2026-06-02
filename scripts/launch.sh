@@ -8,7 +8,6 @@ APP_URL="http://localhost:5173"
 COMPOSE_FILE="${ROOT}/docker-compose.prod.yml"
 BUILD=1
 OPEN_BROWSER=1
-RUN_BOOTSTRAP=1
 TIMEOUT_SECONDS=90
 
 usage() {
@@ -20,7 +19,6 @@ Run local self-checks, start the production-style ChatBI stack, wait for /health
 Options:
   --no-build       Start existing images without rebuilding.
   --no-open        Do not open the browser after startup.
-  --skip-bootstrap Skip scripts/bootstrap_dev.sh self-checks.
   --url URL        App URL to open and health-check. Default: http://localhost:5173
   --timeout SEC    Seconds to wait for /health. Default: 90
   -h, --help       Show this help.
@@ -31,6 +29,28 @@ log() {
   echo "[start-prod] $1"
 }
 
+ensure_env_file() {
+  local existing=0
+  local env_name
+  for env_name in ".env" ".env.dev" ".env.prod" "env.dev"; do
+    if [[ -f "${ROOT}/${env_name}" ]]; then
+      existing=1
+      break
+    fi
+  done
+
+  if [[ "${existing}" -eq 1 ]]; then
+    return 0
+  fi
+  if [[ ! -f "${ROOT}/.env.example" ]]; then
+    echo "No env file found and missing ${ROOT}/.env.example." >&2
+    exit 1
+  fi
+
+  cp "${ROOT}/.env.example" "${ROOT}/.env"
+  log "No env file found; copied .env.example to .env"
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --no-build)
@@ -38,9 +58,6 @@ while [[ $# -gt 0 ]]; do
       ;;
     --no-open)
       OPEN_BROWSER=0
-      ;;
-    --skip-bootstrap)
-      RUN_BOOTSTRAP=0
       ;;
     --url)
       if [[ $# -lt 2 ]]; then
@@ -88,12 +105,9 @@ if [[ ! -f "${COMPOSE_FILE}" ]]; then
   exit 1
 fi
 
-cd "${ROOT}"
+ensure_env_file
 
-if [[ "${RUN_BOOTSTRAP}" -eq 1 ]]; then
-  log "Running bootstrap self-checks"
-  bash "${ROOT}/scripts/bootstrap_dev.sh"
-fi
+cd "${ROOT}"
 
 compose_cmd=(docker compose -f "${COMPOSE_FILE}")
 up_cmd=("${compose_cmd[@]}" up -d)

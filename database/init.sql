@@ -265,7 +265,7 @@ CREATE TABLE app_user (
   UNIQUE KEY uq_app_user_username (username)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 默认管理员由后端启动时按 CHATBI_DEFAULT_ADMIN_* 环境变量幂等写入。
+-- 默认管理员和可选种子用户由后端启动时按环境变量幂等写入。
 
 CREATE TABLE app_chat_session (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,

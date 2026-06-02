@@ -335,7 +335,7 @@ Main Process                    Subprocess
 1. **Skill 子进程隔离**：主进程通过 env 注入 DB；问数/决策脚本仅 `SELECT`（别名 Skill 写受控表）。
 2. **ReAct 默认**：Observation 回灌 + `CHATBI_AGENT_MAX_STEPS` 上限；Legacy 与复合双步链仍可用。
 3. **三级记忆**：`app_chat_message` → `session_summary` → `long_term`；可 `CHATBI_MEMORY_DISABLED` 关闭。
-4. **单库结构**：`chatbi_demo` 承载业务、应用、管理前缀表和链路日志；后端启动时按 `CHATBI_DEFAULT_ADMIN_*` 幂等写入默认管理员。
+4. **单库结构**：`chatbi_demo` 承载业务、应用、管理前缀表和链路日志；后端启动时按 `CHATBI_SEED_USERS` 幂等写入 `app_user`。
 5. **SSE 类型扩展**：除 text/chart/kpi 外，支持上传分析的 `analysis_proposal`、`dashboard_ready` 与 `plan_summary`。
 6. **多 Agent**：Manager 多轮规划 + **顺序**执行专线子任务 + 汇总；上传路径/采纳线索约束路由。
 7. **可中止**：`abort_state` + `/abort` + 前端 `AbortSignal`。

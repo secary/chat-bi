@@ -42,14 +42,14 @@ bash scripts/launch.sh
 - 应用：`http://localhost:5173`（前端静态资源 + 同源 `/api`）
 - MySQL：`127.0.0.1:3307`（`chatbi_demo` 包含业务、应用、管理与日志表）
 
-默认管理员账号会在后端启动时按 `.env` 自动写入：
+启动用户会在后端启动时按 `.env` 自动写入 `app_user`；把管理员也放在同一个配置里：
 
-- 用户名：`admin`
-- 密码：`admin123`
+```dotenv
+CHATBI_SEED_USERS=admin:admin123:admin;demo:demo123:user;analyst:analyst123:user
+```
 
 生产式本地使用一体镜像 `chatbi-app`：容器内同时运行 nginx 和 FastAPI，nginx 通过同源 `/api` 反代到本容器内的后端进程。
 如需只启动不打开浏览器，可运行 `bash scripts/launch.sh --no-open`；如需跳过重建镜像，可加 `--no-build`。
-脚本默认会先运行 `bash scripts/bootstrap_dev.sh` 做本地自检；如需跳过可加 `--skip-bootstrap`。
 
 ### 2. 开发热更新
 
@@ -221,7 +221,7 @@ chat-bi/
 | `CHATBI_AUTH_ENABLED` | 是否开启登录 |
 | `CHATBI_MEMORY_DISABLED` | 是否关闭记忆 |
 | `CHATBI_JWT_SECRET` | JWT 密钥 |
-| `CHATBI_DEFAULT_ADMIN_USERNAME/PASSWORD` | 首次启动时自动写入的默认管理员 |
+| `CHATBI_SEED_USERS` | 启动时写入 `app_user`，格式 `username:password:role;...`，建议包含至少一个 `admin` |
 
 完整示例见 [`.env.example`](.env.example)。
 

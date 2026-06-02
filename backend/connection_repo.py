@@ -1,4 +1,4 @@
-"""app_db_connection CRUD + env mapping for Skill subprocess."""
+"""app_db_connection CRUD + DB config mapping for Skill execution."""
 
 from __future__ import annotations
 
@@ -14,13 +14,13 @@ from backend.db_mysql import (
 )
 
 
-def skill_env_from_row(row: Dict[str, Any]) -> Dict[str, str]:
+def skill_db_config_from_row(row: Dict[str, Any]) -> Dict[str, str]:
     return {
-        "CHATBI_DB_HOST": str(row["host"]),
-        "CHATBI_DB_PORT": str(int(row["port"])),
-        "CHATBI_DB_USER": str(row["username"]),
-        "CHATBI_DB_PASSWORD": str(row["password"]),
-        "CHATBI_DB_NAME": str(row["database_name"]),
+        "host": str(row["host"]),
+        "port": str(int(row["port"])),
+        "user": str(row["username"]),
+        "password": str(row["password"]),
+        "database": str(row["database_name"]),
     }
 
 
@@ -64,11 +64,11 @@ def resolve_skill_db_env(
     if db_connection_id is not None:
         row = get_connection(db_connection_id)
         if row:
-            return skill_env_from_row(row)
+            return skill_db_config_from_row(row)
         return None
     row = get_default_connection()
     if row:
-        return skill_env_from_row(row)
+        return skill_db_config_from_row(row)
     return None
 
 

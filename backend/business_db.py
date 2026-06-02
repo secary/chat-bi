@@ -18,11 +18,11 @@ logger = logging.getLogger(__name__)
 def _merged_connection_params() -> Dict[str, Any]:
     overrides = resolve_skill_db_env(None) or {}
     return {
-        "host": str(overrides.get("CHATBI_DB_HOST", settings.db_host)),
-        "port": int(overrides.get("CHATBI_DB_PORT", settings.db_port)),
-        "user": str(overrides.get("CHATBI_DB_USER", settings.db_user)),
-        "password": str(overrides.get("CHATBI_DB_PASSWORD", settings.db_password)),
-        "database": str(overrides.get("CHATBI_DB_NAME", settings.db_name)),
+        "host": str(overrides.get("host", settings.db_host)),
+        "port": int(overrides.get("port", settings.db_port)),
+        "user": str(overrides.get("user", settings.db_user)),
+        "password": str(overrides.get("password", settings.db_password)),
+        "database": str(overrides.get("database", settings.db_name)),
     }
 
 

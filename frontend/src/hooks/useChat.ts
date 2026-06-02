@@ -82,11 +82,16 @@ export interface UseChatReturn {
   assistantPending: boolean;
   currentTraceId: string | null;
   lastTraceId: string | null;
-  sendMessage: (text: string, traceId?: string, uploads?: UploadedFile[]) => Promise<void>;
+  sendMessage: (
+    text: string,
+    traceId?: string,
+    uploads?: UploadedFile[],
+    dbConnectionIdOverride?: number | null,
+  ) => Promise<void>;
   abort: () => void;
 }
 
-export function useChat(sessionId: number | null): UseChatReturn {
+export function useChat(sessionId: number | null, dbConnectionId?: number | null): UseChatReturn {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentTraceId, setCurrentTraceId] = useState<string | null>(null);
@@ -185,7 +190,12 @@ export function useChat(sessionId: number | null): UseChatReturn {
   }, [sessionId, assistantPending]);
 
   const sendMessage = useCallback(
-    async (text: string, traceId?: string, uploads?: UploadedFile[]) => {
+    async (
+      text: string,
+      traceId?: string,
+      uploads?: UploadedFile[],
+      dbConnectionIdOverride?: number | null,
+    ) => {
       if (!text.trim() || loading || streamingRef.current || sessionId == null) {
         return;
       }
@@ -220,6 +230,8 @@ export function useChat(sessionId: number | null): UseChatReturn {
 
       try {
         const traceIdToUse = traceId || newTraceId();
+        const effectiveDbConnectionId =
+          dbConnectionIdOverride === undefined ? dbConnectionId : dbConnectionIdOverride;
         currentTraceIdRef.current = traceIdToUse;
         setCurrentTraceId(traceIdToUse);
         const ac = new AbortController();
@@ -230,6 +242,7 @@ export function useChat(sessionId: number | null): UseChatReturn {
             history,
             uploads,
             session_id: sessionId,
+            db_connection_id: effectiveDbConnectionId || undefined,
             multi_agents: 'auto',
           },
           traceIdToUse,
@@ -315,7 +328,7 @@ export function useChat(sessionId: number | null): UseChatReturn {
         setCurrentTraceId(null);
       }
     },
-    [loading, sessionId],
+    [dbConnectionId, loading, sessionId],
   );
 
   const abort = useCallback(() => {

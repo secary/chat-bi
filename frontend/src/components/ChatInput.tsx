@@ -3,7 +3,12 @@ import { newTraceId, uploadFile } from '../api/client';
 import type { UploadedFile } from '../types/message';
 
 interface ChatInputProps {
-  onSend: (text: string, traceId?: string, uploads?: UploadedFile[]) => void;
+  onSend: (
+    text: string,
+    traceId?: string,
+    uploads?: UploadedFile[],
+    dbConnectionIdOverride?: number | null,
+  ) => void;
   onAbort?: () => void;
   loading: boolean;
   disabled?: boolean;

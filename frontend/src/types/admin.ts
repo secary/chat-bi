@@ -17,6 +17,38 @@ export interface AdminSkillRow {
   enabled: boolean;
 }
 
+export interface DbConnectionRow {
+  id: number;
+  name: string;
+  host: string;
+  port: number;
+  username: string;
+  database_name: string;
+  is_default: boolean;
+  created_at?: string | null;
+}
+
+export interface DbConnectionCurrent {
+  source: 'saved_default' | 'env';
+  id: number | null;
+  name: string;
+  host: string;
+  port: number;
+  username: string;
+  database_name: string;
+  is_default: boolean;
+}
+
+export interface DbConnectionPayload {
+  name: string;
+  host: string;
+  port: number;
+  username: string;
+  password?: string;
+  database_name: string;
+  is_default: boolean;
+}
+
 export interface SkillAuditIssue {
   code: string;
   level: string;

@@ -6,8 +6,8 @@ import { ChatComposerDock } from '../components/ChatComposerDock';
 import { MessageBubble } from '../components/MessageBubble';
 import { ChatWelcomeHero } from '../components/ChatWelcomeHero';
 import { shouldShowChatWelcomeView } from '../lib/chatWelcomeView';
-import { createSessionApi, listSessionsApi } from '../api/client';
-import type { SessionRow } from '../types/admin';
+import { createSessionApi, listDbConnections, listSessionsApi } from '../api/client';
+import type { DbConnectionRow, SessionRow } from '../types/admin';
 import { logger } from '../lib/logger';
 import {
   readLastSessionId,
@@ -15,17 +15,21 @@ import {
   writeLastSessionId,
 } from '../lib/sessionSelection';
 import { useAuth } from '../contexts/useAuth';
+import { resolveDataSourceSwitch } from '../lib/dataSourceSwitch';
 
 export function ChatPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const bottomRef = useRef<HTMLDivElement>(null);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
+  const [dbConnections, setDbConnections] = useState<DbConnectionRow[]>([]);
+  const [dbConnectionId, setDbConnectionId] = useState<number | null>(null);
+  const [dataSourceNotice, setDataSourceNotice] = useState('');
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [booting, setBooting] = useState(true);
 
   const { messages, loading, assistantPending, currentTraceId, lastTraceId, sendMessage, abort } =
-    useChat(sessionId);
+    useChat(sessionId, dbConnectionId);
   const inputBusy = loading || assistantPending;
   const showWelcome = shouldShowChatWelcomeView(booting, messages.length);
   const inspectableTraceId = currentTraceId || lastTraceId;
@@ -67,6 +71,19 @@ export function ChatPage() {
     })();
   }, [refreshSessions]);
 
+  useEffect(() => {
+    if (user?.role !== 'admin') return;
+    void listDbConnections()
+      .then((rows) => {
+        setDbConnections(rows);
+        const defaultRow = rows.find((item) => item.is_default);
+        setDbConnectionId(defaultRow?.id ?? null);
+      })
+      .catch((e: unknown) => {
+        logger.error('list db connections for chat', e);
+      });
+  }, [user?.role]);
+
   const newSession = async () => {
     try {
       const created = await createSessionApi();
@@ -76,6 +93,28 @@ export function ChatPage() {
       logger.error('new session', e);
     }
   };
+
+  const sendWithDataSourceSwitch = useCallback(
+    async (text: string, traceId?: string, uploads?: Parameters<typeof sendMessage>[2]) => {
+      const match = resolveDataSourceSwitch(text, dbConnections);
+      if (match.status === 'unique') {
+        setDbConnectionId(match.row.id);
+        setDataSourceNotice(`已切换到数据源：${match.row.name}`);
+        await sendMessage(text, traceId, uploads, match.row.id);
+        return;
+      }
+      if (match.status === 'ambiguous') {
+        setDataSourceNotice(
+          `检测到多个可能的数据源：${match.rows.map((row) => row.name).join('、')}，请先手动选择。`,
+        );
+        await sendMessage(text, traceId, uploads);
+        return;
+      }
+      setDataSourceNotice('');
+      await sendMessage(text, traceId, uploads);
+    },
+    [dbConnections, sendMessage],
+  );
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col bg-white">
@@ -88,6 +127,28 @@ export function ChatPage() {
         >
           新对话
         </button>
+        {user?.role === 'admin' ? (
+          <label className="flex items-center gap-2 text-xs text-gray-500">
+            <span>数据源</span>
+            <select
+              value={dbConnectionId ?? ''}
+              onChange={(e) => {
+                const value = Number(e.target.value);
+                setDbConnectionId(Number.isFinite(value) && value > 0 ? value : null);
+                setDataSourceNotice('');
+              }}
+              className="h-8 min-w-48 rounded-lg border border-gray-200 bg-white px-2 text-xs text-gray-700 outline-none transition-colors focus:border-gray-900"
+            >
+              <option value="">默认连接</option>
+              {dbConnections.map((row) => (
+                <option key={row.id} value={row.id}>
+                  {row.name}
+                  {row.is_default ? '（默认）' : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
         {user?.role === 'admin' && inspectableTraceId ? (
           <div className="ml-auto flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs text-gray-600">
             <span className="text-gray-400">{currentTraceId ? '当前 trace' : '最近 trace'}</span>
@@ -109,6 +170,11 @@ export function ChatPage() {
           </div>
         ) : null}
       </header>
+      {dataSourceNotice ? (
+        <div className="border-b border-emerald-100 bg-emerald-50 px-6 py-2 text-xs text-emerald-800">
+          {dataSourceNotice}
+        </div>
+      ) : null}
 
       {booting ? (
         <div className="flex flex-1 items-center justify-center px-6 py-6">
@@ -123,7 +189,7 @@ export function ChatPage() {
               onSelectSession={setSessionId}
             >
               <ChatComposerDock
-                onSend={sendMessage}
+                onSend={sendWithDataSourceSwitch}
                 onAbort={loading ? abort : undefined}
                 inputBusy={inputBusy}
                 booting={booting}
@@ -146,7 +212,7 @@ export function ChatPage() {
           </div>
           <div className="mx-auto min-w-0 w-full max-w-3xl px-4 pb-4">
             <ChatComposerDock
-              onSend={sendMessage}
+              onSend={sendWithDataSourceSwitch}
               onAbort={loading ? abort : undefined}
               inputBusy={inputBusy}
               booting={booting}

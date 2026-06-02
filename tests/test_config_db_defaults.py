@@ -37,14 +37,12 @@ class ConfigDbDefaultsTest(unittest.TestCase):
         self.assertEqual(settings.admin_db_name, "chatbi_admin")
         self.assertEqual(settings.log_db_name, "chatbi_logs")
 
-    def test_default_admin_env_settings(self) -> None:
+    def test_seed_users_env_settings(self) -> None:
         env = {
-            "CHATBI_DEFAULT_ADMIN_USERNAME": "root-admin",
-            "CHATBI_DEFAULT_ADMIN_PASSWORD": "secret",
-            "CHATBI_DEFAULT_ADMIN_RESET_PASSWORD": "true",
+            "CHATBI_SEED_USERS": "root-admin:secret:admin;demo:demo123:user",
+            "CHATBI_SEED_USERS_RESET_PASSWORD": "true",
         }
         with patch.dict(os.environ, env, clear=True):
             settings = Settings()
-        self.assertEqual(settings.default_admin_username, "root-admin")
-        self.assertEqual(settings.default_admin_password, "secret")
-        self.assertTrue(settings.default_admin_reset_password)
+        self.assertEqual(settings.seed_users_raw, "root-admin:secret:admin;demo:demo123:user")
+        self.assertTrue(settings.seed_users_reset_password)

@@ -29,6 +29,28 @@ log() {
   echo "[start-prod] $1"
 }
 
+ensure_env_file() {
+  local existing=0
+  local env_name
+  for env_name in ".env" ".env.dev" ".env.prod" "env.dev"; do
+    if [[ -f "${ROOT}/${env_name}" ]]; then
+      existing=1
+      break
+    fi
+  done
+
+  if [[ "${existing}" -eq 1 ]]; then
+    return 0
+  fi
+  if [[ ! -f "${ROOT}/.env.example" ]]; then
+    echo "No env file found and missing ${ROOT}/.env.example." >&2
+    exit 1
+  fi
+
+  cp "${ROOT}/.env.example" "${ROOT}/.env"
+  log "No env file found; copied .env.example to .env"
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --no-build)
@@ -82,6 +104,8 @@ if [[ ! -f "${COMPOSE_FILE}" ]]; then
   echo "Missing ${COMPOSE_FILE}. Run this from a complete ChatBI checkout." >&2
   exit 1
 fi
+
+ensure_env_file
 
 cd "${ROOT}"
 

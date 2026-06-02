@@ -12,7 +12,7 @@ from pydantic import BaseModel
 
 from backend.env_loader import load_project_env
 from backend.auth_deps import get_current_user, require_admin
-from backend.default_admin_seed import seed_default_admin
+from backend.default_admin_seed import seed_startup_users
 from backend.http_utils import request_trace_id
 from backend.routes.admin_db_route import router as admin_db_router
 from backend.routes.admin_harness_audit_route import router as admin_harness_audit_router
@@ -61,9 +61,9 @@ app.include_router(admin_users_router)
 
 
 @app.on_event("startup")
-def seed_configured_default_admin() -> None:
+def seed_configured_startup_users() -> None:
     for attempt in range(5):
-        if seed_default_admin() != "failed":
+        if "failed" not in seed_startup_users():
             return
         sleep(min(attempt + 1, 3))
 

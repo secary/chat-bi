@@ -20,6 +20,9 @@ class FakeDb:
             return [
                 {"table_name": "sales_order", "table_type": "VIEW"},
                 {"table_name": "customer_profile", "table_type": "VIEW"},
+                {"table_name": "admin_db_connection", "table_type": "BASE TABLE"},
+                {"table_name": "app_user", "table_type": "BASE TABLE"},
+                {"table_name": "log", "table_type": "BASE TABLE"},
                 {"table_name": "field_dictionary", "table_type": "BASE TABLE"},
                 {"table_name": "metric_definition", "table_type": "BASE TABLE"},
                 {"table_name": "alias_mapping", "table_type": "BASE TABLE"},
@@ -92,7 +95,17 @@ class DatabaseOverviewSkillTest(unittest.TestCase):
         self.assertEqual(result["kind"], "database_overview")
         self.assertEqual(len(result["data"]["business_assets"]), 2)
         self.assertEqual(len(result["data"]["semantic_assets"]), 3)
+        self.assertEqual(result["data"]["hidden_asset_count"], 3)
         self.assertIn("可直接查询的业务表/视图：2 张", result["text"])
+
+    def test_hides_app_admin_and_log_tables_from_text(self):
+        result = MODULE.database_overview(FakeDb(), "chatbi_demo")
+
+        self.assertNotIn("admin_db_connection", result["text"])
+        self.assertNotIn("app_user", result["text"])
+        self.assertNotIn("`log`", result["text"])
+        hidden_names = {asset["name"] for asset in result["data"]["hidden_assets"]}
+        self.assertEqual(hidden_names, {"admin_db_connection", "app_user", "log"})
 
     def test_enriches_columns_and_metrics(self):
         result = MODULE.database_overview(FakeDb(), "chatbi_demo")

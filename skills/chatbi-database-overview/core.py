@@ -25,6 +25,9 @@ SEMANTIC_TABLES = {
     "alias_mapping",
 }
 
+INTERNAL_TABLE_PREFIXES = ("admin_", "app_")
+INTERNAL_TABLES = {"log"}
+
 
 @dataclass(frozen=True)
 class DatabaseOverviewRequest:
@@ -123,6 +126,11 @@ def enrich_columns(
     return out
 
 
+def is_internal_app_table(table_name: str) -> bool:
+    normalized = table_name.strip().lower()
+    return normalized in INTERNAL_TABLES or normalized.startswith(INTERNAL_TABLE_PREFIXES)
+
+
 def summarize_database(db: MysqlCli, database: str, column_limit: int) -> dict[str, object]:
     tables = list_tables(db, database)
     available = {row["table_name"] for row in tables}
@@ -133,6 +141,7 @@ def summarize_database(db: MysqlCli, database: str, column_limit: int) -> dict[s
 
     business_assets = []
     semantic_assets = []
+    hidden_assets = []
     for row in tables:
         name = row["table_name"]
         asset = {
@@ -142,7 +151,9 @@ def summarize_database(db: MysqlCli, database: str, column_limit: int) -> dict[s
             "columns": enrich_columns(name, columns.get(name, []), field_meta, column_limit),
             "column_count": len(columns.get(name, [])),
         }
-        if name in SEMANTIC_TABLES:
+        if is_internal_app_table(name):
+            hidden_assets.append(asset)
+        elif name in SEMANTIC_TABLES:
             semantic_assets.append(asset)
         else:
             business_assets.append(asset)
@@ -151,6 +162,8 @@ def summarize_database(db: MysqlCli, database: str, column_limit: int) -> dict[s
         "database": database,
         "business_assets": business_assets,
         "semantic_assets": semantic_assets,
+        "hidden_assets": hidden_assets,
+        "hidden_asset_count": len(hidden_assets),
         "metrics": metrics,
         "dimensions": dimensions,
     }

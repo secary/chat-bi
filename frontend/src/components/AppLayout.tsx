@@ -4,7 +4,7 @@ import { authEnabled } from '../lib/authFlags';
 
 const linkCls = ({ isActive }: { isActive: boolean }) =>
   `block rounded-full px-3 py-2 text-sm transition-colors duration-150 ${
-    isActive ? 'bg-gray-900 font-medium text-white' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+    isActive ? 'bg-accent font-medium text-white' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
   }`;
 
 export function AppLayout() {

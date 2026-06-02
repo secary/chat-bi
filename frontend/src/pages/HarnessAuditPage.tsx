@@ -91,7 +91,7 @@ export function HarnessAuditPage() {
             />
             <button
               type="button"
-              className="rounded-full bg-gray-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
+              className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
               disabled={busy || !traceId.trim()}
               onClick={() => void inspectTrace(traceId)}
             >

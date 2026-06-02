@@ -123,7 +123,7 @@ export function ChatPage() {
           type="button"
           disabled={booting}
           onClick={() => void newSession()}
-          className="rounded-full bg-gray-900 px-3.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
+          className="rounded-full bg-accent px-3.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
         >
           新对话
         </button>
@@ -137,7 +137,7 @@ export function ChatPage() {
                 setDbConnectionId(Number.isFinite(value) && value > 0 ? value : null);
                 setDataSourceNotice('');
               }}
-              className="h-8 min-w-48 rounded-lg border border-gray-200 bg-white px-2 text-xs text-gray-700 outline-none transition-colors focus:border-gray-900"
+              className="h-8 min-w-48 rounded-lg border border-gray-200 bg-white px-2 text-xs text-gray-700 outline-none transition-colors focus:border-accent"
             >
               <option value="">默认连接</option>
               {dbConnections.map((row) => (

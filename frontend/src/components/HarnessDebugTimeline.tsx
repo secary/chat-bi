@@ -53,7 +53,7 @@ export function HarnessDebugTimeline({
           type="button"
           className={
             showDebug
-              ? 'rounded-full bg-gray-900 px-3.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-gray-800'
+              ? 'rounded-full bg-accent px-3.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent-hover'
               : 'rounded-full border border-gray-200 bg-white px-3.5 py-1.5 text-xs text-gray-700 transition-colors hover:bg-gray-50'
           }
           onClick={onToggle}

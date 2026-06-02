@@ -29,6 +29,13 @@ class LlmProfileUpdate(BaseModel):
     api_key: Optional[str] = Field(default=None, max_length=512)
 
 
+class LlmProfileProbe(BaseModel):
+    model: str = Field(..., max_length=255)
+    api_base: Optional[str] = Field(default=None, max_length=512)
+    api_key: Optional[str] = Field(default=None, max_length=512)
+    source_profile_id: Optional[int] = None
+
+
 class ReorderBody(BaseModel):
     ordered_ids: List[int] = Field(..., min_length=1)
 
@@ -134,13 +141,9 @@ def set_active_llm_profile(body: ActiveBody, request: Request) -> dict:
     return {"ok": True}
 
 
-async def _probe_profile(profile_id: int) -> tuple[bool, str]:
+async def _probe_litellm_params(params: dict) -> tuple[bool, str]:
     from litellm import acompletion
 
-    row = llm_profile_repo.get_by_id(profile_id)
-    if not row:
-        return False, "档案不存在"
-    params = profile_row_to_litellm_params(row)
     try:
         await acompletion(
             **params,
@@ -149,14 +152,51 @@ async def _probe_profile(profile_id: int) -> tuple[bool, str]:
             temperature=0,
             timeout=25,
         )
-        llm_profile_repo.set_health(profile_id, "ok", None)
         return True, "ok"
     except Exception as exc:
         msg = f"{type(exc).__name__}: {exc}"
         if len(msg) > 500:
             msg = msg[:500] + "…"
-        llm_profile_repo.set_health(profile_id, "error", msg)
         return False, msg
+
+
+async def _probe_profile(profile_id: int) -> tuple[bool, str]:
+    row = llm_profile_repo.get_by_id(profile_id)
+    if not row:
+        return False, "档案不存在"
+    params = profile_row_to_litellm_params(row)
+    ok, message = await _probe_litellm_params(params)
+    llm_profile_repo.set_health(profile_id, "ok" if ok else "error", None if ok else message)
+    return ok, message
+
+
+@router.post("/llm-profiles/probe")
+async def probe_llm_profile(body: LlmProfileProbe, request: Request) -> dict:
+    trace_id = request_trace_id(request)
+    model = body.model.strip()
+    if not model:
+        raise HTTPException(status_code=400, detail="模型名不能为空")
+    api_key = body.api_key
+    if not api_key and body.source_profile_id is not None:
+        row = llm_profile_repo.get_by_id(body.source_profile_id)
+        if not row:
+            raise HTTPException(status_code=404, detail="档案不存在")
+        api_key = row.get("api_key")
+    params = profile_row_to_litellm_params(
+        {
+            "model": model,
+            "api_base": body.api_base,
+            "api_key": api_key,
+        }
+    )
+    ok, message = await _probe_litellm_params(params)
+    log_event(
+        trace_id,
+        "admin.llm_settings",
+        "profile_probe_tested",
+        payload={"model": model, "ok": ok},
+    )
+    return {"ok": ok, "message": message}
 
 
 @router.post("/llm-profiles/{profile_id:int}/test")

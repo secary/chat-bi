@@ -416,6 +416,18 @@ export async function putLlmProfilesActive(profileId: number | null): Promise<{ 
   });
 }
 
+export async function postLlmProfileProbe(payload: {
+  model: string;
+  api_base?: string | null;
+  api_key?: string | null;
+  source_profile_id?: number | null;
+}): Promise<{ ok: boolean; message: string }> {
+  return requestJson<{ ok: boolean; message: string }>('/admin/llm-profiles/probe', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function postLlmProfileTest(id: number): Promise<{ ok: boolean; message: string }> {
   return requestJson<{ ok: boolean; message: string }>(`/admin/llm-profiles/${id}/test`, {
     method: 'POST',

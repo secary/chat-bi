@@ -34,7 +34,7 @@ export function LlmConfigPage() {
   const [view, setView] = useState<LlmSettingsView | null>(null);
   const [providerId, setProviderId] = useState(LLM_PROVIDER_PRESETS[0]?.id ?? '');
   const [displayName, setDisplayName] = useState('');
-  const [customModel, setCustomModel] = useState('');
+  const [modelName, setModelName] = useState(LLM_PROVIDER_PRESETS[0]?.model ?? '');
   const [customApiBase, setCustomApiBase] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [state, setState] = useState<SaveState>('idle');
@@ -50,8 +50,7 @@ export function LlmConfigPage() {
     [providerId],
   );
   const customProviderSelected = providerId === CUSTOM_PROVIDER_ID;
-  const providerLabel = preset?.label || '其他';
-  const selectedModel = customProviderSelected ? customModel.trim() : preset?.model || '';
+  const selectedModel = modelName.trim();
   const selectedApiBase = customProviderSelected ? customApiBase.trim() : preset?.apiBase || '';
   const activeProfile = profiles.find((profile) => profile.id === view?.active_profile_id);
   const activeModel = activeProfile?.model || view?.effective_model || '未配置';
@@ -86,7 +85,7 @@ export function LlmConfigPage() {
     const needsApiKey = !editingProfileId;
     if (!selectedModel || !selectedApiBase || (needsApiKey && !apiKey.trim())) {
       setState('error');
-      setMessage(customProviderSelected ? '请填写模型、Base URL 和 API Key。' : '请选择厂商并填写 API Key。');
+      setMessage(customProviderSelected ? '请填写模型名、Base URL 和 API Key。' : '请填写模型名和 API Key。');
       return;
     }
     setState('saving');
@@ -110,7 +109,7 @@ export function LlmConfigPage() {
         ? savedProfiles.find((profile) => profile.id === editingProfileId)
         : findProfileForPreset(savedProfiles, selectedModel, selectedApiBase);
       const payload = {
-        display_name: displayName.trim() || `${providerLabel} 默认模型`,
+        display_name: displayName.trim() || selectedModel,
         model: probePayload.model,
         api_base: probePayload.api_base,
         api_key: apiKey.trim() || undefined,
@@ -144,11 +143,11 @@ export function LlmConfigPage() {
     setApiKey('');
     if (detectedProviderId) {
       setProviderId(detectedProviderId);
-      setCustomModel('');
+      setModelName(profile.model);
       setCustomApiBase('');
     } else {
       setProviderId(CUSTOM_PROVIDER_ID);
-      setCustomModel(profile.model);
+      setModelName(profile.model);
       setCustomApiBase(profile.api_base || '');
     }
     setState('idle');
@@ -328,6 +327,11 @@ export function LlmConfigPage() {
                       type="button"
                       onClick={() => {
                         setProviderId(item.id);
+                        const selectedPreset = LLM_PROVIDER_PRESETS.find(
+                          (candidate) => candidate.id === item.id,
+                        );
+                        setModelName(selectedPreset?.model || '');
+                        if (selectedPreset) setCustomApiBase('');
                         setState('idle');
                         setMessage('');
                       }}
@@ -346,30 +350,31 @@ export function LlmConfigPage() {
             </div>
 
             <label className="block text-sm font-medium text-gray-900">
+              模型名
+              <input
+                className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm transition-all focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+                value={modelName}
+                onChange={(event) => {
+                  setModelName(event.target.value);
+                  setState('idle');
+                  setMessage('');
+                }}
+                placeholder="例如：openai/gpt-4o-mini"
+              />
+            </label>
+
+            <label className="block text-sm font-medium text-gray-900">
               备注名{editingProfileId ? '（编辑中）' : ''}
               <input
                 className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm transition-all focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
                 value={displayName}
                 onChange={(event) => setDisplayName(event.target.value)}
-                placeholder={`${providerLabel} 默认模型`}
+                placeholder={selectedModel || '默认使用模型名'}
               />
             </label>
 
             {customProviderSelected ? (
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="block text-sm font-medium text-gray-900">
-                  模型
-                  <input
-                    className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm transition-all focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
-                    value={customModel}
-                    onChange={(event) => {
-                      setCustomModel(event.target.value);
-                      setState('idle');
-                      setMessage('');
-                    }}
-                    placeholder="例如：openai/gpt-4o-mini"
-                  />
-                </label>
+              <div>
                 <label className="block text-sm font-medium text-gray-900">
                   Base URL
                   <input
@@ -431,6 +436,8 @@ export function LlmConfigPage() {
                 onClick={() => {
                   setEditingProfileId(null);
                   setDisplayName('');
+                  setModelName(preset?.model || '');
+                  setCustomApiBase('');
                   setApiKey('');
                   setState('idle');
                   setMessage('');

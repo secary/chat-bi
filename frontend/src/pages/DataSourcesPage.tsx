@@ -214,35 +214,31 @@ export function DataSourcesPage() {
             )}
           </div>
           <div className="space-y-2">
-            {rows.length > 0 ? (
-              rows.map((row) => (
-                <button
-                  key={row.id}
-                  type="button"
-                  onClick={() => selectRow(row)}
-                  className={`w-full rounded-lg border px-3 py-3 text-left transition-colors ${
-                    selectedId === row.id
-                      ? 'border-accent bg-accent-light'
-                      : 'border-gray-200 hover:border-accent hover:bg-accent-light'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="truncate text-sm font-medium text-gray-900">{row.name}</span>
-                    {row.is_default ? (
-                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-700">
-                        默认
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="mt-1 truncate font-mono text-xs text-gray-500">
-                    {connectionLabel(row)}
-                  </p>
-                  <p className="mt-1 truncate text-xs text-gray-400">用户：{row.username}</p>
-                </button>
-              ))
-            ) : (
-              <p className="px-2 py-2 text-center text-xs text-gray-400">暂无已保存数据源</p>
-            )}
+            {rows.map((row) => (
+              <button
+                key={row.id}
+                type="button"
+                onClick={() => selectRow(row)}
+                className={`w-full rounded-lg border px-3 py-3 text-left transition-colors ${
+                  selectedId === row.id
+                    ? 'border-accent bg-accent-light'
+                    : 'border-gray-200 hover:border-accent hover:bg-accent-light'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="truncate text-sm font-medium text-gray-900">{row.name}</span>
+                  {row.is_default ? (
+                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-700">
+                      默认
+                    </span>
+                  ) : null}
+                </div>
+                <p className="mt-1 truncate font-mono text-xs text-gray-500">
+                  {connectionLabel(row)}
+                </p>
+                <p className="mt-1 truncate text-xs text-gray-400">用户：{row.username}</p>
+              </button>
+            ))}
             <button
               type="button"
               onClick={newConnection}

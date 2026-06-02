@@ -26,7 +26,7 @@
            │                                             │ trace            │
   ┌────────┴────────┐                                    └──────────────────┘
   │   MySQL        │
-  │ chatbi_demo + chatbi_local_logs │
+  │ chatbi_demo                     │
   └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -34,11 +34,10 @@
 
 | 数据库 | 用途 | 主要表前缀 / 表 |
 |--------|------|-----------------|
-| `chatbi_demo` | BI 业务、应用、管理 | 业务表、语义层、`chatbi_app_*`、`chatbi_admin_*` |
-| `chatbi_local_logs` | 链路日志 | `chatbi_logs_trace_log` |
+| `chatbi_demo` | BI 业务、应用、管理、链路日志 | 业务表、语义层、`app_*`、`app_chat_session`、`app_chat_message`、`app_user_memory`、`admin_db_connection`、`admin_llm_settings`、`admin_llm_model_profile`、`admin_skill_registry`、`log` |
 
 **Docker compose**：
-- `docker-compose.dev.yml` 与 `docker-compose.yml` 默认都将 `chatbi_demo` 放在 `demo-mysql` named volume 中，并将 `chatbi_local_logs` 放到独立 `log-mysql` 实例的宿主机目录 `database/mysql-data-log/`，以减少 macOS Spotlight 对主业务库数据目录的索引干扰。
+- `docker-compose.dev.yml` 与 `docker-compose.prod.yml` 默认只启动一个 MySQL 容器，并初始化 `chatbi_demo` 一个库。
 
 `CHATBI_APP_DB_*` / `CHATBI_ADMIN_DB_*` 为兼容扩展点；默认沿用 `chatbi_demo`。
 
@@ -54,7 +53,7 @@
 | `config.py` | `Settings`：`CHATBI_AGENT_REACT`、`CHATBI_AGENT_MAX_STEPS`、DB、JWT、记忆开关等 |
 | `env_loader.py` | 加载根目录 `.env` / `.env.dev` |
 | `http_utils.py` | 提取或生成 `x-trace-id` |
-| `db_tables.py` | 表名常量（`chatbi_app_*`、`chatbi_admin_*`） |
+| `db_tables.py` | 表名常量（`app_*`、`admin_*`、`log`） |
 
 ### 2.2 认证体系
 
@@ -70,13 +69,13 @@
 |------|------|
 | `db_mysql.py` | `app_connection()` / `admin_connection()` 及 fetch/execute 工具 |
 | `business_db.py` | 只读业务库；`connection_repo.resolve_skill_db_env()` 合并连接覆盖 |
-| `user_repo.py` | `chatbi_app_user` CRUD |
-| `session_repo.py` | `chatbi_app_chat_session` / `chatbi_app_chat_message`；`list_messages_for_llm()`；`load_messages_ui()` 恢复 `planSummary` / `analysisProposal` / `dashboardReady` |
-| `memory_repo.py` | `chatbi_app_user_memory`：session_summary、long_term；`suggested_prompts_for_user()` |
-| `connection_repo.py` | `chatbi_admin_db_connection` CRUD；`resolve_skill_db_env(conn_id)` 供 Skill 子进程 |
-| `skill_registry_repo.py` | `chatbi_admin_skill_registry`：按 slug 启用/禁用 |
-| `llm_settings_repo.py` | `chatbi_admin_llm_settings`：全局 LLM 行 + `active_profile_id` |
-| `llm_profile_repo.py` | `chatbi_admin_llm_model_profile`：多 Profile、排序、健康检查字段 |
+| `user_repo.py` | `app_user` CRUD |
+| `session_repo.py` | `app_chat_session` / `app_chat_message`；`list_messages_for_llm()`；`load_messages_ui()` 恢复 `planSummary` / `analysisProposal` / `dashboardReady` |
+| `memory_repo.py` | `app_user_memory`：session_summary、long_term；`suggested_prompts_for_user()` |
+| `connection_repo.py` | `admin_db_connection` CRUD；`resolve_skill_db_env(conn_id)` 供 Skill 子进程 |
+| `skill_registry_repo.py` | `admin_skill_registry`：按 slug 启用/禁用 |
+| `llm_settings_repo.py` | `admin_llm_settings`：全局 LLM 行 + `active_profile_id` |
+| `llm_profile_repo.py` | `admin_llm_model_profile`：多 Profile、排序、健康检查字段 |
 
 ### 2.4 Agent 系统 (agent/)
 
@@ -177,8 +176,8 @@ executor.run_script(skill_doc, args, trace_id, skill_db_overrides)
 | 文件 | 职责 |
 |------|------|
 | `memory_service.py` | `format_memory_for_prompt`；`refresh_memory_after_turn`（BackgroundTasks） |
-| `trace.py` | `log_event()` → `chatbi_local_logs`（mysql CLI，best-effort） |
-| `app_llm.py` | `effective_llm_params()`：env + `llm_settings` + **active Profile** |
+| `trace.py` | `log_event()` → `chatbi_demo.log`（mysql CLI，best-effort） |
+| `app_llm.py` | `effective_llm_params()`：env + `admin_llm_settings` + **active Profile** |
 | `llm_runtime.py` | LiteLLM 调用封装、fallback 等 |
 | `dashboard_overview.py` | `/dashboard/overview` 聚合 KPI 与图表数据 |
 
@@ -242,32 +241,32 @@ EventSourceResponse (SSE)
 ## 4. 关键数据模型
 
 ```
-chatbi_app_user
+app_user
   id, username, password_hash, role, is_active, created_at
 
-chatbi_app_chat_session
+app_chat_session
   id, title, user_id, created_at, updated_at
 
-chatbi_app_chat_message
+app_chat_message
   id, session_id, role, content, payload_json
   payload_json: thinking, chart, kpiCards, planSummary,
                 analysisProposal, dashboardReady, error
 
-chatbi_app_user_memory
+app_user_memory
   user_id, kind (session_summary | long_term), title, content,
   source_session_id, updated_at
 
-chatbi_admin_db_connection
+admin_db_connection
   id, name, host, port, credentials, database_name, is_default, ...
 
-chatbi_admin_llm_settings
+admin_llm_settings
   id=1, model, api_base, api_key, active_profile_id, ...
 
-chatbi_admin_llm_model_profile
+admin_llm_model_profile
   id, display_name, model, api_base, api_key, sort_order,
   health_status, ...
 
-chatbi_admin_skill_registry
+admin_skill_registry
   skill_slug, enabled
 ```
 
@@ -327,7 +326,7 @@ Main Process                    Subprocess
 | 流式 | SSE (`sse_starlette`) |
 | 图表 | ECharts（前端）/ matplotlib（PDF） |
 | PDF | WeasyPrint + ReportLab |
-| 追踪 | MySQL `chatbi_logs_trace_log` |
+| 追踪 | MySQL `log` |
 
 ---
 
@@ -335,13 +334,13 @@ Main Process                    Subprocess
 
 1. **Skill 子进程隔离**：主进程通过 env 注入 DB；问数/决策脚本仅 `SELECT`（别名 Skill 写受控表）。
 2. **ReAct 默认**：Observation 回灌 + `CHATBI_AGENT_MAX_STEPS` 上限；Legacy 与复合双步链仍可用。
-3. **三级记忆**：`chat_message` → `session_summary` → `long_term`；可 `CHATBI_MEMORY_DISABLED` 关闭。
-4. **双库结构**：`chatbi_demo` 承载业务、应用和管理前缀表，`chatbi_local_logs` 独立承载链路日志；后端启动时按 `CHATBI_DEFAULT_ADMIN_*` 幂等写入默认管理员。
+3. **三级记忆**：`app_chat_message` → `session_summary` → `long_term`；可 `CHATBI_MEMORY_DISABLED` 关闭。
+4. **单库结构**：`chatbi_demo` 承载业务、应用、管理前缀表和链路日志；后端启动时按 `CHATBI_DEFAULT_ADMIN_*` 幂等写入默认管理员。
 5. **SSE 类型扩展**：除 text/chart/kpi 外，支持上传分析的 `analysis_proposal`、`dashboard_ready` 与 `plan_summary`。
 6. **多 Agent**：Manager 多轮规划 + **顺序**执行专线子任务 + 汇总；上传路径/采纳线索约束路由。
 7. **可中止**：`abort_state` + `/abort` + 前端 `AbortSignal`。
 8. **上下文窗口**：`context_window` 减少无关历史对 Skill 选用的干扰。
-9. **LLM 配置**：env 默认 &lt; `llm_settings` &lt; **active `llm_model_profile`**（管理页切换）。
+9. **LLM 配置**：env 默认 &lt; `admin_llm_settings` &lt; **active `admin_llm_model_profile`**（管理页切换）。
 10. **Skill 选用**：Prompt 元数据 + 专线边界；**无执行前 validator**（已移除 `skill_call_validator`）。
 
 ---

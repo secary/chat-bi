@@ -34,22 +34,22 @@
 
 ```bash
 cp .env.example .env
-docker compose up -d --build
+bash scripts/launch.sh
 ```
 
 访问地址：
 
-- 前端：`http://localhost:5173`
-- 后端：`http://localhost:8000`
-- 业务库 MySQL：`127.0.0.1:3307`
-- 日志库 MySQL：`127.0.0.1:33067`
+- 应用：`http://localhost:5173`（前端静态资源 + 同源 `/api`）
+- MySQL：`127.0.0.1:3307`（`chatbi_demo` 包含业务、应用、管理与日志表）
 
 默认管理员账号会在后端启动时按 `.env` 自动写入：
 
 - 用户名：`admin`
 - 密码：`admin123`
 
-前端生产镜像固定通过同源 `/api` 访问后端，不再依赖根目录 `.env` 中的前端 API 地址。
+生产式本地使用一体镜像 `chatbi-app`：容器内同时运行 nginx 和 FastAPI，nginx 通过同源 `/api` 反代到本容器内的后端进程。
+如需只启动不打开浏览器，可运行 `bash scripts/launch.sh --no-open`；如需跳过重建镜像，可加 `--no-build`。
+脚本默认会先运行 `bash scripts/bootstrap_dev.sh` 做本地自检；如需跳过可加 `--skip-bootstrap`。
 
 ### 2. 开发热更新
 
@@ -69,8 +69,9 @@ docker compose --env-file .env.dev -f docker-compose.dev.yml up -d --build
 
 - 前端：`http://localhost:5174`
 - 后端：`http://localhost:8001`
-- 业务库 MySQL：`127.0.0.1:3308`
-- 日志库 MySQL：`127.0.0.1:33067`
+- MySQL：`127.0.0.1:33067`（`chatbi_demo` 包含业务、应用、管理与日志表）
+
+开发态使用一体开发容器 `chatbi-app-dev`：容器内同时运行 Vite dev server 和 FastAPI reload server，并通过 bind mount 保持前后端热更新。
 
 开发 compose 默认关闭登录：
 
@@ -163,17 +164,22 @@ chat-bi/
 ├── AGENTS.md
 ├── README.md
 ├── TODO.md
+├── Dockerfile
 ├── docker-compose.yml
 ├── docker-compose.dev.yml
+├── docker-compose.prod.yml
 ├── pyproject.toml
+├── deploy/
+│   ├── docker-entrypoint.dev.sh
+│   ├── docker-entrypoint.prod.sh
+│   └── nginx.app.conf
 ├── scripts/
 │   ├── bootstrap_dev.sh
 │   ├── run_tests.py
 │   ├── format_code.py
 │   └── e2e_smoke.py
 ├── database/
-│   ├── init.sql
-│   └── init_log.sql
+│   └── init.sql
 ├── backend/
 │   ├── main.py
 │   ├── routes/
@@ -201,15 +207,15 @@ chat-bi/
 
 默认数据库职责：
 
-- `chatbi_demo`：业务数据、语义层、应用表 `chatbi_app_*`、管理表 `chatbi_admin_*`
-- `chatbi_local_logs`：链路日志表
+- `chatbi_demo`：业务数据、语义层、应用表 `app_*`、管理表 `admin_*`、链路日志表 `log`
 
 最常用环境变量：
 
 | 变量 | 说明 |
 | --- | --- |
 | `CHATBI_DB_HOST/PORT/NAME/USER/PASSWORD` | 业务库连接 |
-| `CHATBI_LOG_DB_HOST/PORT/NAME/USER/PASSWORD` | 日志库连接 |
+| `CHATBI_LOG_DB_NAME` | 可选日志库名；默认复用 `CHATBI_DB_NAME` |
+| `LLM_MODEL/API_BASE/OPENAI_API_KEY` | LiteLLM 模型配置；`.env.example` 默认用本地 Ollama 占位 |
 | `CHATBI_AGENT_REACT` | `1` 启用 ReAct，多轮 Skill 调度 |
 | `CHATBI_AGENT_MAX_STEPS` | 单轮消息最大 Agent 步数 |
 | `CHATBI_AUTH_ENABLED` | 是否开启登录 |
@@ -219,7 +225,7 @@ chat-bi/
 
 完整示例见 [`.env.example`](.env.example)。
 
-LLM 配置默认不写入 `.env`；优先在管理页维护。如需通过环境变量临时覆盖，可使用 `LLM_MODEL`、`OPENAI_API_KEY`、`API_BASE`。
+LLM 配置可通过 `.env` 提供启动占位，也可在管理页维护；运行时以管理页激活的 Profile 优先。
 
 ## 测试
 

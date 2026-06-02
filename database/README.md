@@ -4,11 +4,9 @@
 
 - `init.sql`
   - 主初始化脚本。
-  - 创建并填充 `chatbi_demo`（业务 + 语义层 + 应用前缀表 + 管理前缀表）。
+  - 创建并填充 `chatbi_demo`（业务 + 语义层 + 应用前缀表 + 管理前缀表 + 日志表）。
+  - 日志表为 `chatbi_demo.log`。
   - 默认管理员由后端启动时按 `CHATBI_DEFAULT_ADMIN_*` 环境变量幂等写入。
-- `init_log.sql`
-  - 独立日志库初始化脚本。
-  - 仅创建 `chatbi_local_logs.chatbi_logs_trace_log`。
 
 ## 运行生成物
 
@@ -17,7 +15,7 @@
 - `mysql-data-dev/`
   - 历史开发态宿主机 MySQL 数据目录；当前 `docker-compose.dev.yml` 已改用 named volume，不再作为主开发库默认挂载。
 - `mysql-data-log/`
-  - 当前独立日志实例 `log-mysql` 的宿主机数据目录。
+  - 历史独立日志实例 `log-mysql` 的宿主机数据目录，可按需备份后清理。
 
 ## 清理建议
 

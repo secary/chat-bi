@@ -250,12 +250,12 @@ VALUES
 -- 应用表：前端登录、会话、记忆、配置、日志
 -- ============================================================
 
-DROP TABLE IF EXISTS chatbi_app_user_memory;
-DROP TABLE IF EXISTS chatbi_app_chat_message;
-DROP TABLE IF EXISTS chatbi_app_chat_session;
-DROP TABLE IF EXISTS chatbi_app_user;
+DROP TABLE IF EXISTS app_user_memory;
+DROP TABLE IF EXISTS app_chat_message;
+DROP TABLE IF EXISTS app_chat_session;
+DROP TABLE IF EXISTS app_user;
 
-CREATE TABLE chatbi_app_user (
+CREATE TABLE app_user (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   username VARCHAR(120) NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
@@ -267,30 +267,30 @@ CREATE TABLE chatbi_app_user (
 
 -- 默认管理员由后端启动时按 CHATBI_DEFAULT_ADMIN_* 环境变量幂等写入。
 
-CREATE TABLE chatbi_app_chat_session (
+CREATE TABLE app_chat_session (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   title VARCHAR(255) NOT NULL DEFAULT '新对话',
   user_id BIGINT NOT NULL,
   created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-  CONSTRAINT fk_chatbi_app_chat_session_user FOREIGN KEY (user_id) REFERENCES chatbi_app_user (id),
+  CONSTRAINT fk_app_chat_session_user FOREIGN KEY (user_id) REFERENCES app_user (id),
   KEY idx_chat_session_updated (updated_at),
   KEY idx_chat_session_user_updated (user_id, updated_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE chatbi_app_chat_message (
+CREATE TABLE app_chat_message (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   session_id BIGINT NOT NULL,
   role VARCHAR(20) NOT NULL,
   content LONGTEXT NOT NULL,
   payload_json JSON NULL,
   created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-  CONSTRAINT fk_chatbi_app_chat_message_session FOREIGN KEY (session_id)
-    REFERENCES chatbi_app_chat_session(id) ON DELETE CASCADE,
+  CONSTRAINT fk_app_chat_message_session FOREIGN KEY (session_id)
+    REFERENCES app_chat_session(id) ON DELETE CASCADE,
   KEY idx_chat_message_session (session_id, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE chatbi_app_user_memory (
+CREATE TABLE app_user_memory (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   user_id BIGINT NOT NULL,
   kind VARCHAR(32) NOT NULL,
@@ -299,9 +299,9 @@ CREATE TABLE chatbi_app_user_memory (
   source_session_id BIGINT NULL,
   created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-  CONSTRAINT fk_chatbi_app_user_memory_user FOREIGN KEY (user_id) REFERENCES chatbi_app_user (id) ON DELETE CASCADE,
-  CONSTRAINT fk_chatbi_app_user_memory_session FOREIGN KEY (source_session_id)
-    REFERENCES chatbi_app_chat_session (id) ON DELETE SET NULL,
+  CONSTRAINT fk_app_user_memory_user FOREIGN KEY (user_id) REFERENCES app_user (id) ON DELETE CASCADE,
+  CONSTRAINT fk_app_user_memory_session FOREIGN KEY (source_session_id)
+    REFERENCES app_chat_session (id) ON DELETE SET NULL,
   KEY idx_user_memory_user_kind (user_id, kind, updated_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -309,18 +309,18 @@ CREATE TABLE chatbi_app_user_memory (
 -- 应用配置表：数据源连接、LLM 配置、技能开关、日志
 -- ============================================================
 
-DROP TABLE IF EXISTS chatbi_admin_llm_settings;
-DROP TABLE IF EXISTS chatbi_admin_llm_model_profile;
-DROP TABLE IF EXISTS chatbi_admin_app_db_connection;
-DROP TABLE IF EXISTS chatbi_admin_skill_registry;
+DROP TABLE IF EXISTS admin_llm_settings;
+DROP TABLE IF EXISTS admin_llm_model_profile;
+DROP TABLE IF EXISTS admin_db_connection;
+DROP TABLE IF EXISTS admin_skill_registry;
 
-CREATE TABLE chatbi_admin_skill_registry (
+CREATE TABLE admin_skill_registry (
   skill_slug VARCHAR(128) PRIMARY KEY,
   enabled TINYINT(1) NOT NULL DEFAULT 1,
   updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE chatbi_admin_app_db_connection (
+CREATE TABLE admin_db_connection (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   name VARCHAR(120) NOT NULL,
   host VARCHAR(255) NOT NULL,
@@ -333,7 +333,7 @@ CREATE TABLE chatbi_admin_app_db_connection (
   UNIQUE KEY uq_app_db_connection_name (name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE chatbi_admin_llm_model_profile (
+CREATE TABLE admin_llm_model_profile (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   display_name VARCHAR(128) NULL,
   model VARCHAR(255) NOT NULL,
@@ -348,7 +348,7 @@ CREATE TABLE chatbi_admin_llm_model_profile (
   KEY idx_llm_model_profile_sort (sort_order, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE chatbi_admin_llm_settings (
+CREATE TABLE admin_llm_settings (
   id INT PRIMARY KEY,
   model VARCHAR(255) NULL,
   api_base VARCHAR(512) NULL,
@@ -356,9 +356,28 @@ CREATE TABLE chatbi_admin_llm_settings (
   active_profile_id BIGINT NULL,
   updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
   CONSTRAINT fk_llm_settings_active_profile FOREIGN KEY (active_profile_id)
-    REFERENCES chatbi_admin_llm_model_profile (id) ON DELETE SET NULL
+    REFERENCES admin_llm_model_profile (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-INSERT INTO chatbi_admin_llm_settings (id, model, api_base, api_key, active_profile_id)
+INSERT INTO admin_llm_settings (id, model, api_base, api_key, active_profile_id)
 VALUES (1, NULL, NULL, NULL, NULL)
 ON DUPLICATE KEY UPDATE id = id;
+
+-- ============================================================
+-- 链路日志表
+-- ============================================================
+
+USE chatbi_demo;
+
+CREATE TABLE IF NOT EXISTS log (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  trace_id VARCHAR(64) NOT NULL,
+  span_name VARCHAR(80) NOT NULL,
+  event_name VARCHAR(80) NOT NULL,
+  level VARCHAR(20) NOT NULL,
+  message VARCHAR(500) NOT NULL,
+  payload JSON NULL,
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  KEY idx_trace_log_trace_id (trace_id),
+  KEY idx_trace_log_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -25,6 +25,7 @@ MODULE_SUITES: dict[str, list[str]] = {
     "foundation": [
         "tests/test_bootstrap_dev_script.py",
         "tests/test_config_db_defaults.py",
+        "tests/test_connection_repo_db_overrides.py",
         "tests/test_env_loader.py",
         "tests/test_format_code_script.py",
         "tests/test_http_utils.py",
@@ -104,6 +105,7 @@ MODULE_SUITES: dict[str, list[str]] = {
     ],
     "data-sources": [
         "tests/test_config_db_defaults.py",
+        "tests/test_connection_repo_db_overrides.py",
         "tests/test_database_overview_skill.py",
         "tests/test_db_mysql_targets.py",
         "tests/test_executor_run_script.py",

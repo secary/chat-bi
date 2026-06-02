@@ -15,6 +15,7 @@ import {
   writeLastSessionId,
 } from '../lib/sessionSelection';
 import { useAuth } from '../contexts/useAuth';
+import { resolveDataSourceSwitch } from '../lib/dataSourceSwitch';
 
 export function ChatPage() {
   const navigate = useNavigate();
@@ -23,6 +24,7 @@ export function ChatPage() {
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [dbConnections, setDbConnections] = useState<DbConnectionRow[]>([]);
   const [dbConnectionId, setDbConnectionId] = useState<number | null>(null);
+  const [dataSourceNotice, setDataSourceNotice] = useState('');
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [booting, setBooting] = useState(true);
 
@@ -92,6 +94,28 @@ export function ChatPage() {
     }
   };
 
+  const sendWithDataSourceSwitch = useCallback(
+    async (text: string, traceId?: string, uploads?: Parameters<typeof sendMessage>[2]) => {
+      const match = resolveDataSourceSwitch(text, dbConnections);
+      if (match.status === 'unique') {
+        setDbConnectionId(match.row.id);
+        setDataSourceNotice(`已切换到数据源：${match.row.name}`);
+        await sendMessage(text, traceId, uploads, match.row.id);
+        return;
+      }
+      if (match.status === 'ambiguous') {
+        setDataSourceNotice(
+          `检测到多个可能的数据源：${match.rows.map((row) => row.name).join('、')}，请先手动选择。`,
+        );
+        await sendMessage(text, traceId, uploads);
+        return;
+      }
+      setDataSourceNotice('');
+      await sendMessage(text, traceId, uploads);
+    },
+    [dbConnections, sendMessage],
+  );
+
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col bg-white">
       <header className="flex flex-wrap items-center gap-3 border-b border-gray-100 bg-white px-6 py-3">
@@ -111,6 +135,7 @@ export function ChatPage() {
               onChange={(e) => {
                 const value = Number(e.target.value);
                 setDbConnectionId(Number.isFinite(value) && value > 0 ? value : null);
+                setDataSourceNotice('');
               }}
               className="h-8 min-w-48 rounded-lg border border-gray-200 bg-white px-2 text-xs text-gray-700 outline-none transition-colors focus:border-gray-900"
             >
@@ -145,6 +170,11 @@ export function ChatPage() {
           </div>
         ) : null}
       </header>
+      {dataSourceNotice ? (
+        <div className="border-b border-emerald-100 bg-emerald-50 px-6 py-2 text-xs text-emerald-800">
+          {dataSourceNotice}
+        </div>
+      ) : null}
 
       {booting ? (
         <div className="flex flex-1 items-center justify-center px-6 py-6">
@@ -159,7 +189,7 @@ export function ChatPage() {
               onSelectSession={setSessionId}
             >
               <ChatComposerDock
-                onSend={sendMessage}
+                onSend={sendWithDataSourceSwitch}
                 onAbort={loading ? abort : undefined}
                 inputBusy={inputBusy}
                 booting={booting}
@@ -182,7 +212,7 @@ export function ChatPage() {
           </div>
           <div className="mx-auto min-w-0 w-full max-w-3xl px-4 pb-4">
             <ChatComposerDock
-              onSend={sendMessage}
+              onSend={sendWithDataSourceSwitch}
               onAbort={loading ? abort : undefined}
               inputBusy={inputBusy}
               booting={booting}

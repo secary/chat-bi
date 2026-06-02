@@ -2,7 +2,12 @@ import { ChatInput } from './ChatInput';
 import type { UploadedFile } from '../types/message';
 
 interface ChatComposerDockProps {
-  onSend: (text: string, traceId?: string, uploads?: UploadedFile[]) => void;
+  onSend: (
+    text: string,
+    traceId?: string,
+    uploads?: UploadedFile[],
+    dbConnectionIdOverride?: number | null,
+  ) => void;
   onAbort?: () => void;
   inputBusy: boolean;
   booting: boolean;

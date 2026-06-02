@@ -30,9 +30,8 @@ flowchart TD
 - `skills/`：Agent Skill 目录，每个 Skill 由 `SKILL.md` 和可选 `scripts/` 组成。
 - `database/`：MySQL 表结构、业务数据和语义层元数据初始化。
 - 数据库默认按表前缀区分职责：
-  - `chatbi_demo`：业务事实表、语义层、应用表 `chatbi_app_*`、管理表 `chatbi_admin_*`
-  - `chatbi_local_logs`：trace 日志表 `chatbi_logs_trace_log`
-  - 默认只保留业务演示库和独立日志库两套库；`CHATBI_APP_DB_*` / `CHATBI_ADMIN_DB_*` 仅作兼容扩展点。
+  - `chatbi_demo`：业务事实表、语义层、应用表 `app_*`、管理表 `admin_*`、trace 日志表 `log`
+  - 默认只保留 `chatbi_demo` 一个 schema；`CHATBI_APP_DB_*` / `CHATBI_ADMIN_DB_*` / `CHATBI_LOG_DB_*` 仅作兼容扩展点。
 
 ## 模块边界
 - `main.py` 只负责 HTTP/SSE 协议层和路由注册。

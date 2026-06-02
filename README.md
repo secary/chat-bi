@@ -41,8 +41,7 @@ docker compose up -d --build
 
 - 前端：`http://localhost:5173`
 - 后端：`http://localhost:8000`
-- 业务库 MySQL：`127.0.0.1:3307`
-- 日志库 MySQL：`127.0.0.1:33067`
+- MySQL：`127.0.0.1:3307`（`chatbi_demo` 包含业务、应用、管理与日志表）
 
 默认管理员账号会在后端启动时按 `.env` 自动写入：
 
@@ -69,8 +68,7 @@ docker compose --env-file .env.dev -f docker-compose.dev.yml up -d --build
 
 - 前端：`http://localhost:5174`
 - 后端：`http://localhost:8001`
-- 业务库 MySQL：`127.0.0.1:3308`
-- 日志库 MySQL：`127.0.0.1:33067`
+- MySQL：`127.0.0.1:33067`（`chatbi_demo` 包含业务、应用、管理与日志表）
 
 开发 compose 默认关闭登录：
 
@@ -172,8 +170,7 @@ chat-bi/
 │   ├── format_code.py
 │   └── e2e_smoke.py
 ├── database/
-│   ├── init.sql
-│   └── init_log.sql
+│   └── init.sql
 ├── backend/
 │   ├── main.py
 │   ├── routes/
@@ -201,15 +198,14 @@ chat-bi/
 
 默认数据库职责：
 
-- `chatbi_demo`：业务数据、语义层、应用表 `chatbi_app_*`、管理表 `chatbi_admin_*`
-- `chatbi_local_logs`：链路日志表
+- `chatbi_demo`：业务数据、语义层、应用表 `app_*`、管理表 `admin_*`、链路日志表 `log`
 
 最常用环境变量：
 
 | 变量 | 说明 |
 | --- | --- |
 | `CHATBI_DB_HOST/PORT/NAME/USER/PASSWORD` | 业务库连接 |
-| `CHATBI_LOG_DB_HOST/PORT/NAME/USER/PASSWORD` | 日志库连接 |
+| `CHATBI_LOG_DB_NAME` | 可选日志库名；默认复用 `CHATBI_DB_NAME` |
 | `CHATBI_AGENT_REACT` | `1` 启用 ReAct，多轮 Skill 调度 |
 | `CHATBI_AGENT_MAX_STEPS` | 单轮消息最大 Agent 步数 |
 | `CHATBI_AUTH_ENABLED` | 是否开启登录 |

@@ -1,9 +1,9 @@
 name: chatbi-prod
 
 services:
-  demo-mysql:
+  chatbi-db:
     image: mysql:8.0
-    container_name: chatbi-prod-mysql
+    container_name: chatbi-db
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: root123456
@@ -20,25 +20,6 @@ services:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
 
-  log-mysql:
-    image: mysql:8.0
-    container_name: chatbi-prod-mysql-log
-    restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: root123456
-      MYSQL_DATABASE: chatbi_local_logs
-      MYSQL_USER: demo_user
-      MYSQL_PASSWORD: demo_pass
-      TZ: Asia/Shanghai
-    ports:
-      - "33061:3306"
-    volumes:
-      - ./database/mysql-data-log:/var/lib/mysql
-      - ./database/init_log.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    command:
-      - --character-set-server=utf8mb4
-      - --collation-server=utf8mb4_unicode_ci
-
   backend:
     build:
       context: .
@@ -51,17 +32,15 @@ services:
       - path: .env
         required: false
     environment:
-      CHATBI_DB_HOST: demo-mysql
+      CHATBI_DB_HOST: chatbi-db
       CHATBI_DB_PORT: 3306
-      CHATBI_LOG_DB_HOST: log-mysql
+      CHATBI_LOG_DB_HOST: chatbi-db
       CHATBI_LOG_DB_PORT: 3306
-      CHATBI_LOG_DB_NAME: chatbi_local_logs
       CHATBI_MYSQL_CMD: mysql
     ports:
       - "8000:8000"
     depends_on:
-      - demo-mysql
-      - log-mysql
+      - chatbi-db
 
   frontend:
     build:

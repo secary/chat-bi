@@ -211,7 +211,7 @@ ReAct / Manager 在送入 Planner 前还会经 **context_window** 压缩（§4.4
 
 ## 5. 长短期记忆
 
-[`memory_service.py`](../../backend/memory_service.py) + [`memory_repo.py`](../../backend/memory_repo.py)，表 `chatbi_app_user_memory`（默认库 `chatbi_demo`）。
+[`memory_service.py`](../../backend/memory_service.py) + [`memory_repo.py`](../../backend/memory_repo.py)，表 `app_user_memory`（默认库 `chatbi_demo`）。
 
 - **读**：`format_memory_for_prompt` → long_term + session_summary；`CHATBI_MEMORY_DISABLED` 时跳过。
 - **写**：SSE 结束且助手消息落库后，`BackgroundTasks` 调用 `refresh_memory_after_turn`（会话摘要 + 合并长期偏好）。
@@ -225,14 +225,13 @@ ReAct / Manager 在送入 Planner 前还会经 **context_window** 压缩（§4.4
 
 | 位置 | 用途 |
 |------|------|
-| `chatbi_demo` | 业务事实表、语义层、`chatbi_app_*`、`chatbi_admin_*` |
-| `chatbi_local_logs` | `chatbi_logs_trace_log`（trace-id 串联） |
+| `chatbi_demo` | 业务事实表、语义层、`app_user`、`app_chat_session`、`app_chat_message`、`app_user_memory`、`admin_db_connection`、`admin_llm_settings`、`admin_llm_model_profile`、`admin_skill_registry`、`log`（trace-id 串联） |
 
 **Compose 默认**：
-- `docker-compose.dev.yml` 与 `docker-compose.yml` 都将 `chatbi_demo` 放到 `demo-mysql` named volume；日志库改走独立 `log-mysql`，宿主机端口 **33067**。
-- 宿主机直连主业务库端口分别为 **3308**（dev）和 **3307**（prod）。
+- `docker-compose.dev.yml` 与 `docker-compose.prod.yml` 都只启动一个 MySQL 容器，并初始化 `chatbi_demo` 一个库。
+- 宿主机直连 MySQL 端口分别为 **33067**（dev）和 **3307**（prod）。
 
-宿主机本地运行后端时，默认直接沿用 `CHATBI_DB_*` 作为业务演示库，`CHATBI_LOG_DB_*` 指向独立日志库。
+宿主机本地运行后端时，日志连接默认复用 `CHATBI_DB_HOST/PORT/USER/PASSWORD/NAME`；仅在需要拆分日志库时设置 `CHATBI_LOG_DB_NAME`。
 
 ---
 
@@ -263,7 +262,7 @@ Multi-Agent 在 [`multi_agent_runner`](../../backend/agent/multi_agent_runner.py
 
 ## 8. Skill 一览
 
-目录名 = `skill` slug；启用过滤：[`scan_skills_enabled`](../../backend/agent/prompt_builder.py) + `chatbi_admin_skill_registry`。
+目录名 = `skill` slug；启用过滤：[`scan_skills_enabled`](../../backend/agent/prompt_builder.py) + `admin_skill_registry`。
 
 | Skill slug | 作用（摘要） | 典型用法 |
 |------------|----------------|----------|

@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 MAX_PAYLOAD_LENGTH = 6000
-TRACE_LOG_TABLE = "chatbi_logs_trace_log"
+TRACE_LOG_TABLE = "log"
 
 
 def log_skill_event(

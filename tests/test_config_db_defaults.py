@@ -20,6 +20,8 @@ class ConfigDbDefaultsTest(unittest.TestCase):
             settings = Settings()
         self.assertEqual(settings.app_db_name, "chatbi_demo")
         self.assertEqual(settings.admin_db_name, "chatbi_demo")
+        self.assertEqual(settings.log_db_host, "127.0.0.1")
+        self.assertEqual(settings.log_db_port, "3308")
         self.assertEqual(settings.log_db_name, "chatbi_demo")
 
     def test_explicit_feature_db_names_still_override_defaults(self) -> None:

@@ -116,5 +116,5 @@ def _quote(value: str) -> str:
 
 def _safe_ident(value: str) -> str:
     if not value or "`" in value or "\x00" in value:
-        return "chatbi_local_logs"
+        return "chatbi_demo"
     return value

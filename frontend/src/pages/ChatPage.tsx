@@ -6,8 +6,8 @@ import { ChatComposerDock } from '../components/ChatComposerDock';
 import { MessageBubble } from '../components/MessageBubble';
 import { ChatWelcomeHero } from '../components/ChatWelcomeHero';
 import { shouldShowChatWelcomeView } from '../lib/chatWelcomeView';
-import { createSessionApi, listSessionsApi } from '../api/client';
-import type { SessionRow } from '../types/admin';
+import { createSessionApi, listDbConnections, listSessionsApi } from '../api/client';
+import type { DbConnectionRow, SessionRow } from '../types/admin';
 import { logger } from '../lib/logger';
 import {
   readLastSessionId,
@@ -21,11 +21,13 @@ export function ChatPage() {
   const { user } = useAuth();
   const bottomRef = useRef<HTMLDivElement>(null);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
+  const [dbConnections, setDbConnections] = useState<DbConnectionRow[]>([]);
+  const [dbConnectionId, setDbConnectionId] = useState<number | null>(null);
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [booting, setBooting] = useState(true);
 
   const { messages, loading, assistantPending, currentTraceId, lastTraceId, sendMessage, abort } =
-    useChat(sessionId);
+    useChat(sessionId, dbConnectionId);
   const inputBusy = loading || assistantPending;
   const showWelcome = shouldShowChatWelcomeView(booting, messages.length);
   const inspectableTraceId = currentTraceId || lastTraceId;
@@ -67,6 +69,19 @@ export function ChatPage() {
     })();
   }, [refreshSessions]);
 
+  useEffect(() => {
+    if (user?.role !== 'admin') return;
+    void listDbConnections()
+      .then((rows) => {
+        setDbConnections(rows);
+        const defaultRow = rows.find((item) => item.is_default);
+        setDbConnectionId(defaultRow?.id ?? null);
+      })
+      .catch((e: unknown) => {
+        logger.error('list db connections for chat', e);
+      });
+  }, [user?.role]);
+
   const newSession = async () => {
     try {
       const created = await createSessionApi();
@@ -88,6 +103,27 @@ export function ChatPage() {
         >
           新对话
         </button>
+        {user?.role === 'admin' ? (
+          <label className="flex items-center gap-2 text-xs text-gray-500">
+            <span>数据源</span>
+            <select
+              value={dbConnectionId ?? ''}
+              onChange={(e) => {
+                const value = Number(e.target.value);
+                setDbConnectionId(Number.isFinite(value) && value > 0 ? value : null);
+              }}
+              className="h-8 min-w-48 rounded-lg border border-gray-200 bg-white px-2 text-xs text-gray-700 outline-none transition-colors focus:border-gray-900"
+            >
+              <option value="">默认连接</option>
+              {dbConnections.map((row) => (
+                <option key={row.id} value={row.id}>
+                  {row.name}
+                  {row.is_default ? '（默认）' : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
         {user?.role === 'admin' && inspectableTraceId ? (
           <div className="ml-auto flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs text-gray-600">
             <span className="text-gray-400">{currentTraceId ? '当前 trace' : '最近 trace'}</span>

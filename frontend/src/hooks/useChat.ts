@@ -86,7 +86,7 @@ export interface UseChatReturn {
   abort: () => void;
 }
 
-export function useChat(sessionId: number | null): UseChatReturn {
+export function useChat(sessionId: number | null, dbConnectionId?: number | null): UseChatReturn {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentTraceId, setCurrentTraceId] = useState<string | null>(null);
@@ -230,6 +230,7 @@ export function useChat(sessionId: number | null): UseChatReturn {
             history,
             uploads,
             session_id: sessionId,
+            db_connection_id: dbConnectionId || undefined,
             multi_agents: 'auto',
           },
           traceIdToUse,
@@ -315,7 +316,7 @@ export function useChat(sessionId: number | null): UseChatReturn {
         setCurrentTraceId(null);
       }
     },
-    [loading, sessionId],
+    [dbConnectionId, loading, sessionId],
   );
 
   const abort = useCallback(() => {

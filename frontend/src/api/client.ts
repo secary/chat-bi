@@ -2,6 +2,9 @@ import type { ChatRequest, SseEvent, UploadedFile } from '../types/message';
 import type {
   AdminSkillRow,
   SkillAuditRow,
+  DbConnectionCurrent,
+  DbConnectionPayload,
+  DbConnectionRow,
   LlmProfilePublic,
   LlmSettingsView,
   HarnessAuditReport,
@@ -262,6 +265,41 @@ export async function getSessionMessagesApi(
 
 export async function listAdminSkills(): Promise<AdminSkillRow[]> {
   return requestJson<AdminSkillRow[]>('/admin/skills');
+}
+
+export async function listDbConnections(): Promise<DbConnectionRow[]> {
+  return requestJson<DbConnectionRow[]>('/admin/db-connections');
+}
+
+export async function getCurrentDbConnection(): Promise<DbConnectionCurrent> {
+  return requestJson<DbConnectionCurrent>('/admin/db-connections/current');
+}
+
+export async function createDbConnection(payload: DbConnectionPayload): Promise<DbConnectionRow> {
+  return requestJson<DbConnectionRow>('/admin/db-connections', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateDbConnection(
+  id: number,
+  payload: DbConnectionPayload,
+): Promise<DbConnectionRow> {
+  return requestJson<DbConnectionRow>(`/admin/db-connections/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteDbConnection(id: number): Promise<void> {
+  await requestJson(`/admin/db-connections/${id}`, { method: 'DELETE' });
+}
+
+export async function testDbConnection(id: number): Promise<{ ok: boolean }> {
+  return requestJson<{ ok: boolean }>(`/admin/db-connections/${id}/test`, {
+    method: 'POST',
+  });
 }
 
 export async function listSkillAudits(): Promise<{ items: SkillAuditRow[] }> {

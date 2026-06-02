@@ -8,7 +8,6 @@ APP_URL="http://localhost:5173"
 COMPOSE_FILE="${ROOT}/docker-compose.prod.yml"
 BUILD=1
 OPEN_BROWSER=1
-RUN_BOOTSTRAP=1
 TIMEOUT_SECONDS=90
 
 usage() {
@@ -20,7 +19,6 @@ Run local self-checks, start the production-style ChatBI stack, wait for /health
 Options:
   --no-build       Start existing images without rebuilding.
   --no-open        Do not open the browser after startup.
-  --skip-bootstrap Skip scripts/bootstrap_dev.sh self-checks.
   --url URL        App URL to open and health-check. Default: http://localhost:5173
   --timeout SEC    Seconds to wait for /health. Default: 90
   -h, --help       Show this help.
@@ -38,9 +36,6 @@ while [[ $# -gt 0 ]]; do
       ;;
     --no-open)
       OPEN_BROWSER=0
-      ;;
-    --skip-bootstrap)
-      RUN_BOOTSTRAP=0
       ;;
     --url)
       if [[ $# -lt 2 ]]; then
@@ -89,11 +84,6 @@ if [[ ! -f "${COMPOSE_FILE}" ]]; then
 fi
 
 cd "${ROOT}"
-
-if [[ "${RUN_BOOTSTRAP}" -eq 1 ]]; then
-  log "Running bootstrap self-checks"
-  bash "${ROOT}/scripts/bootstrap_dev.sh"
-fi
 
 compose_cmd=(docker compose -f "${COMPOSE_FILE}")
 up_cmd=("${compose_cmd[@]}" up -d)

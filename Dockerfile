@@ -68,6 +68,7 @@ FROM backend-base
 COPY backend /app/backend
 COPY skills /app/skills
 COPY deploy/nginx.app.conf /etc/nginx/conf.d/default.conf
+RUN rm -f /etc/nginx/sites-enabled/default
 COPY deploy/docker-entrypoint.prod.sh /entrypoint.sh
 COPY --from=frontend-build /app/dist /usr/share/nginx/html
 

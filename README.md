@@ -49,7 +49,6 @@ bash scripts/launch.sh
 
 生产式本地使用一体镜像 `chatbi-app`：容器内同时运行 nginx 和 FastAPI，nginx 通过同源 `/api` 反代到本容器内的后端进程。
 如需只启动不打开浏览器，可运行 `bash scripts/launch.sh --no-open`；如需跳过重建镜像，可加 `--no-build`。
-脚本默认会先运行 `bash scripts/bootstrap_dev.sh` 做本地自检；如需跳过可加 `--skip-bootstrap`。
 
 ### 2. 开发热更新
 

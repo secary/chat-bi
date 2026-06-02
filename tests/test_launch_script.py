@@ -42,7 +42,7 @@ class LaunchScriptTest(unittest.TestCase):
             executable.chmod(executable.stat().st_mode | stat.S_IEXEC)
         return bin_dir
 
-    def test_launch_runs_bootstrap_builds_waits_and_opens_browser(self) -> None:
+    def test_launch_builds_waits_and_opens_browser(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir) / "repo"
             repo.mkdir()
@@ -63,7 +63,6 @@ class LaunchScriptTest(unittest.TestCase):
             )
 
             log = log_path.read_text(encoding="utf-8")
-            self.assertIn("bootstrap", log)
             self.assertIn("docker compose -f", log)
             self.assertIn("docker-compose.prod.yml up -d --build", log)
             self.assertIn("curl -fsS http://localhost:5173/health", log)
@@ -102,27 +101,3 @@ class LaunchScriptTest(unittest.TestCase):
             self.assertNotIn("--build", log)
             self.assertIn("curl -fsS http://127.0.0.1:9999/health", log)
             self.assertNotIn("open ", log)
-
-    def test_launch_can_skip_bootstrap(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            repo = Path(temp_dir) / "repo"
-            repo.mkdir()
-            self.create_minimal_repo(repo)
-            bin_dir = self.create_fake_bin(repo)
-            log_path = repo / "start-prod.log"
-
-            subprocess.run(
-                ["bash", "scripts/launch.sh", "--skip-bootstrap", "--no-open"],
-                cwd=repo,
-                check=True,
-                capture_output=True,
-                text=True,
-                env={
-                    "PATH": f"{bin_dir}:{'/usr/bin:/bin'}",
-                    "START_PROD_LOG": str(log_path),
-                },
-            )
-
-            log = log_path.read_text(encoding="utf-8")
-            self.assertNotIn("bootstrap", log)
-            self.assertIn("docker-compose.prod.yml up -d --build", log)

@@ -102,8 +102,8 @@ preflight: bash -n scripts/launch.sh + docker compose config + launch 单测
 
 | 主题 | 路径 |
 |---|---|
-| CI/CD | [docs/ci-cd/README.md](docs/ci-cd/README.md) |
-| 架构 | [docs/architecture/README.md](docs/architecture/README.md) |
-| 技术指南 | [docs/guide/tech-guide.md](docs/guide/tech-guide.md) |
-| 使用指南 | [docs/guide/user-guide.md](docs/guide/user-guide.md) |
-| 测试 | [docs/testing/README.md](docs/testing/README.md) |
+| CI/CD | [docs/ci-cd.md](docs/ci-cd.md) |
+| 架构 | [docs/architecture.md](docs/architecture.md) |
+| Agent 运行时 | [docs/agent-runtime.md](docs/agent-runtime.md) |
+| 页面帮助 | [docs/help/](docs/help/) |
+| 测试 | [docs/testing.md](docs/testing.md) |

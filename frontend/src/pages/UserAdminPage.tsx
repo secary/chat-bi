@@ -1,23 +1,28 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import {
-  createUserApi,
-  deactivateUserApi,
-  listUsersApi,
-  patchUserApi,
-} from '../api/client';
+import { createUserApi, listUsersApi, patchUserApi } from '../api/client';
 import { useAuth } from '../contexts/useAuth';
 import type { AppUserRow } from '../types/auth';
 import { logger } from '../lib/logger';
+import { UserAdminTable } from '../components/UserAdminTable';
+
+type UserRole = 'admin' | 'user';
+
+function isUserActive(row: AppUserRow): boolean {
+  return typeof row.is_active === 'boolean' ? row.is_active : Boolean(row.is_active);
+}
 
 export function UserAdminPage() {
   const { user } = useAuth();
   const [rows, setRows] = useState<AppUserRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [notice, setNotice] = useState('');
+  const [error, setError] = useState('');
   const [form, setForm] = useState({
     username: '',
     password: '',
-    role: 'user' as 'admin' | 'user',
+    role: 'user' as UserRole,
   });
 
   const refresh = useCallback(async () => {
@@ -26,6 +31,7 @@ export function UserAdminPage() {
       setRows(list);
     } catch (e) {
       logger.error('list users', e);
+      setError('用户列表读取失败。');
     } finally {
       setLoading(false);
     }
@@ -35,13 +41,28 @@ export function UserAdminPage() {
     void Promise.resolve().then(refresh);
   }, [refresh]);
 
+  const stats = useMemo(() => {
+    const activeCount = rows.filter(isUserActive).length;
+    return {
+      total: rows.length,
+      admins: rows.filter((row) => row.role === 'admin').length,
+      active: activeCount,
+      inactive: rows.length - activeCount,
+    };
+  }, [rows]);
+
   if (user?.role !== 'admin') {
     return <Navigate to="/" replace />;
   }
 
   const onCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.username.trim() || !form.password) return;
+    setError('');
+    setNotice('');
+    if (!form.username.trim() || !form.password) {
+      setError('请填写用户名和密码。');
+      return;
+    }
     try {
       await createUserApi({
         username: form.username.trim(),
@@ -49,145 +70,162 @@ export function UserAdminPage() {
         role: form.role,
       });
       setForm({ username: '', password: '', role: 'user' });
+      setNotice('用户已创建。');
       await refresh();
     } catch (err) {
       logger.error('create user', err);
+      setError(err instanceof Error ? err.message : '创建用户失败。');
     }
   };
 
-  const toggleActive = async (r: AppUserRow) => {
-    const active = typeof r.is_active === 'boolean' ? r.is_active : Boolean(r.is_active);
+  const toggleActive = async (row: AppUserRow) => {
+    if (row.id === user.id && isUserActive(row)) {
+      setError('不能停用当前登录用户。');
+      return;
+    }
     try {
-      await patchUserApi(r.id, { is_active: !active });
+      setBusyId(row.id);
+      setError('');
+      await patchUserApi(row.id, { is_active: !isUserActive(row) });
+      setNotice(isUserActive(row) ? '用户已停用。' : '用户已启用。');
       await refresh();
     } catch (e) {
       logger.error('patch user', e);
+      setError('更新用户状态失败。');
+    } finally {
+      setBusyId(null);
     }
   };
 
-  const resetPassword = async (id: number) => {
-    const pwd = window.prompt('输入新密码（不少于 1 位）');
+  const updateRole = async (row: AppUserRow, role: UserRole) => {
+    if (role === row.role) return;
+    try {
+      setBusyId(row.id);
+      setError('');
+      await patchUserApi(row.id, { role });
+      setNotice('用户角色已更新。');
+      await refresh();
+    } catch (e) {
+      logger.error('patch user role', e);
+      setError('更新用户角色失败。');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const resetPassword = async (row: AppUserRow) => {
+    const pwd = window.prompt(`为 ${row.username} 输入新密码`);
     if (!pwd) return;
     try {
-      await patchUserApi(id, { password: pwd });
+      setBusyId(row.id);
+      setError('');
+      await patchUserApi(row.id, { password: pwd });
+      setNotice('密码已重置。');
       await refresh();
     } catch (e) {
       logger.error('reset password', e);
-    }
-  };
-
-  const deactivate = async (id: number) => {
-    if (!window.confirm('确定禁用该用户？')) return;
-    try {
-      await deactivateUserApi(id);
-      await refresh();
-    } catch (e) {
-      logger.error('deactivate user', e);
+      setError('重置密码失败。');
+    } finally {
+      setBusyId(null);
     }
   };
 
   return (
-    <div className="h-full overflow-y-auto bg-gray-50 p-6 lg:p-8">
-      <h1 className="mb-4 text-lg font-semibold tracking-tight text-gray-900">用户管理</h1>
-      <p className="mb-6 text-sm text-gray-500">
-        创建账号并分配角色（admin 可访问全部管理页；user 为普通分析用户）。
-      </p>
+    <div className="h-full overflow-y-auto bg-gray-50 px-6 py-6 lg:px-8">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-5">
+        <header className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="text-lg font-semibold tracking-tight text-gray-900">用户管理</h1>
+            <p className="mt-1 text-sm text-gray-500">创建账号、分配角色并维护登录状态。</p>
+          </div>
+        </header>
 
-      <form
-        onSubmit={(ev) => void onCreate(ev)}
-        className="mb-8 max-w-xl rounded-xl border border-gray-200 bg-surface p-5 shadow-card"
-      >
-        <h2 className="mb-3 text-sm font-medium text-gray-700">新建用户</h2>
-        <div className="flex flex-wrap gap-3">
-          <input
-            placeholder="用户名"
-            value={form.username}
-            onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))}
-            className="rounded-lg border border-gray-200 px-3 py-2 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
-          />
-          <input
-            type="password"
-            placeholder="密码"
-            value={form.password}
-            onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-            className="rounded-lg border border-gray-200 px-3 py-2 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
-          />
-          <select
-            value={form.role}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, role: e.target.value as 'admin' | 'user' }))
-            }
-            className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
-          >
-            <option value="user">user</option>
-            <option value="admin">admin</option>
-          </select>
-          <button
-            type="submit"
-            className="rounded-lg bg-accent px-4 py-2 text-sm text-white transition-colors hover:bg-accent-hover active:scale-[0.98]"
-          >
-            创建
-          </button>
-        </div>
-      </form>
+        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            ['全部账号', stats.total],
+            ['管理员', stats.admins],
+            ['启用', stats.active],
+            ['停用', stats.inactive],
+          ].map(([label, value]) => (
+            <div key={label} className="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-card">
+              <div className="text-xs text-gray-500">{label}</div>
+              <div className="mt-1 text-2xl font-semibold text-gray-900">{value}</div>
+            </div>
+          ))}
+        </section>
 
-      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-surface shadow-card">
-        <table className="min-w-full text-left text-sm">
-          <thead className="border-b border-gray-200 text-xs font-medium tracking-wider text-gray-500 uppercase">
-            <tr>
-              <th className="px-4 py-3">ID</th>
-              <th className="px-4 py-3">用户名</th>
-              <th className="px-4 py-3">角色</th>
-              <th className="px-4 py-3">状态</th>
-              <th className="px-4 py-3">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-gray-400">
-                  加载中…
-                </td>
-              </tr>
-            ) : (
-              rows.map((r) => {
-                const active =
-                  typeof r.is_active === 'boolean' ? r.is_active : Boolean(r.is_active);
-                return (
-                  <tr key={r.id} className="border-b border-gray-100 transition-colors hover:bg-gray-50/50">
-                    <td className="px-4 py-2.5">{r.id}</td>
-                    <td className="px-4 py-2.5">{r.username}</td>
-                    <td className="px-4 py-2.5">{r.role}</td>
-                    <td className="px-4 py-2.5">{active ? '启用' : '禁用'}</td>
-                    <td className="space-x-3 px-4 py-2.5">
-                      <button
-                        type="button"
-                        className="text-xs text-accent transition-colors hover:text-accent-hover"
-                        onClick={() => void resetPassword(r.id)}
-                      >
-                        重置密码
-                      </button>
-                      <button
-                        type="button"
-                        className="text-xs text-accent transition-colors hover:text-accent-hover"
-                        onClick={() => void toggleActive(r)}
-                      >
-                        {active ? '禁用' : '启用'}
-                      </button>
-                      <button
-                        type="button"
-                        className="text-xs text-red-600 transition-colors hover:text-red-700"
-                        onClick={() => void deactivate(r.id)}
-                      >
-                        禁用（软删）
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+        <section className="grid gap-5 lg:grid-cols-[360px_minmax(0,1fr)]">
+          <form
+            onSubmit={(ev) => void onCreate(ev)}
+            className="rounded-lg border border-gray-200 bg-white p-5 shadow-card"
+          >
+            <div className="mb-4">
+              <h2 className="text-sm font-semibold text-gray-900">新建用户</h2>
+            </div>
+            <div className="space-y-3">
+              <label className="block text-xs font-medium text-gray-500">
+                用户名
+                <input
+                  value={form.username}
+                  onChange={(e) => setForm((prev) => ({ ...prev, username: e.target.value }))}
+                  className="mt-1.5 h-10 w-full rounded-lg border border-gray-200 px-3 text-sm transition-all focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+                  placeholder="例如 analyst"
+                />
+              </label>
+              <label className="block text-xs font-medium text-gray-500">
+                初始密码
+                <input
+                  type="password"
+                  value={form.password}
+                  onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
+                  className="mt-1.5 h-10 w-full rounded-lg border border-gray-200 px-3 text-sm transition-all focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+                  placeholder="输入初始密码"
+                />
+              </label>
+              <label className="block text-xs font-medium text-gray-500">
+                角色
+                <select
+                  value={form.role}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, role: e.target.value as UserRole }))
+                  }
+                  className="mt-1.5 h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm transition-all focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+                >
+                  <option value="user">分析用户</option>
+                  <option value="admin">管理员</option>
+                </select>
+              </label>
+              <button
+                type="submit"
+                className="h-10 w-full rounded-lg bg-accent px-4 text-sm font-medium text-white transition-colors hover:bg-accent-hover active:scale-[0.98]"
+              >
+                创建用户
+              </button>
+            </div>
+            {notice || error ? (
+              <div
+                className={`mt-4 rounded-lg border px-3 py-2 text-sm ${
+                  error
+                    ? 'border-red-200 bg-red-50 text-red-700'
+                    : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                }`}
+              >
+                {error || notice}
+              </div>
+            ) : null}
+          </form>
+
+          <UserAdminTable
+            rows={rows}
+            loading={loading}
+            busyId={busyId}
+            currentUserId={user.id}
+            onRoleChange={(row, role) => void updateRole(row, role)}
+            onResetPassword={(row) => void resetPassword(row)}
+            onToggleActive={(row) => void toggleActive(row)}
+            isActive={isUserActive}
+          />
+        </section>
       </div>
     </div>
   );

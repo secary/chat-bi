@@ -214,39 +214,35 @@ export function DataSourcesPage() {
             )}
           </div>
           <div className="space-y-2">
-            {rows.length > 0 ? (
-              rows.map((row) => (
-                <button
-                  key={row.id}
-                  type="button"
-                  onClick={() => selectRow(row)}
-                  className={`w-full rounded-lg border px-3 py-3 text-left transition-colors ${
-                    selectedId === row.id
-                      ? 'border-gray-900 bg-gray-50'
-                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="truncate text-sm font-medium text-gray-900">{row.name}</span>
-                    {row.is_default ? (
-                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-700">
-                        默认
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="mt-1 truncate font-mono text-xs text-gray-500">
-                    {connectionLabel(row)}
-                  </p>
-                  <p className="mt-1 truncate text-xs text-gray-400">用户：{row.username}</p>
-                </button>
-              ))
-            ) : (
-              <p className="px-2 py-2 text-center text-xs text-gray-400">暂无已保存数据源</p>
-            )}
+            {rows.map((row) => (
+              <button
+                key={row.id}
+                type="button"
+                onClick={() => selectRow(row)}
+                className={`w-full rounded-lg border px-3 py-3 text-left transition-colors ${
+                  selectedId === row.id
+                    ? 'border-accent bg-accent-light'
+                    : 'border-gray-200 hover:border-accent hover:bg-accent-light'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="truncate text-sm font-medium text-gray-900">{row.name}</span>
+                  {row.is_default ? (
+                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-700">
+                      默认
+                    </span>
+                  ) : null}
+                </div>
+                <p className="mt-1 truncate font-mono text-xs text-gray-500">
+                  {connectionLabel(row)}
+                </p>
+                <p className="mt-1 truncate text-xs text-gray-400">用户：{row.username}</p>
+              </button>
+            ))}
             <button
               type="button"
               onClick={newConnection}
-              className="flex min-h-20 w-full items-center justify-center rounded-lg border border-dashed border-gray-300 px-3 py-6 text-sm font-medium text-gray-700 transition-colors hover:border-gray-900 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2"
+              className="flex min-h-20 w-full items-center justify-center rounded-lg border border-dashed border-accent/60 px-3 py-6 text-sm font-medium text-gray-700 transition-colors hover:border-accent hover:bg-accent-light focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"
             >
               + 新建数据源
             </button>
@@ -292,7 +288,7 @@ export function DataSourcesPage() {
                 <input
                   value={form.name}
                   onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-gray-900"
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-accent"
                   placeholder="零眸测试库"
                 />
               </label>
@@ -303,7 +299,7 @@ export function DataSourcesPage() {
                   onChange={(e) =>
                     setForm((prev) => ({ ...prev, database_name: e.target.value }))
                   }
-                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-gray-900"
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-accent"
                   placeholder="chatbi_demo"
                 />
               </label>
@@ -312,7 +308,7 @@ export function DataSourcesPage() {
                 <input
                   value={form.host}
                   onChange={(e) => setForm((prev) => ({ ...prev, host: e.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-gray-900"
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-accent"
                   placeholder="127.0.0.1"
                 />
               </label>
@@ -322,7 +318,7 @@ export function DataSourcesPage() {
                   value={form.port}
                   onChange={(e) => setForm((prev) => ({ ...prev, port: e.target.value }))}
                   inputMode="numeric"
-                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-gray-900"
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-accent"
                   placeholder="3306"
                 />
               </label>
@@ -331,7 +327,7 @@ export function DataSourcesPage() {
                 <input
                   value={form.username}
                   onChange={(e) => setForm((prev) => ({ ...prev, username: e.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-gray-900"
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-accent"
                   placeholder="demo_user"
                 />
               </label>
@@ -343,7 +339,7 @@ export function DataSourcesPage() {
                   type="password"
                   value={form.password}
                   onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-gray-900"
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-accent"
                   placeholder={selected ? '保持原密码' : '连接密码'}
                 />
               </label>
@@ -354,7 +350,7 @@ export function DataSourcesPage() {
                 type="checkbox"
                 checked={form.is_default}
                 onChange={(e) => setForm((prev) => ({ ...prev, is_default: e.target.checked }))}
-                className="h-4 w-4 rounded border-gray-300 text-gray-900"
+                className="h-4 w-4 rounded border-gray-300 text-accent"
               />
               设为默认数据源
             </label>
@@ -364,7 +360,7 @@ export function DataSourcesPage() {
                 type="button"
                 onClick={() => void submit()}
                 disabled={busy}
-                className="rounded-full bg-gray-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
+                className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
               >
                 {busy ? '保存中…' : '保存数据源'}
               </button>

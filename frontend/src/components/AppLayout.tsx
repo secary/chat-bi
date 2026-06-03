@@ -36,6 +36,9 @@ export function AppLayout() {
           <NavLink to="/" end className={linkCls}>
             对话
           </NavLink>
+          <NavLink to="/help" className={linkCls}>
+            帮助文档
+          </NavLink>
           {user?.role === 'admin' ? (
             <>
               <NavLink to="/audits" className={linkCls}>

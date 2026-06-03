@@ -41,7 +41,10 @@ class StartDevScriptTest(unittest.TestCase):
         executable.write_text(
             "#!/usr/bin/env bash\n"
             'echo "mysql $*" >> "$CHATBI_START_DEV_LOG"\n'
-            'if [[ "$*" == *"SELECT 1 FROM app_user"* ]]; then exit 1; fi\n'
+            'if [[ "$*" == *"information_schema.TABLES"* ]]; then\n'
+            '  echo "${CHATBI_FAKE_TABLE_COUNT:-0}"\n'
+            "  exit 0\n"
+            "fi\n"
             "cat >/dev/null\n"
             "exit 0\n",
             encoding="utf-8",
@@ -74,6 +77,31 @@ class StartDevScriptTest(unittest.TestCase):
             self.assertIn("mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u root", log)
             self.assertIn("-u demo_user -pdemo_pass chatbi_demo", log)
             self.assertIn("Importing database/init.sql", result.stdout)
+            self.assertIn("Local dev MySQL is ready on 127.0.0.1:3306", result.stdout)
+
+    def test_db_only_skips_init_sql_when_database_has_tables(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir) / "repo"
+            repo.mkdir()
+            self.create_minimal_repo(repo)
+            bin_dir = self.create_fake_mysql(repo)
+            log_path = repo / "start-dev.log"
+
+            result = subprocess.run(
+                ["bash", "scripts/start_dev.sh", "--db-only"],
+                cwd=repo,
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    "CHATBI_FAKE_TABLE_COUNT": "1",
+                    "CHATBI_START_DEV_LOG": str(log_path),
+                    "PATH": f"{bin_dir}:{'/usr/bin:/bin'}",
+                },
+            )
+
+            self.assertNotIn("Importing database/init.sql", result.stdout)
+            self.assertIn("skipping database/init.sql", result.stdout)
             self.assertIn("Local dev MySQL is ready on 127.0.0.1:3306", result.stdout)
 
     def test_rejects_invalid_port(self) -> None:

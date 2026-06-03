@@ -1,3 +1,4 @@
+| 263  | 新增普通用户手册、管理员手册和开发者手册源文档，并在前端新增“帮助文档”页面按角色展示普通用户、管理员、开发者内容；根 README 不调整 | `.venv/bin/python scripts/format_code.py frontend/src/App.tsx frontend/src/components/AppLayout.tsx frontend/src/pages/HelpPage.tsx frontend/src/lib/helpDocs.ts`；`npm run build`；`git diff --check` |
 | 262  | 生产 CD workflow 与文档对齐：`TAILSCALE_AUTHKEY` 改为可选，未配置时跳过 Tailscale 并直接走普通 SSH | `ruby -e 'require "yaml"; YAML.load_file(".github/workflows/deploy-prod.yml")'`；`git diff --check` |
 | 261  | 后端通用 `env_loader` 严格排除 `.env.dev`，开发配置只由 `scripts/start_dev.sh` 显式加载，避免生产手动后端进程被 dev 配置覆盖 | `.venv/bin/python scripts/format_code.py backend/env_loader.py tests/test_env_loader.py`；`PYTHONPATH=. .venv/bin/python scripts/run_tests.py foundation -- -q tests/test_env_loader.py tests/test_start_dev_script.py tests/test_launch_script.py tests/test_config_db_defaults.py` |
 | 260  | README 第一章改为“通过 Docker 直接部署”，章节标题不编号，章内部署流程拆成 1-6 步 | 文档改动，未跑测试；`git diff --check` |

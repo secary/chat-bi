@@ -9,6 +9,7 @@ import { DataSourcesPage } from './pages/DataSourcesPage';
 import { LoginPage } from './pages/LoginPage';
 import { UserAdminPage } from './pages/UserAdminPage';
 import { HarnessAuditPage } from './pages/HarnessAuditPage';
+import { HelpPage } from './pages/HelpPage';
 
 export default function App() {
   return (
@@ -19,6 +20,7 @@ export default function App() {
           <Route element={<RequireAuth />}>
             <Route element={<AppLayout />}>
               <Route path="/" element={<ChatPage />} />
+              <Route path="/help" element={<HelpPage />} />
               <Route path="/dashboard" element={<Navigate to="/" replace />} />
               <Route path="/audits" element={<HarnessAuditPage />} />
               <Route path="/harness-audits" element={<Navigate to="/audits" replace />} />

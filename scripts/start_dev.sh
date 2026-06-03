@@ -125,8 +125,13 @@ GRANT ALL PRIVILEGES ON \`${CHATBI_DB_NAME}\`.* TO ${user_literal}@'%';
 FLUSH PRIVILEGES;
 SQL
 
-  if "${app_mysql[@]}" "${CHATBI_DB_NAME}" -N -s -e "SELECT 1 FROM app_user LIMIT 1" >/dev/null 2>&1; then
-    log "Local MySQL database already initialized"
+  local table_count
+  table_count="$(
+    "${app_mysql[@]}" "${CHATBI_DB_NAME}" -N -s -e \
+      "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = $(sql_literal "${CHATBI_DB_NAME}")"
+  )"
+  if [[ "${table_count:-0}" != "0" ]]; then
+    log "Local MySQL database already contains tables; skipping database/init.sql"
     return 0
   fi
 

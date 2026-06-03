@@ -47,7 +47,7 @@ jobs:
         run: bash -n scripts/launch.sh
 
       - name: Validate production compose config
-        run: docker compose -f docker-compose.prod.yml config
+        run: docker compose -f docker-compose.yml config
 
       - name: Run launch script tests
         env:
@@ -89,11 +89,11 @@ jobs:
           test -n "${PROD_SSH_HOST}" || { echo "Missing secret PROD_SSH_HOST"; exit 1; }
           test -n "${PROD_SSH_USER}" || { echo "Missing secret PROD_SSH_USER"; exit 1; }
           test -n "${PROD_SSH_KEY}" || { echo "Missing secret PROD_SSH_KEY"; exit 1; }
-          test -n "${TAILSCALE_AUTHKEY}" || { echo "Missing secret TAILSCALE_AUTHKEY"; exit 1; }
           test -n "${PROD_DEPLOY_PATH}" || { echo "Missing variable or secret PROD_DEPLOY_PATH"; exit 1; }
           [[ "${HEALTH_TIMEOUT_SECONDS}" =~ ^[0-9]+$ ]] || { echo "PROD_HEALTH_TIMEOUT_SECONDS must be an integer"; exit 1; }
 
       - name: Connect to Tailscale
+        if: ${{ env.TAILSCALE_AUTHKEY != '' }}
         uses: tailscale/github-action@v4
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}

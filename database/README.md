@@ -13,7 +13,7 @@
 - `mysql-data/`
   - 历史单实例宿主机 MySQL 数据目录，可清理。
 - `mysql-data-dev/`
-  - 历史开发态宿主机 MySQL 数据目录；当前 `docker-compose.dev.yml` 已改用 named volume，不再作为主开发库默认挂载。
+  - 历史开发态宿主机 MySQL 数据目录；当前开发库由本机 MySQL 管理，不再作为主开发库默认挂载。
 - `mysql-data-log/`
   - 历史独立日志实例 `log-mysql` 的宿主机数据目录，可按需备份后清理。
 

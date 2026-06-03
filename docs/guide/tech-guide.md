@@ -228,8 +228,8 @@ ReAct / Manager 在送入 Planner 前还会经 **context_window** 压缩（§4.4
 | `chatbi_demo` | 业务事实表、语义层、`app_user`、`app_chat_session`、`app_chat_message`、`app_user_memory`、`admin_db_connection`、`admin_llm_settings`、`admin_llm_model_profile`、`admin_skill_registry`、`log`（trace-id 串联） |
 
 **Compose 默认**：
-- `docker-compose.dev.yml` 与 `docker-compose.prod.yml` 都只启动一个 MySQL 容器，并初始化 `chatbi_demo` 一个库。
-- 宿主机直连 MySQL 端口分别为 **33067**（dev）和 **3307**（prod）。
+- 开发环境使用本机 MySQL；`docker-compose.yml` 启动生产式 MySQL 与一体应用容器，并初始化 `chatbi_demo` 一个库。
+- 宿主机直连 MySQL 端口分别为 **3306**（dev）和 **3307**（prod）。
 
 宿主机本地运行后端时，日志连接默认复用 `CHATBI_DB_HOST/PORT/USER/PASSWORD/NAME`；仅在需要拆分日志库时设置 `CHATBI_LOG_DB_NAME`。
 

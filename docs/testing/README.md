@@ -37,10 +37,10 @@ VS Code 工作区也已启用保存时自动格式化：Python 走 Black，前�
 E2E smoke 用于开发应用和 LLM 已运行时的链路验收，不放进默认 CI。它会直接请求 `/chat` SSE，验证典型问法的 Skill 路由、图表事件和边界场景。
 
 ```bash
-docker compose -f docker-compose.dev.yml up -d
+bash scripts/start_dev.sh
 python scripts/e2e_smoke.py
 python scripts/e2e_smoke.py --cases S1,S4,E1
-CHATBI_E2E_URL=http://localhost:8001 python scripts/e2e_smoke.py
+CHATBI_E2E_URL=http://localhost:8000 python scripts/e2e_smoke.py
 ```
 
 详细手动验证清单见 [e2e-manual.md](e2e-manual.md)。
@@ -99,7 +99,7 @@ uv sync
 
 ### Foundation
 
-- `test_env_loader.py::EnvLoaderTest::test_dev_env_overrides_base_env`：`.env.dev` 覆盖基础 `.env`。
+- `test_env_loader.py::EnvLoaderTest::test_loads_base_env_only`：后端通用 env loader 只加载 `.env`，不自动读取 `.env.dev`。
 - `test_http_utils.py::test_request_trace_id_uses_header_when_valid`：合法 `X-Trace-Id` 透传。
 - `test_http_utils.py::test_request_trace_id_generates_when_header_invalid`：非法 trace id 自动生成。
 - `test_observation.py::ObservationTest::test_summarize_table_includes_row_count_and_samples`：Observation 摘要包含行数、列和样例。

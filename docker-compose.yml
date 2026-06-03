@@ -1,4 +1,4 @@
-name: chatbi-prod
+name: chatbi
 
 services:
   chatbi-db:

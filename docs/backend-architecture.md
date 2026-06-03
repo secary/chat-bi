@@ -37,7 +37,7 @@
 | `chatbi_demo` | BI 业务、应用、管理、链路日志 | 业务表、语义层、`app_*`、`app_chat_session`、`app_chat_message`、`app_user_memory`、`admin_db_connection`、`admin_llm_settings`、`admin_llm_model_profile`、`admin_skill_registry`、`log` |
 
 **Docker compose**：
-- `docker-compose.dev.yml` 与 `docker-compose.prod.yml` 默认只启动一个 MySQL 容器，并初始化 `chatbi_demo` 一个库。
+- 开发环境通过 `scripts/start_dev.sh` 初始化本机 MySQL；`docker-compose.yml` 默认启动生产式 MySQL 与一体应用容器，并初始化 `chatbi_demo` 一个库。
 
 `CHATBI_APP_DB_*` / `CHATBI_ADMIN_DB_*` 为兼容扩展点；默认沿用 `chatbi_demo`。
 
@@ -51,7 +51,7 @@
 |------|------|
 | `main.py` | FastAPI 实例、CORS、路由注册、`POST /upload`（`/tmp/chatbi-uploads/`）、`/health` |
 | `config.py` | `Settings`：`CHATBI_AGENT_REACT`、`CHATBI_AGENT_MAX_STEPS`、DB、JWT、记忆开关等 |
-| `env_loader.py` | 加载根目录 `.env` / `.env.dev` |
+| `env_loader.py` | 仅加载根目录 `.env`；`.env.dev` 由 `scripts/start_dev.sh` 显式加载 |
 | `http_utils.py` | 提取或生成 `x-trace-id` |
 | `db_tables.py` | 表名常量（`app_*`、`admin_*`、`log`） |
 

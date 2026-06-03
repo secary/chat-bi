@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 APP_URL="http://localhost:5173"
-COMPOSE_FILE="${ROOT}/docker-compose.prod.yml"
+COMPOSE_FILE="${ROOT}/docker-compose.yml"
 BUILD=1
 OPEN_BROWSER=1
 TIMEOUT_SECONDS=90
@@ -100,7 +100,7 @@ ensure_env_file
 
 cd "${ROOT}"
 
-compose_cmd=(docker compose -f "${COMPOSE_FILE}")
+compose_cmd=(docker compose)
 up_cmd=("${compose_cmd[@]}" up -d)
 if [[ "${BUILD}" -eq 1 ]]; then
   up_cmd+=("--build")
@@ -116,7 +116,7 @@ if command -v curl >/dev/null 2>&1; then
   until curl -fsS "${HEALTH_URL}" >/dev/null 2>&1; do
     if (( SECONDS >= deadline )); then
       log "Timed out waiting for ${HEALTH_URL}"
-      log "Check logs with: docker compose -f docker-compose.prod.yml logs -f"
+      log "Check logs with: docker compose logs -f"
       exit 1
     fi
     sleep 2

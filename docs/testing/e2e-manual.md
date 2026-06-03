@@ -5,8 +5,8 @@
 ## 一键自动运行
 
 ```bash
-# 启动开发应用
-docker compose -f docker-compose.dev.yml up -d
+# 启动开发应用（MySQL、后端、前端都在宿主机）
+bash scripts/start_dev.sh
 
 # 运行全部用例（需 LLM API Key 已配置）
 python scripts/e2e_smoke.py
@@ -17,11 +17,11 @@ python scripts/e2e_smoke.py --cases S1,M1,C1
 # 开启鉴权时传 token
 python scripts/e2e_smoke.py --token "Bearer xxx"
 
-# 指定后端地址（默认 8001）
+# 指定后端地址（脚本默认 8000）
 python scripts/e2e_smoke.py --url http://localhost:8000
 
 # 也可以用环境变量，便于临时接入 CI 或同事机器
-CHATBI_E2E_URL=http://localhost:8001 python scripts/e2e_smoke.py --cases S1,S4,E1
+CHATBI_E2E_URL=http://localhost:8000 python scripts/e2e_smoke.py --cases S1,S4,E1
 ```
 
 脚本会逐条打印 ✓ / ✗，最终输出通过率。用例覆盖范围见下方各节。
@@ -30,8 +30,8 @@ CHATBI_E2E_URL=http://localhost:8001 python scripts/e2e_smoke.py --cases S1,S4,E
 
 ## 准备（浏览器手动验证）
 
-1. 启动完整环境：`docker compose -f docker-compose.dev.yml up -d`
-2. 浏览器打开 `http://localhost:5174`
+1. 启动完整环境：`bash scripts/start_dev.sh`
+2. 浏览器打开 `http://localhost:5173`
 3. 打开 DevTools → Network，过滤 `/chat`，观察 SSE 流中 `thinking` 步骤的 skill 名称
 
 ---

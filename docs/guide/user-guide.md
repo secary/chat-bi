@@ -48,8 +48,7 @@
 **启动方式**请优先参考 [README.md](../../README.md)：
 
 - **Docker 全栈（生产式本地）**：`chatbi-app` 暴露应用端口 **5173**；MySQL 宿主机 **3307**。
-- **Docker 开发热更新**：`chatbi-app-dev` 同时承载 Vite 与 FastAPI reload；前端 **5174**，后端调试端口 **8001**，MySQL 宿主机 **33067**。`docker-compose.dev.yml` 中 `chatbi-db-dev` 使用 Docker named volume 保存 `chatbi_demo`。
-- **宿主机开发**：本地运行后端与前端，MySQL 仍建议用 Docker。
+- **宿主机开发**：`bash scripts/start_dev.sh` 初始化本机 MySQL，并运行 FastAPI reload 与 Vite；前端 **5173**，后端 **8000**，MySQL **3306**。
 
 宿主机 `.env` / `.env.dev` 默认只需要配置 `CHATBI_DB_*`；日志表默认写入同一个 `CHATBI_DB_NAME`。
 
@@ -61,7 +60,7 @@
 
 - **种子用户**：后端启动时按 `.env` / `.env.dev` 中的 `CHATBI_SEED_USERS=username:password:role;...` 幂等写入多个 `app_user`，其中管理员写成 `admin:密码:admin`。对外演示前**务必改密**。
 - **角色**：普通用户与 **admin**。侧栏中「多 Agents 管理、技能管理、数据源、LLM、用户管理」仅 **admin** 可见。
-- **开发 compose 默认关登录**：`docker-compose.dev.yml` 设置 `CHATBI_AUTH_ENABLED=false`，界面可能提示「开发环境：用户登录已关闭」，接口以种子用户身份运行。生产式 `docker-compose.yml` 应开启 JWT（`CHATBI_JWT_SECRET` 等，见 `.env.example`）。
+- **开发脚本默认关登录**：`scripts/start_dev.sh` 设置 `CHATBI_AUTH_ENABLED=false` 与 `VITE_AUTH_ENABLED=false`，界面可能提示「开发环境：用户登录已关闭」，接口以种子用户身份运行。生产式启动应开启 JWT（`CHATBI_JWT_SECRET` 等，见 `.env.example`）。
 - 前端是否展示登录页还受 `VITE_AUTH_ENABLED` 影响（与后端开关需一致）。
 
 ---

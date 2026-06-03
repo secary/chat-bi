@@ -2,7 +2,7 @@
 
 在 GitHub Copilot cloud agent / online mode 中处理本仓库任务时，先快速读取：
 - `AGENTS.md`
-- `docs/plans/current-sprint.md`
+- `docs/current-sprint.md`
 - 与当前任务最相关的专题文档
 
 遵守这些仓库事实：
@@ -17,7 +17,7 @@
 - 新增测试文件必须注册到 `scripts/run_tests.py` 的 `MODULE_SUITES`。
 - Python 相关命令优先使用 `.venv/bin/python`。
 - 代码改动后先跑 `scripts/format_code.py`，再跑最小必要测试。
-- 仅文档改动通常不跑测试，但需要做自查并同步 `docs/plans/current-sprint.md`。
+- 仅文档改动通常不跑测试，但需要做自查并同步 `docs/current-sprint.md`。
 - Skill 相关改动只触碰 `skills/<skill-name>/SKILL.md` 与其 `scripts/`；问数/决策脚本只执行 `SELECT`。
 
 如果任务更偏专项，请优先选择仓库内自定义 agent：

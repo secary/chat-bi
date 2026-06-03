@@ -136,7 +136,9 @@ SQL
   fi
 
   log "Importing database/init.sql"
-  "${admin_mysql[@]}" "${CHATBI_DB_NAME}" <"${ROOT}/database/init.sql"
+  "${admin_mysql[@]}" "${CHATBI_DB_NAME}" < <(
+    sed "s/chatbi_demo/${CHATBI_DB_NAME}/g" "${ROOT}/database/init.sql"
+  )
 }
 
 load_env_file "${ROOT}/.env.dev"

@@ -28,7 +28,10 @@ class StartDevScriptTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
-        (repo / "database/init.sql").write_text("SELECT 1;\n", encoding="utf-8")
+        (repo / "database/init.sql").write_text(
+            "CREATE DATABASE IF NOT EXISTS chatbi_demo;\n" "USE chatbi_demo;\n" "SELECT 1;\n",
+            encoding="utf-8",
+        )
         script_source = ROOT / "scripts/start_dev.sh"
         target = repo / "scripts/start_dev.sh"
         target.write_text(script_source.read_text(encoding="utf-8"), encoding="utf-8")
@@ -45,7 +48,11 @@ class StartDevScriptTest(unittest.TestCase):
             '  echo "${CHATBI_FAKE_TABLE_COUNT:-0}"\n'
             "  exit 0\n"
             "fi\n"
+            'if [[ -n "${CHATBI_START_DEV_SQL_LOG:-}" ]]; then\n'
+            '  cat >> "$CHATBI_START_DEV_SQL_LOG"\n'
+            "else\n"
             "cat >/dev/null\n"
+            "fi\n"
             "exit 0\n",
             encoding="utf-8",
             newline="\n",
@@ -78,6 +85,41 @@ class StartDevScriptTest(unittest.TestCase):
             self.assertIn("-u demo_user -pdemo_pass chatbi_demo", log)
             self.assertIn("Importing database/init.sql", result.stdout)
             self.assertIn("Local dev MySQL is ready on 127.0.0.1:3306", result.stdout)
+
+    def test_db_only_imports_init_sql_into_configured_database(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir) / "repo"
+            repo.mkdir()
+            self.create_minimal_repo(repo)
+            env_path = repo / ".env.dev"
+            env_path.write_text(
+                env_path.read_text(encoding="utf-8").replace(
+                    "CHATBI_DB_NAME=chatbi_demo",
+                    "CHATBI_DB_NAME=chatbi_dev",
+                ),
+                encoding="utf-8",
+            )
+            bin_dir = self.create_fake_mysql(repo)
+            log_path = repo / "start-dev.log"
+            sql_log_path = repo / "start-dev.sql"
+
+            subprocess.run(
+                ["bash", "scripts/start_dev.sh", "--db-only"],
+                cwd=repo,
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    "CHATBI_START_DEV_LOG": str(log_path),
+                    "CHATBI_START_DEV_SQL_LOG": str(sql_log_path),
+                    "PATH": f"{bin_dir}:{'/usr/bin:/bin'}",
+                },
+            )
+
+            sql_log = sql_log_path.read_text(encoding="utf-8")
+            self.assertIn("CREATE DATABASE IF NOT EXISTS chatbi_dev", sql_log)
+            self.assertIn("USE chatbi_dev", sql_log)
+            self.assertNotIn("USE chatbi_demo;", sql_log)
 
     def test_db_only_skips_init_sql_when_database_has_tables(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

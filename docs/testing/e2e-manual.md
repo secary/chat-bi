@@ -5,7 +5,7 @@
 ## 一键自动运行
 
 ```bash
-# 启动开发应用（MySQL in Docker，前后端 on host）
+# 启动开发应用（MySQL、后端、前端都在宿主机）
 bash scripts/start_dev.sh
 
 # 运行全部用例（需 LLM API Key 已配置）

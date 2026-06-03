@@ -69,9 +69,9 @@ bash scripts/start_dev.sh
 
 - 前端：`http://localhost:5173`
 - 后端：`http://localhost:8000`
-- MySQL：`127.0.0.1:33067`（`chatbi_demo` 包含业务、应用、管理与日志表）
+- MySQL：`127.0.0.1:3306`（`chatbi_demo` 包含业务、应用、管理与日志表）
 
-开发态只保留 MySQL 容器 `chatbi-db-dev`；FastAPI reload server 和 Vite dev server 都运行在宿主机，调试和热更新更直接。
+开发态的 MySQL、FastAPI reload server 和 Vite dev server 都运行在宿主机；生产式运行仍保留 MySQL 与应用容器。
 
 本机开发脚本默认关闭登录：
 
@@ -80,7 +80,14 @@ bash scripts/start_dev.sh
 
 如需与生产一致的登录流程，请在 `.env.dev` 中同步开启这两个开关。
 
-只启动开发数据库：
+`start_dev.sh` 会读取 `.env.dev` 中的 `CHATBI_DB_*`，自动创建数据库和用户，并在首次初始化时导入 `database/init.sql`。默认使用本机 MySQL 管理账号 `root`；如需密码或其他管理账号，可在 `.env.dev` 中增加：
+
+```dotenv
+CHATBI_MYSQL_ADMIN_USER=root
+CHATBI_MYSQL_ADMIN_PASSWORD=你的本机MySQL管理密码
+```
+
+只初始化/检查开发数据库：
 
 ```bash
 bash scripts/start_dev.sh --db-only
@@ -102,7 +109,7 @@ bash scripts/bootstrap_dev.sh
 # 首次/依赖变动
 bash scripts/bootstrap_dev.sh --sync
 
-# 开发启动（MySQL in Docker，前后端 on host）
+# 开发启动（MySQL、后端、前端都在宿主机）
 bash scripts/start_dev.sh
 
 # 代码格式化
@@ -166,7 +173,6 @@ chat-bi/
 ├── TODO.md
 ├── Dockerfile
 ├── docker-compose.yml
-├── docker-compose.dev.yml
 ├── docker-compose.prod.yml
 ├── pyproject.toml
 ├── deploy/
@@ -271,7 +277,7 @@ bash scripts/launch.sh
 开发数据库重建：
 
 ```bash
-docker compose --env-file .env.dev -f docker-compose.dev.yml down -v
+mysql --protocol=TCP -h 127.0.0.1 -P 3306 -uroot -e 'DROP DATABASE IF EXISTS chatbi_demo;'
 bash scripts/start_dev.sh --db-only
 ```
 

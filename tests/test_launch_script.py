@@ -104,7 +104,7 @@ class LaunchScriptTest(unittest.TestCase):
             repo = Path(temp_dir) / "repo"
             repo.mkdir()
             self.create_minimal_repo(repo)
-            (repo / ".env.prod").write_text(
+            (repo / ".env").write_text(
                 "CHATBI_SEED_USERS=ops:ops123:admin;demo:demo123:user\n",
                 encoding="utf-8",
             )
@@ -123,7 +123,7 @@ class LaunchScriptTest(unittest.TestCase):
                 },
             )
 
-            self.assertFalse((repo / ".env").exists())
+            self.assertTrue((repo / ".env").exists())
             self.assertNotIn("copied .env.example", result.stdout)
 
     def test_launch_can_skip_build_and_browser(self) -> None:

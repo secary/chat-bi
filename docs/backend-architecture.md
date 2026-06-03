@@ -51,7 +51,7 @@
 |------|------|
 | `main.py` | FastAPI 实例、CORS、路由注册、`POST /upload`（`/tmp/chatbi-uploads/`）、`/health` |
 | `config.py` | `Settings`：`CHATBI_AGENT_REACT`、`CHATBI_AGENT_MAX_STEPS`、DB、JWT、记忆开关等 |
-| `env_loader.py` | 加载根目录 `.env` / `.env.dev` |
+| `env_loader.py` | 仅加载根目录 `.env`；`.env.dev` 由 `scripts/start_dev.sh` 显式加载 |
 | `http_utils.py` | 提取或生成 `x-trace-id` |
 | `db_tables.py` | 表名常量（`app_*`、`admin_*`、`log`） |
 

@@ -34,7 +34,7 @@ ChatBI 是银行场景的对话式数据分析 Demo，支持中文问数、语�
 - 依赖方向：types/ → lib/utils/ → services/ → app/；禁止反向引用。
 - 单文件不超过 300 行；新功能必须补测试并注册到 `scripts/run_tests.py` 的 `MODULE_SUITES`。
 - 禁止 `console.log`；前端 API 统一走 `apiClient`，禁止裸 `fetch()`。
-- Python 测试优先用 `.venv/bin/python`；本地环境默认 `.env.dev` 优先，其次 `.env`。
+- Python 测试优先用 `.venv/bin/python`；后端通用加载只读 `.env`，本地开发由 `scripts/start_dev.sh` 显式读取 `.env.dev`。
 - `.venv` 由 `uv sync` 按 `pyproject.toml` + `uv.lock` 管理。
 - 新增 Python 依赖只改 `pyproject.toml`，再执行 `uv lock`。
 - Skill 新增/删除只改 `skills/<skill-name>/SKILL.md` 与可选 `scripts/`；问数/决策脚本只执行 `SELECT`。

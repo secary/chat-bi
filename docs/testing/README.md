@@ -99,7 +99,7 @@ uv sync
 
 ### Foundation
 
-- `test_env_loader.py::EnvLoaderTest::test_dev_env_overrides_base_env`：`.env.dev` 覆盖基础 `.env`。
+- `test_env_loader.py::EnvLoaderTest::test_loads_base_env_only`：后端通用 env loader 只加载 `.env`，不自动读取 `.env.dev`。
 - `test_http_utils.py::test_request_trace_id_uses_header_when_valid`：合法 `X-Trace-Id` 透传。
 - `test_http_utils.py::test_request_trace_id_generates_when_header_invalid`：非法 trace id 自动生成。
 - `test_observation.py::ObservationTest::test_summarize_table_includes_row_count_and_samples`：Observation 摘要包含行数、列和样例。

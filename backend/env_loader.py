@@ -11,7 +11,9 @@ except ImportError:
 
 
 def load_project_env(project_root: Path) -> None:
-    """Load base env first, then dev env as an override for local testing."""
+    """Load only the production-style base env.
+
+    Local development loads .env.dev explicitly from scripts/start_dev.sh so
+    production/manual backend runs cannot be shadowed by dev-only settings.
+    """
     load_dotenv(project_root / ".env")
-    load_dotenv(project_root / ".env.dev", override=True)
-    load_dotenv(project_root / "env.dev", override=True)

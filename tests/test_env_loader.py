@@ -9,7 +9,7 @@ from backend.env_loader import load_project_env
 
 
 class EnvLoaderTest(unittest.TestCase):
-    def test_dev_env_overrides_base_env(self):
+    def test_loads_base_env_only(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / ".env").write_text("CHATBI_DB_PORT=3307\n", encoding="utf-8")
@@ -19,7 +19,7 @@ class EnvLoaderTest(unittest.TestCase):
             os.environ.pop("CHATBI_DB_PORT", None)
             try:
                 load_project_env(root)
-                self.assertEqual(os.environ.get("CHATBI_DB_PORT"), "3308")
+                self.assertEqual(os.environ.get("CHATBI_DB_PORT"), "3307")
             finally:
                 if previous is None:
                     os.environ.pop("CHATBI_DB_PORT", None)

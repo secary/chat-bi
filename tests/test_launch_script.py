@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class LaunchScriptTest(unittest.TestCase):
     def create_minimal_repo(self, repo: Path) -> None:
         (repo / "scripts").mkdir(parents=True, exist_ok=True)
-        (repo / "docker-compose.prod.yml").write_text(
+        (repo / "docker-compose.yml").write_text(
             "services:\n  chatbi-app:\n    image: chatbi-test\n",
             encoding="utf-8",
         )
@@ -67,8 +67,7 @@ class LaunchScriptTest(unittest.TestCase):
             )
 
             log = log_path.read_text(encoding="utf-8")
-            self.assertIn("docker compose -f", log)
-            self.assertIn("docker-compose.prod.yml up -d --build", log)
+            self.assertIn("docker compose up -d --build", log)
             self.assertIn("curl -fsS http://localhost:5173/health", log)
             self.assertIn("open http://localhost:5173", log)
             self.assertIn("ChatBI is ready at http://localhost:5173", result.stdout)
@@ -154,7 +153,7 @@ class LaunchScriptTest(unittest.TestCase):
             )
 
             log = log_path.read_text(encoding="utf-8")
-            self.assertIn("docker-compose.prod.yml up -d", log)
+            self.assertIn("docker compose up -d", log)
             self.assertNotIn("--build", log)
             self.assertIn("curl -fsS http://127.0.0.1:9999/health", log)
             self.assertNotIn("open ", log)

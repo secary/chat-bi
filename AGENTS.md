@@ -27,7 +27,7 @@ ChatBI 是银行场景的对话式数据分析 Demo，支持中文问数、语�
 - 日常进场：`bash scripts/bootstrap_dev.sh`
 - 本地清理：`bash scripts/bootstrap_dev.sh --format`
 - 快速测试：`PYTHONPATH=. .venv/bin/python scripts/run_tests.py foundation -- -q`
-- 开发启动：`bash scripts/start_dev.sh`（开发库、后端、前端都跑宿主机；生产库仍在 prod compose）
+- 开发启动：`bash scripts/start_dev.sh`（开发库、后端、前端都跑宿主机；默认 compose 仍保留生产式数据库容器）
 
 ## 必守规则
 - 开始工作先读本文件和 `docs/plans/current-sprint.md`，再按任务需要查对应 docs/design。

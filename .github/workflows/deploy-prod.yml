@@ -47,7 +47,7 @@ jobs:
         run: bash -n scripts/launch.sh
 
       - name: Validate production compose config
-        run: docker compose -f docker-compose.prod.yml config
+        run: docker compose config
 
       - name: Run launch script tests
         env:

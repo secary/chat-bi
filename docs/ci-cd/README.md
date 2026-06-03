@@ -52,12 +52,12 @@ CHATBI_MEMORY_DISABLED=1
 `.github/workflows/deploy-prod.yml` 复用 `scripts/launch.sh` 做生产式部署。流程是：
 
 1. checkout 要部署的 ref。
-2. 部署前执行 preflight：`bash -n scripts/launch.sh`、`docker compose -f docker-compose.prod.yml config`、`python -m unittest tests.test_launch_script`。
+2. 部署前执行 preflight：`bash -n scripts/launch.sh`、`docker compose config`、`python -m unittest tests.test_launch_script`。
 3. 用 `tailscale/github-action@v4` 将 GitHub-hosted runner 临时接入 tailnet，并 ping `PROD_SSH_HOST` 验证可达。
 4. 通过 SSH 创建远端部署目录。
 5. 用 `rsync --delete` 同步仓库文件到服务器，但排除 `.env`、`.env.dev`、`.env.prod`、`.venv`、`frontend/node_modules`、`data`。
 6. 如果配置了 `PROD_ENV_FILE` secret，则覆盖远端 `.env`；否则保留远端已有 `.env`，若远端没有 `.env`，`launch.sh` 会从 `.env.example` 生成。
-7. 在服务器执行 `bash scripts/launch.sh --no-open --url <PROD_APP_URL> --timeout <PROD_HEALTH_TIMEOUT_SECONDS>`，由脚本负责 `docker compose -f docker-compose.prod.yml up -d --build` 和 `/health` 检查。
+7. 在服务器执行 `bash scripts/launch.sh --no-open --url <PROD_APP_URL> --timeout <PROD_HEALTH_TIMEOUT_SECONDS>`，由脚本负责 `docker compose up -d --build` 和 `/health` 检查。
 
 触发方式：
 

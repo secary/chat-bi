@@ -173,7 +173,7 @@ chat-bi/
 ├── TODO.md
 ├── Dockerfile
 ├── docker-compose.yml
-├── docker-compose.prod.yml
+├── docker-compose.yml
 ├── pyproject.toml
 ├── deploy/
 │   ├── docker-entrypoint.dev.sh

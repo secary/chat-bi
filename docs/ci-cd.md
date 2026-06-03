@@ -45,7 +45,7 @@ CHATBI_MEMORY_DISABLED=1
 
 ## 本地提交前建议
 
-与 CI 保持一致的完整检查命令见 [docs/testing/README.md](../testing/README.md#提交前本地检查)。
+与 CI 保持一致的完整检查命令见 [docs/testing.md](testing.md#提交前本地检查)。
 
 ## 生产 CD
 

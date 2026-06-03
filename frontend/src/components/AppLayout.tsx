@@ -1,6 +1,7 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/useAuth';
 import { authEnabled } from '../lib/authFlags';
+import { helpTopicForPath } from '../lib/helpDocs';
 
 const linkCls = ({ isActive }: { isActive: boolean }) =>
   `block rounded-full px-3 py-2 text-sm transition-colors duration-150 ${
@@ -9,6 +10,8 @@ const linkCls = ({ isActive }: { isActive: boolean }) =>
 
 export function AppLayout() {
   const { user, logout } = useAuth();
+  const location = useLocation();
+  const helpLink = `/help?topic=${helpTopicForPath(location.pathname)}`;
 
   return (
     <div className="flex h-screen bg-white">
@@ -73,7 +76,13 @@ export function AppLayout() {
           )}
         </div>
       </aside>
-      <main className="min-h-0 min-w-0 flex-1 overflow-hidden">
+      <main className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
+        <NavLink
+          to={helpLink}
+          className="absolute right-6 top-5 z-20 text-sm font-medium text-accent transition-colors duration-150 hover:text-accent/80"
+        >
+          文档
+        </NavLink>
         <Outlet />
       </main>
     </div>

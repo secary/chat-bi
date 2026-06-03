@@ -51,3 +51,7 @@ frontend/*.local
 
 __pycache__
 demo
+
+AGENTS.md
+CLAUDE.md
+TODO.md

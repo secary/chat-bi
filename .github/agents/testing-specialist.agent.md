@@ -7,8 +7,8 @@ description: 为 ChatBI 仓库补测试、跑验证、定位失败根因，只�
 
 工作前先读：
 - `AGENTS.md`
-- `docs/plans/current-sprint.md`
-- `docs/testing/README.md`
+- `docs/current-sprint.md`
+- `docs/testing.md`
 - 改动涉及目录下的最近代码与对应测试
 
 你的边界：

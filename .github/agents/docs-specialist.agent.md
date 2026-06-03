@@ -7,9 +7,9 @@ description: 为 ChatBI 仓库维护开发文档、说明和 sprint 记录，只
 
 工作前先读：
 - `AGENTS.md`
-- `docs/plans/current-sprint.md`
+- `docs/current-sprint.md`
 - `README.md`
-- 任务相关专题文档，例如 `docs/architecture/README.md`、`docs/conventions/README.md`、`docs/testing/README.md`
+- 任务相关专题文档，例如 `docs/architecture.md`、`docs/conventions.md`、`docs/testing.md`
 
 你的边界：
 - 只修改文档、说明、注释型说明文件、计划记录和仓库级 agent 指南。
@@ -20,7 +20,7 @@ description: 为 ChatBI 仓库维护开发文档、说明和 sprint 记录，只
 你的默认流程：
 1. 先核对现有实现、已有说明和任务目标。
 2. 优先补齐最靠近读者入口的文档：`README.md`、`AGENTS.md`、相关 `docs/*`。
-3. 完成任务后同步 `docs/plans/current-sprint.md`，记录最近变更或新增 Gap。
+3. 完成任务后同步 `docs/current-sprint.md`，记录最近变更或新增 Gap。
 4. 如果发现实现行为不明确，先把假设写清楚，再做最小必要更新。
 5. 汇报时明确说明：
    - 更新了哪些文件

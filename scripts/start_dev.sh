@@ -73,6 +73,82 @@ validate_mysql_name() {
   fi
 }
 
+env_value() {
+  local key="$1"
+  printf '%s' "${!key:-}"
+}
+
+truthy() {
+  local value
+  value="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+  case "${value}" in
+    1|true|yes|on)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+seed_env_db_connections() {
+  local db_name="$1"
+  local idx name host port username password database_name is_default default_value
+  local name_literal host_literal username_literal password_literal database_literal
+
+  for idx in $(seq 1 20); do
+    name="$(env_value "CHATBI_DB_CONNECTION_${idx}_NAME")"
+    host="$(env_value "CHATBI_DB_CONNECTION_${idx}_HOST")"
+    username="$(env_value "CHATBI_DB_CONNECTION_${idx}_USER")"
+    database_name="$(env_value "CHATBI_DB_CONNECTION_${idx}_DATABASE")"
+    if [[ -z "${name}" && -z "${host}" && -z "${username}" && -z "${database_name}" ]]; then
+      continue
+    fi
+    port="$(env_value "CHATBI_DB_CONNECTION_${idx}_PORT")"
+    password="$(env_value "CHATBI_DB_CONNECTION_${idx}_PASSWORD")"
+    default_value="$(env_value "CHATBI_DB_CONNECTION_${idx}_DEFAULT")"
+    port="${port:-3306}"
+
+    if [[ -z "${name}" || -z "${host}" || -z "${username}" || -z "${database_name}" ]]; then
+      echo "CHATBI_DB_CONNECTION_${idx} requires NAME, HOST, USER, and DATABASE." >&2
+      exit 2
+    fi
+    if ! [[ "${port}" =~ ^[0-9]+$ ]]; then
+      echo "CHATBI_DB_CONNECTION_${idx}_PORT must be a number." >&2
+      exit 2
+    fi
+    validate_mysql_name "CHATBI_DB_CONNECTION_${idx}_DATABASE" "${database_name}"
+    is_default=0
+    if truthy "${default_value}"; then
+      is_default=1
+    fi
+
+    name_literal="$(sql_literal "${name}")"
+    host_literal="$(sql_literal "${host}")"
+    username_literal="$(sql_literal "${username}")"
+    password_literal="$(sql_literal "${password}")"
+    database_literal="$(sql_literal "${database_name}")"
+
+    if [[ "${is_default}" -eq 1 ]]; then
+      "${SEED_ADMIN_MYSQL[@]}" "${db_name}" -e "UPDATE admin_db_connection SET is_default = 0;"
+    fi
+    "${SEED_ADMIN_MYSQL[@]}" "${db_name}" <<SQL
+INSERT INTO admin_db_connection
+  (name, host, port, username, password, database_name, is_default)
+VALUES
+  (${name_literal}, ${host_literal}, ${port}, ${username_literal}, ${password_literal}, ${database_literal}, ${is_default})
+ON DUPLICATE KEY UPDATE
+  host = VALUES(host),
+  port = VALUES(port),
+  username = VALUES(username),
+  password = VALUES(password),
+  database_name = VALUES(database_name),
+  is_default = VALUES(is_default);
+SQL
+    log "Loaded env database connection: ${name}"
+  done
+}
+
 init_local_mysql() {
   if ! command -v mysql >/dev/null 2>&1; then
     echo "mysql command not found. Install MySQL client first." >&2
@@ -125,13 +201,22 @@ GRANT ALL PRIVILEGES ON \`${CHATBI_DB_NAME}\`.* TO ${user_literal}@'%';
 FLUSH PRIVILEGES;
 SQL
 
-  if "${app_mysql[@]}" "${CHATBI_DB_NAME}" -N -s -e "SELECT 1 FROM app_user LIMIT 1" >/dev/null 2>&1; then
-    log "Local MySQL database already initialized"
-    return 0
+  local table_count
+  table_count="$(
+    "${app_mysql[@]}" "${CHATBI_DB_NAME}" -N -s -e \
+      "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = $(sql_literal "${CHATBI_DB_NAME}")"
+  )"
+  if [[ "${table_count:-0}" != "0" ]]; then
+    log "Local MySQL database already contains tables; skipping database/init.sql"
+  else
+    log "Importing database/init.sql"
+    "${admin_mysql[@]}" "${CHATBI_DB_NAME}" < <(
+      sed "s/chatbi_demo/${CHATBI_DB_NAME}/g" "${ROOT}/database/init.sql"
+    )
   fi
 
-  log "Importing database/init.sql"
-  "${admin_mysql[@]}" "${CHATBI_DB_NAME}" <"${ROOT}/database/init.sql"
+  SEED_ADMIN_MYSQL=("${admin_mysql[@]}")
+  seed_env_db_connections "${CHATBI_DB_NAME}"
 }
 
 load_env_file "${ROOT}/.env.dev"

@@ -112,5 +112,6 @@ fi
 
 log "Recommended next steps:"
 log "1. First setup: bash scripts/bootstrap_dev.sh --sync"
-log "2. Code cleanup: bash scripts/bootstrap_dev.sh --format"
-log "3. Quick tests: PYTHONPATH=. .venv/bin/python scripts/run_tests.py foundation -- -q"
+log "2. Start local dev: bash scripts/start_dev.sh"
+log "3. Code cleanup: bash scripts/bootstrap_dev.sh --format"
+log "4. Quick tests: PYTHONPATH=. .venv/bin/python scripts/run_tests.py foundation -- -q"

@@ -37,10 +37,10 @@ VS Code 工作区也已启用保存时自动格式化：Python 走 Black，前�
 E2E smoke 用于开发应用和 LLM 已运行时的链路验收，不放进默认 CI。它会直接请求 `/chat` SSE，验证典型问法的 Skill 路由、图表事件和边界场景。
 
 ```bash
-docker compose -f docker-compose.dev.yml up -d
+bash scripts/start_dev.sh
 python scripts/e2e_smoke.py
 python scripts/e2e_smoke.py --cases S1,S4,E1
-CHATBI_E2E_URL=http://localhost:8001 python scripts/e2e_smoke.py
+CHATBI_E2E_URL=http://localhost:8000 python scripts/e2e_smoke.py
 ```
 
 详细手动验证清单见 [e2e-manual.md](e2e-manual.md)。

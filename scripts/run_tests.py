@@ -37,6 +37,7 @@ MODULE_SUITES: dict[str, list[str]] = {
         "tests/test_e2e_smoke_script.py",
         "tests/test_executor_run_script.py",
         "tests/test_run_tests_script.py",
+        "tests/test_start_dev_script.py",
         "tests/test_trace.py",
         "tests/test_trace_repo.py",
     ],

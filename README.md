@@ -62,39 +62,36 @@ bash scripts/bootstrap_dev.sh --sync
 开发态启动：
 
 ```bash
-docker compose --env-file .env.dev -f docker-compose.dev.yml up -d --build
+bash scripts/start_dev.sh
 ```
 
 访问地址：
 
-- 前端：`http://localhost:5174`
-- 后端：`http://localhost:8001`
+- 前端：`http://localhost:5173`
+- 后端：`http://localhost:8000`
 - MySQL：`127.0.0.1:33067`（`chatbi_demo` 包含业务、应用、管理与日志表）
 
-开发态使用一体开发容器 `chatbi-app-dev`：容器内同时运行 Vite dev server 和 FastAPI reload server，并通过 bind mount 保持前后端热更新。
+开发态只保留 MySQL 容器 `chatbi-db-dev`；FastAPI reload server 和 Vite dev server 都运行在宿主机，调试和热更新更直接。
 
-开发 compose 默认关闭登录：
+本机开发脚本默认关闭登录：
 
 - 后端：`CHATBI_AUTH_ENABLED=false`
 - 前端：`VITE_AUTH_ENABLED=false`
 
 如需与生产一致的登录流程，请在 `.env.dev` 中同步开启这两个开关。
 
-### 3. 宿主机前后端启动
+只启动开发数据库：
 
 ```bash
-# Backend
-uv sync
-source .venv/bin/activate
-uvicorn backend.main:app --reload --port 8000
-
-# Frontend
-cd frontend
-npm ci
-npm run dev
+bash scripts/start_dev.sh --db-only
 ```
 
-MySQL 仍建议通过 Docker 启动。
+如需拆开手动启动前后端，先运行上面的 `--db-only`，再分别执行：
+
+```bash
+PYTHONPATH=. .venv/bin/python -m uvicorn backend.main:app --reload --host 127.0.0.1 --port 8000
+cd frontend && VITE_PROXY_TARGET=http://127.0.0.1:8000 VITE_AUTH_ENABLED=false npm run dev
+```
 
 ## 常用命令
 
@@ -104,6 +101,9 @@ bash scripts/bootstrap_dev.sh
 
 # 首次/依赖变动
 bash scripts/bootstrap_dev.sh --sync
+
+# 开发启动（MySQL in Docker，前后端 on host）
+bash scripts/start_dev.sh
 
 # 代码格式化
 bash scripts/bootstrap_dev.sh --format
@@ -265,10 +265,15 @@ MySQL 官方镜像只会在空数据目录时执行初始化 SQL。若你沿用�
 
 ```bash
 docker compose down -v
-docker compose up -d --build
+bash scripts/launch.sh
 ```
 
-开发 compose 也同理；如果只想重建开发数据库，请对 `docker-compose.dev.yml` 执行对应的 `down -v` 后重启。
+开发数据库重建：
+
+```bash
+docker compose --env-file .env.dev -f docker-compose.dev.yml down -v
+bash scripts/start_dev.sh --db-only
+```
 
 ### 修改 `database/init.sql` 后数据没变化
 

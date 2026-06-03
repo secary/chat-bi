@@ -2,7 +2,7 @@ name: chatbi-prod
 
 services:
   chatbi-db:
-    image: mysql:8.0
+    image: ${MYSQL_IMAGE:-mysql:8.0}
     container_name: chatbi-db
     restart: unless-stopped
     environment:
@@ -35,6 +35,12 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
+        NODE_IMAGE: ${NODE_IMAGE:-node:22-bookworm-slim}
+        PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.11-slim}
+        DEBIAN_MIRROR: ${DEBIAN_MIRROR:-http://deb.debian.org/debian}
+        DEBIAN_SECURITY_MIRROR: ${DEBIAN_SECURITY_MIRROR:-http://deb.debian.org/debian-security}
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org}
         # Same-origin /api (see deploy/nginx.app.conf). Not taken from root .env to avoid
         # stale FRONTEND_API_BASE_URL=http://localhost:8000 breaking the prod bundle.
         VITE_API_BASE_URL: /api

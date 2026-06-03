@@ -16,7 +16,7 @@ dependencies = [
     "pymysql==1.2.0",
     "cryptography==48.0.0",
     "passlib[bcrypt]==1.7.4",
-    "PyJWT==2.12.1",
+    "PyJWT==2.13.0",
     "bcrypt==4.3.0",
     "pyyaml==6.0.3",
     "matplotlib==3.10.9",

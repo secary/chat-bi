@@ -30,16 +30,7 @@ log() {
 }
 
 ensure_env_file() {
-  local existing=0
-  local env_name
-  for env_name in ".env" ".env.dev" ".env.prod" "env.dev"; do
-    if [[ -f "${ROOT}/${env_name}" ]]; then
-      existing=1
-      break
-    fi
-  done
-
-  if [[ "${existing}" -eq 1 ]]; then
+  if [[ -f "${ROOT}/.env" ]]; then
     return 0
   fi
   if [[ ! -f "${ROOT}/.env.example" ]]; then

@@ -1,0 +1,161 @@
+name: ChatBI Production CD
+
+"on":
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to deploy
+        default: main
+        required: true
+      skip_build:
+        description: Reuse existing Docker images on the server
+        default: false
+        required: false
+        type: boolean
+  workflow_run:
+    workflows:
+      - ChatBI CI
+    branches:
+      - main
+    types:
+      - completed
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chatbi-prod-cd
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Preflight checks
+    if: >-
+      ${{
+        github.event_name == 'workflow_dispatch' ||
+        github.event.workflow_run.conclusion == 'success'
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.ref }}
+
+      - name: Validate launch script syntax
+        run: bash -n scripts/launch.sh
+
+      - name: Validate production compose config
+        run: docker compose -f docker-compose.prod.yml config
+
+      - name: Run launch script tests
+        env:
+          PYTHONPATH: .
+        run: python -m unittest tests.test_launch_script
+
+  deploy:
+    name: Deploy production
+    if: >-
+      ${{
+        github.event_name == 'workflow_dispatch' ||
+        github.event.workflow_run.conclusion == 'success'
+      }}
+    needs:
+      - preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: chatbi-prod
+    env:
+      PROD_SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+      PROD_SSH_USER: ${{ secrets.PROD_SSH_USER }}
+      PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+      PROD_SSH_PORT: ${{ secrets.PROD_SSH_PORT || '22' }}
+      TAILSCALE_AUTHKEY: ${{ secrets.TAILSCALE_AUTHKEY }}
+      PROD_DEPLOY_PATH: ${{ vars.PROD_DEPLOY_PATH || secrets.PROD_DEPLOY_PATH }}
+      PROD_APP_URL: ${{ vars.PROD_APP_URL || secrets.PROD_APP_URL || 'http://localhost:5173' }}
+      PROD_ENV_FILE: ${{ secrets.PROD_ENV_FILE }}
+      HEALTH_TIMEOUT_SECONDS: ${{ vars.PROD_HEALTH_TIMEOUT_SECONDS || '120' }}
+      SKIP_BUILD: ${{ inputs.skip_build || 'false' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.ref }}
+
+      - name: Validate deployment settings
+        run: |
+          set -euo pipefail
+          test -n "${PROD_SSH_HOST}" || { echo "Missing secret PROD_SSH_HOST"; exit 1; }
+          test -n "${PROD_SSH_USER}" || { echo "Missing secret PROD_SSH_USER"; exit 1; }
+          test -n "${PROD_SSH_KEY}" || { echo "Missing secret PROD_SSH_KEY"; exit 1; }
+          test -n "${TAILSCALE_AUTHKEY}" || { echo "Missing secret TAILSCALE_AUTHKEY"; exit 1; }
+          test -n "${PROD_DEPLOY_PATH}" || { echo "Missing variable or secret PROD_DEPLOY_PATH"; exit 1; }
+          [[ "${HEALTH_TIMEOUT_SECONDS}" =~ ^[0-9]+$ ]] || { echo "PROD_HEALTH_TIMEOUT_SECONDS must be an integer"; exit 1; }
+
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+          ping: ${{ secrets.PROD_SSH_HOST }}
+
+      - name: Configure SSH
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${PROD_SSH_KEY}" > ~/.ssh/chatbi_cd
+          chmod 600 ~/.ssh/chatbi_cd
+          ssh-keyscan -p "${PROD_SSH_PORT}" "${PROD_SSH_HOST}" >> ~/.ssh/known_hosts
+
+      - name: Prepare remote directory
+        run: |
+          set -euo pipefail
+          remote_dir="$(printf '%q' "${PROD_DEPLOY_PATH}")"
+          ssh -i ~/.ssh/chatbi_cd -p "${PROD_SSH_PORT}" \
+            "${PROD_SSH_USER}@${PROD_SSH_HOST}" \
+            "mkdir -p ${remote_dir}"
+
+      - name: Sync release files
+        run: |
+          set -euo pipefail
+          remote_path="$(printf '%q' "${PROD_DEPLOY_PATH}")"
+          rsync -az --delete \
+            --exclude '.git/' \
+            --exclude '.env' \
+            --exclude '.env.dev' \
+            --exclude '.env.prod' \
+            --exclude '.venv/' \
+            --exclude 'frontend/node_modules/' \
+            --exclude 'data/' \
+            -e "ssh -i ~/.ssh/chatbi_cd -p ${PROD_SSH_PORT}" \
+            ./ "${PROD_SSH_USER}@${PROD_SSH_HOST}:${remote_path}/"
+
+      - name: Upload production env file
+        run: |
+          set -euo pipefail
+          if [[ -z "${PROD_ENV_FILE}" ]]; then
+            echo "PROD_ENV_FILE is not set; keeping the remote .env if it exists."
+            exit 0
+          fi
+
+          tmp_env="${RUNNER_TEMP}/chatbi-prod.env"
+          remote_env_path="$(printf '%q' "${PROD_DEPLOY_PATH}/.env")"
+          printf '%s\n' "${PROD_ENV_FILE}" > "${tmp_env}"
+          scp -i ~/.ssh/chatbi_cd -P "${PROD_SSH_PORT}" \
+            "${tmp_env}" \
+            "${PROD_SSH_USER}@${PROD_SSH_HOST}:${remote_env_path}"
+
+      - name: Launch production stack
+        run: |
+          set -euo pipefail
+          remote_dir="$(printf '%q' "${PROD_DEPLOY_PATH}")"
+          app_url="$(printf '%q' "${PROD_APP_URL}")"
+          timeout="$(printf '%q' "${HEALTH_TIMEOUT_SECONDS}")"
+          build_flag=""
+          if [[ "${SKIP_BUILD}" == "true" ]]; then
+            build_flag="--no-build"
+          fi
+
+          ssh -i ~/.ssh/chatbi_cd -p "${PROD_SSH_PORT}" \
+            "${PROD_SSH_USER}@${PROD_SSH_HOST}" \
+            "cd ${remote_dir} && bash scripts/launch.sh --no-open ${build_flag} --url ${app_url} --timeout ${timeout}"

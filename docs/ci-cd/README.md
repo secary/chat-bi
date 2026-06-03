@@ -47,10 +47,39 @@ CHATBI_MEMORY_DISABLED=1
 
 与 CI 保持一致的完整检查命令见 [docs/testing/README.md](../testing/README.md#提交前本地检查)。
 
-## CD 预留
+## 生产 CD
 
-当前 workflow 不自动部署，避免误发布。后续需要 CD 时，建议新增独立 workflow：
+`.github/workflows/deploy-prod.yml` 复用 `scripts/launch.sh` 做生产式部署。流程是：
 
-- `deploy-dev.yml`：push 到 `dev/**` 后部署开发环境。
-- `deploy-prod.yml`：仅 tag 或 GitHub Environment 审批后部署生产环境。
-- 部署前强制依赖 `ChatBI CI` 成功。
+1. checkout 要部署的 ref。
+2. 部署前执行 preflight：`bash -n scripts/launch.sh`、`docker compose -f docker-compose.prod.yml config`、`python -m unittest tests.test_launch_script`。
+3. 用 `tailscale/github-action@v4` 将 GitHub-hosted runner 临时接入 tailnet，并 ping `PROD_SSH_HOST` 验证可达。
+4. 通过 SSH 创建远端部署目录。
+5. 用 `rsync --delete` 同步仓库文件到服务器，但排除 `.env`、`.env.dev`、`.env.prod`、`.venv`、`frontend/node_modules`、`data`。
+6. 如果配置了 `PROD_ENV_FILE` secret，则覆盖远端 `.env`；否则保留远端已有 `.env`，若远端没有 `.env`，`launch.sh` 会从 `.env.example` 生成。
+7. 在服务器执行 `bash scripts/launch.sh --no-open --url <PROD_APP_URL> --timeout <PROD_HEALTH_TIMEOUT_SECONDS>`，由脚本负责 `docker compose -f docker-compose.prod.yml up -d --build` 和 `/health` 检查。
+
+触发方式：
+
+- `workflow_run`：`ChatBI CI` 在 `main` 分支成功后自动部署。
+- `workflow_dispatch`：手动选择 ref 部署；可勾选 `skip_build` 来追加 `--no-build`。
+
+`workflow_run` 触发时已经要求 `ChatBI CI` 成功；`workflow_dispatch` 手动发布时也会先跑上述 preflight，通过后才会连接服务器。
+
+需要在 GitHub 仓库配置：
+
+| 类型 | 名称 | 说明 |
+|---|---|---|
+| Secret | `PROD_SSH_HOST` | 生产服务器地址 |
+| Secret | `PROD_SSH_USER` | SSH 用户 |
+| Secret | `PROD_SSH_KEY` | 可登录服务器的私钥 |
+| Secret | `TAILSCALE_AUTHKEY` | Tailscale auth key，建议使用 tagged、reusable、ephemeral，设备审批场景下还要 pre-approved |
+| Secret | `PROD_SSH_PORT` | SSH 端口；不配置则默认 `22` |
+| Secret 或 Variable | `PROD_DEPLOY_PATH` | 服务器上的部署目录 |
+| Secret 或 Variable | `PROD_APP_URL` | 健康检查和访问地址；不配置则默认 `http://localhost:5173` |
+| Secret | `PROD_ENV_FILE` | 可选，生产 `.env` 完整内容 |
+| Variable | `PROD_HEALTH_TIMEOUT_SECONDS` | 可选，健康检查超时秒数；默认 `120` |
+
+workflow 已绑定 GitHub Environment `chatbi-prod`。建议在该环境开启 required reviewers，这样即使 `main` CI 成功，也需要审批后才会真正发版。
+
+如果服务器只暴露在 Tailscale 内网，`PROD_SSH_HOST` 可以直接填服务器的 `100.x.y.z` 地址或 MagicDNS 名称，GitHub runner 会先加入 tailnet 再 SSH。

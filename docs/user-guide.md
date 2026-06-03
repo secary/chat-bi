@@ -10,9 +10,9 @@
 | -------- | -------------------------------------------------------------------- |
 | 业务或产品试用者 | 每个菜单做什么、典型问题怎么问、结果怎么看 |
 | 实施或运维人员 | 前后端如何启动、登录与权限、环境与端口大致关系 |
-| 二次开发者 | 结合 [docs/architecture/README.md](../architecture/README.md) 理解分层与模块边界 |
+| 二次开发者 | 结合 [docs/architecture.md](architecture.md) 理解分层与模块边界 |
 
-更细的架构与 Agent 契约见 [docs/architecture/README.md](../architecture/README.md) 与设计文档 [docs/design/](../design/)。
+更细的架构与 Agent 契约见 [docs/architecture.md](architecture.md) 与 [docs/agent-runtime.md](agent-runtime.md)。
 
 ---
 
@@ -199,7 +199,7 @@
 - **安全边界**：问数类 Skill 仅 `SELECT`；别名写入受控表。勿将未评估的生产敏感数据接入 Demo 环境。
 - **Skill 选用**：依赖 Prompt 中的选用时机/不要用说明与各专线边界，**无执行前硬校验**；错误选用需通过换问法或 Observation 纠正。
 - **PDF 与中文**：缺中文字体时可能乱码，推荐在 Docker 镜像内导出。
-- **文档漂移**：以 [README.md](../../README.md) 与 [current-sprint.md](../plans/current-sprint.md) 为准。
+- **文档漂移**：以 [README.md](../README.md) 与 [current-sprint.md](current-sprint.md) 为准。
 
 ---
 
@@ -207,10 +207,10 @@
 
 | 文档 | 内容 |
 | --------------------------------------------------------- | ----------------------------- |
-| [README.md](../../README.md) | 启动、端口、默认账号、目录结构 |
+| [README.md](../README.md) | 启动、端口、默认账号、目录结构 |
 | [tech-guide.md](tech-guide.md) | Agent、Prompt、记忆、中止、Skill |
-| [architecture/README.md](../architecture/README.md) | 分层与模块边界 |
-| [plans/current-sprint.md](../plans/current-sprint.md) | 当前迭代与 Gap |
+| [architecture.md](architecture.md) | 分层与模块边界 |
+| [current-sprint.md](current-sprint.md) | 当前迭代与 Gap |
 
 ---
 

@@ -1,6 +1,6 @@
 # ChatBI 技术实现指南
 
-本文面向需要阅读代码或扩展系统的开发者，说明 **Agent 编排、Prompt 拼装、记忆、存储与 Skill 调用** 的实现要点。与 [docs/architecture/README.md](../architecture/README.md) 互补；面向功能与界面的说明见 [user-guide.md](user-guide.md)。
+本文面向需要阅读代码或扩展系统的开发者，说明 **Agent 编排、Prompt 拼装、记忆、存储与 Skill 调用** 的实现要点。与 [docs/architecture.md](architecture.md) 互补；面向功能与界面的说明见 [user-guide.md](user-guide.md)。
 
 ---
 
@@ -296,11 +296,11 @@ Agent 不直接执行 SQL：`executor` 子进程 `--json` → SkillResult → fo
 
 | 主题 | 文档 |
 |------|------|
-| 模块分层与禁止事项 | [architecture/README.md](../architecture/README.md) |
-| ReAct / Legacy 验收 | [design/agent-runtime.md](../design/agent-runtime.md) |
+| 模块分层与禁止事项 | [architecture.md](architecture.md) |
+| ReAct / Legacy 验收 | [agent-runtime.md](agent-runtime.md) |
 | SkillResult / SSE | `backend/agent/protocol.py`、`formatter.py` |
 | 环境变量 | `.env.example`、`backend/config.py` |
-| 测试套件 | [testing/README.md](../testing/README.md)、`scripts/run_tests.py` |
+| 测试套件 | [testing.md](testing.md)、`scripts/run_tests.py` |
 
 ---
 

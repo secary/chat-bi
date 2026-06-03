@@ -62,7 +62,7 @@ app.include_router(admin_users_router)
 
 @app.on_event("startup")
 def seed_configured_startup_users() -> None:
-    for attempt in range(5):
+    for attempt in range(30):
         if "failed" not in seed_startup_users():
             return
         sleep(min(attempt + 1, 3))

@@ -85,7 +85,7 @@ def _seed_user(
         logger.info("%s user normalized: %s", label, username)
         return "updated"
     except Exception:
-        logger.exception("%s seed failed.", label)
+        logger.exception("%s user seed failed: %s", label, username)
         return "failed"
 
 

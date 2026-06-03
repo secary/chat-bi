@@ -36,9 +36,6 @@ export function AppLayout() {
           <NavLink to="/" end className={linkCls}>
             对话
           </NavLink>
-          <NavLink to="/help" className={linkCls}>
-            帮助文档
-          </NavLink>
           {user?.role === 'admin' ? (
             <>
               <NavLink to="/audits" className={linkCls}>
@@ -76,7 +73,13 @@ export function AppLayout() {
           )}
         </div>
       </aside>
-      <main className="min-h-0 min-w-0 flex-1 overflow-hidden">
+      <main className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
+        <NavLink
+          to="/help"
+          className="absolute right-6 top-5 z-20 text-sm font-medium text-accent transition-colors duration-150 hover:text-accent/80"
+        >
+          文档
+        </NavLink>
         <Outlet />
       </main>
     </div>

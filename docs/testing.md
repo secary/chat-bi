@@ -40,7 +40,10 @@ E2E smoke 用于开发应用和 LLM 已运行时的链路验收，不放进默�
 bash scripts/start_dev.sh
 python scripts/e2e_smoke.py
 python scripts/e2e_smoke.py --cases S1,S4,E1
+python scripts/e2e_smoke.py --groups smoke,metadata
+python scripts/e2e_smoke.py --groups upload
 CHATBI_E2E_URL=http://localhost:8000 python scripts/e2e_smoke.py
+CHATBI_E2E_USERNAME=admin CHATBI_E2E_PASSWORD=admin123 python scripts/e2e_smoke.py
 ```
 
 详细手动验证清单见 [e2e-manual.md](e2e-manual.md)。

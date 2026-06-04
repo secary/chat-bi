@@ -1,0 +1,183 @@
+name: ChatBI Pre CD
+
+"on":
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to deploy
+        default: main
+        required: true
+      skip_build:
+        description: Reuse existing Docker images on the server
+        default: false
+        required: false
+        type: boolean
+  workflow_run:
+    workflows:
+      - ChatBI CI
+    types:
+      - completed
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chatbi-pre-cd
+  cancel-in-progress: true
+
+jobs:
+  preflight:
+    name: Preflight checks
+    if: >-
+      ${{
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.event == 'pull_request' &&
+          github.event.workflow_run.head_repository.full_name == github.repository
+        )
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.ref }}
+
+      - name: Validate launch script syntax
+        run: bash -n scripts/launch.sh
+
+      - name: Validate production compose config
+        run: docker compose -f docker-compose.yml config
+
+      - name: Run launch script tests
+        env:
+          PYTHONPATH: .
+        run: python -m unittest tests.test_launch_script
+
+  deploy:
+    name: Deploy pre
+    if: >-
+      ${{
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.event == 'pull_request' &&
+          github.event.workflow_run.head_repository.full_name == github.repository
+        )
+      }}
+    needs:
+      - preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: chatbi-pre
+    env:
+      PRE_SSH_HOST: ${{ secrets.PRE_SSH_HOST }}
+      PRE_SSH_USER: ${{ secrets.PRE_SSH_USER }}
+      PRE_SSH_KEY: ${{ secrets.PRE_SSH_KEY }}
+      PRE_SSH_PORT: ${{ secrets.PRE_SSH_PORT || '22' }}
+      PRE_TAILSCALE_AUTHKEY: ${{ secrets.PRE_TAILSCALE_AUTHKEY }}
+      PRE_DEPLOY_PATH: ${{ vars.PRE_DEPLOY_PATH || secrets.PRE_DEPLOY_PATH }}
+      PRE_APP_URL: ${{ vars.PRE_APP_URL || secrets.PRE_APP_URL || 'http://localhost:5173' }}
+      PRE_E2E_URL: ${{ vars.PRE_E2E_URL || secrets.PRE_E2E_URL }}
+      PRE_E2E_CASES: ${{ vars.PRE_E2E_CASES || 'S1,S4,E1' }}
+      PRE_E2E_TIMEOUT_SECONDS: ${{ vars.PRE_E2E_TIMEOUT_SECONDS || '120' }}
+      PRE_E2E_TOKEN: ${{ secrets.PRE_E2E_TOKEN }}
+      PRE_ENV_FILE: ${{ secrets.PRE_ENV_FILE }}
+      HEALTH_TIMEOUT_SECONDS: ${{ vars.PRE_HEALTH_TIMEOUT_SECONDS || '120' }}
+      SKIP_BUILD: ${{ inputs.skip_build || 'false' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.ref }}
+
+      - name: Validate deployment settings
+        run: |
+          set -euo pipefail
+          test -n "${PRE_SSH_HOST}" || { echo "Missing secret PRE_SSH_HOST"; exit 1; }
+          test -n "${PRE_SSH_USER}" || { echo "Missing secret PRE_SSH_USER"; exit 1; }
+          test -n "${PRE_SSH_KEY}" || { echo "Missing secret PRE_SSH_KEY"; exit 1; }
+          test -n "${PRE_DEPLOY_PATH}" || { echo "Missing variable or secret PRE_DEPLOY_PATH"; exit 1; }
+          test -n "${PRE_E2E_URL}" || { echo "Missing variable or secret PRE_E2E_URL"; exit 1; }
+          [[ "${HEALTH_TIMEOUT_SECONDS}" =~ ^[0-9]+$ ]] || { echo "PRE_HEALTH_TIMEOUT_SECONDS must be an integer"; exit 1; }
+          [[ "${PRE_E2E_TIMEOUT_SECONDS}" =~ ^[0-9]+$ ]] || { echo "PRE_E2E_TIMEOUT_SECONDS must be an integer"; exit 1; }
+
+      - name: Connect to Tailscale
+        if: ${{ env.PRE_TAILSCALE_AUTHKEY != '' }}
+        uses: tailscale/github-action@v4
+        with:
+          authkey: ${{ secrets.PRE_TAILSCALE_AUTHKEY }}
+          ping: ${{ secrets.PRE_SSH_HOST }}
+
+      - name: Configure SSH
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${PRE_SSH_KEY}" > ~/.ssh/chatbi_cd
+          chmod 600 ~/.ssh/chatbi_cd
+          ssh-keyscan -p "${PRE_SSH_PORT}" "${PRE_SSH_HOST}" >> ~/.ssh/known_hosts
+
+      - name: Prepare remote directory
+        run: |
+          set -euo pipefail
+          remote_dir="$(printf '%q' "${PRE_DEPLOY_PATH}")"
+          ssh -i ~/.ssh/chatbi_cd -p "${PRE_SSH_PORT}" \
+            "${PRE_SSH_USER}@${PRE_SSH_HOST}" \
+            "mkdir -p ${remote_dir}"
+
+      - name: Sync release files
+        run: |
+          set -euo pipefail
+          remote_path="$(printf '%q' "${PRE_DEPLOY_PATH}")"
+          rsync -az --delete \
+            --exclude '.git/' \
+            --exclude '.env' \
+            --exclude '.env.dev' \
+            --exclude '.env.prod' \
+            --exclude '.venv/' \
+            --exclude 'frontend/node_modules/' \
+            --exclude 'data/' \
+            -e "ssh -i ~/.ssh/chatbi_cd -p ${PRE_SSH_PORT}" \
+            ./ "${PRE_SSH_USER}@${PRE_SSH_HOST}:${remote_path}/"
+
+      - name: Upload pre env file
+        run: |
+          set -euo pipefail
+          if [[ -z "${PRE_ENV_FILE}" ]]; then
+            echo "PRE_ENV_FILE is not set; keeping the remote .env if it exists."
+            exit 0
+          fi
+
+          tmp_env="${RUNNER_TEMP}/chatbi-pre.env"
+          remote_env_path="$(printf '%q' "${PRE_DEPLOY_PATH}/.env")"
+          printf '%s\n' "${PRE_ENV_FILE}" > "${tmp_env}"
+          scp -i ~/.ssh/chatbi_cd -P "${PRE_SSH_PORT}" \
+            "${tmp_env}" \
+            "${PRE_SSH_USER}@${PRE_SSH_HOST}:${remote_env_path}"
+
+      - name: Launch pre stack
+        run: |
+          set -euo pipefail
+          remote_dir="$(printf '%q' "${PRE_DEPLOY_PATH}")"
+          app_url="$(printf '%q' "${PRE_APP_URL}")"
+          timeout="$(printf '%q' "${HEALTH_TIMEOUT_SECONDS}")"
+          build_flag=""
+          if [[ "${SKIP_BUILD}" == "true" ]]; then
+            build_flag="--no-build"
+          fi
+
+          ssh -i ~/.ssh/chatbi_cd -p "${PRE_SSH_PORT}" \
+            "${PRE_SSH_USER}@${PRE_SSH_HOST}" \
+            "cd ${remote_dir} && bash scripts/launch.sh --no-open ${build_flag} --url ${app_url} --timeout ${timeout}"
+
+      - name: Run pre E2E smoke
+        env:
+          CHATBI_E2E_TOKEN: ${{ secrets.PRE_E2E_TOKEN }}
+        run: |
+          set -euo pipefail
+          python scripts/e2e_smoke.py \
+            --url "${PRE_E2E_URL}" \
+            --cases "${PRE_E2E_CASES}" \
+            --timeout "${PRE_E2E_TIMEOUT_SECONDS}"

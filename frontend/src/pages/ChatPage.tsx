@@ -16,6 +16,7 @@ import {
 } from '../lib/sessionSelection';
 import { useAuth } from '../contexts/useAuth';
 import { resolveDataSourceSwitch } from '../lib/dataSourceSwitch';
+import { isAdminRole } from '../lib/roles';
 
 export function ChatPage() {
   const navigate = useNavigate();
@@ -72,7 +73,7 @@ export function ChatPage() {
   }, [refreshSessions]);
 
   useEffect(() => {
-    if (user?.role !== 'admin') return;
+    if (!isAdminRole(user?.role)) return;
     void listDbConnections()
       .then((rows) => {
         setDbConnections(rows);
@@ -127,7 +128,7 @@ export function ChatPage() {
         >
           新对话
         </button>
-        {user?.role === 'admin' ? (
+        {isAdminRole(user?.role) ? (
           <label className="flex items-center gap-2 text-xs text-gray-500">
             <span>数据源</span>
             <select
@@ -149,7 +150,7 @@ export function ChatPage() {
             </select>
           </label>
         ) : null}
-        {user?.role === 'admin' && inspectableTraceId ? (
+        {isAdminRole(user?.role) && inspectableTraceId ? (
           <div className="ml-auto flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs text-gray-600">
             <span className="text-gray-400">{currentTraceId ? '当前 trace' : '最近 trace'}</span>
             <button

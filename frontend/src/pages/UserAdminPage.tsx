@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/useAuth';
 import type { AppUserRow } from '../types/auth';
 import { logger } from '../lib/logger';
 import { UserAdminTable } from '../components/UserAdminTable';
+import { isAdminRole } from '../lib/roles';
 
 type UserRole = 'admin' | 'user';
 
@@ -14,6 +15,7 @@ function isUserActive(row: AppUserRow): boolean {
 
 export function UserAdminPage() {
   const { user } = useAuth();
+  const currentUserIsRoot = user?.username === 'root' || user?.role === 'root';
   const [rows, setRows] = useState<AppUserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<number | null>(null);
@@ -28,7 +30,7 @@ export function UserAdminPage() {
   const refresh = useCallback(async () => {
     try {
       const list = await listUsersApi();
-      setRows(list);
+      setRows(list.filter((row) => row.username !== 'root'));
     } catch (e) {
       logger.error('list users', e);
       setError('用户列表读取失败。');
@@ -51,12 +53,17 @@ export function UserAdminPage() {
     };
   }, [rows]);
 
-  if (user?.role !== 'admin') {
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (!isAdminRole(user.role)) {
     return <Navigate to="/" replace />;
   }
 
   const onCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) return;
     setError('');
     setNotice('');
     if (!form.username.trim() || !form.password) {
@@ -136,7 +143,7 @@ export function UserAdminPage() {
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="text-lg font-semibold tracking-tight text-gray-900">用户管理</h1>
-            <p className="mt-1 text-sm text-gray-500">创建账号、分配角色并维护登录状态。</p>
+            <p className="mt-1 text-sm text-gray-500">root 管理管理员；管理员维护普通用户。</p>
           </div>
         </header>
 
@@ -192,7 +199,9 @@ export function UserAdminPage() {
                   className="mt-1.5 h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm transition-all focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
                 >
                   <option value="user">分析用户</option>
-                  <option value="admin">管理员</option>
+                  <option value="admin" disabled={!currentUserIsRoot}>
+                    管理员
+                  </option>
                 </select>
               </label>
               <button
@@ -220,6 +229,7 @@ export function UserAdminPage() {
             loading={loading}
             busyId={busyId}
             currentUserId={user.id}
+            currentUsername={user.username}
             onRoleChange={(row, role) => void updateRole(row, role)}
             onResetPassword={(row) => void resetPassword(row)}
             onToggleActive={(row) => void toggleActive(row)}

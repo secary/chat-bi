@@ -210,3 +210,22 @@ class StartDevScriptTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 2)
             self.assertIn("Ports must be non-negative integers.", result.stderr)
+
+    def test_requires_env_dev(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir) / "repo"
+            repo.mkdir()
+            self.create_minimal_repo(repo)
+            (repo / ".env.dev").unlink()
+
+            result = subprocess.run(
+                ["bash", "scripts/start_dev.sh", "--db-only"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("Missing", result.stderr)
+            self.assertIn(".env.dev", result.stderr)

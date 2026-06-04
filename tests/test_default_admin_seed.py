@@ -11,9 +11,12 @@ from backend.default_admin_seed import (
 
 
 def test_parse_seed_users_supports_multiple_users():
-    users = parse_seed_users("secary:pass1:admin; analyst:pass2:user; viewer:pass3")
+    users = parse_seed_users(
+        "root:pass0:root; secary:pass1:admin; analyst:pass2:user; viewer:pass3"
+    )
 
     assert [(u.username, u.password, u.role) for u in users] == [
+        ("root", "pass0", "root"),
         ("secary", "pass1", "admin"),
         ("analyst", "pass2", "user"),
         ("viewer", "pass3", "user"),
@@ -97,3 +100,26 @@ def test_seed_startup_users_skips_when_seed_users_empty(monkeypatch):
 
     assert result == []
     get_by_username.assert_not_called()
+
+
+def test_seed_startup_users_prunes_users_not_in_seed(monkeypatch):
+    monkeypatch.setattr("backend.default_admin_seed.get_by_username", Mock(return_value=None))
+    monkeypatch.setattr("backend.default_admin_seed.create_user", Mock())
+    monkeypatch.setattr("backend.default_admin_seed.hash_password", Mock(return_value="hashed"))
+    monkeypatch.setattr(
+        "backend.default_admin_seed.list_users",
+        Mock(
+            return_value=[
+                {"id": 1, "username": "root", "role": "root", "is_active": 1},
+                {"id": 2, "username": "legacy", "role": "admin", "is_active": 1},
+                {"id": 3, "username": "inactive", "role": "user", "is_active": 0},
+            ]
+        ),
+    )
+    update_user = Mock()
+    monkeypatch.setattr("backend.default_admin_seed.update_user", update_user)
+
+    result = seed_startup_users(Settings(seed_users_raw="root:secret:root", seed_users_prune=True))
+
+    assert result == ["created", "updated"]
+    update_user.assert_called_once_with(2, is_active=False)

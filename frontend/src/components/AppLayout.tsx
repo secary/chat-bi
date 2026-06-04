@@ -2,6 +2,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/useAuth';
 import { authEnabled } from '../lib/authFlags';
 import { helpTopicForPath } from '../lib/helpDocs';
+import { isAdminRole } from '../lib/roles';
 
 const linkCls = ({ isActive }: { isActive: boolean }) =>
   `block rounded-full px-3 py-2 text-sm transition-colors duration-150 ${
@@ -39,7 +40,7 @@ export function AppLayout() {
           <NavLink to="/" end className={linkCls}>
             对话
           </NavLink>
-          {user?.role === 'admin' ? (
+          {isAdminRole(user?.role) ? (
             <>
               <NavLink to="/audits" className={linkCls}>
                 审计

@@ -33,7 +33,10 @@ jobs:
     if: >-
       ${{
         github.event_name == 'workflow_dispatch' ||
-        github.event.workflow_run.conclusion == 'success'
+        (
+          github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.event == 'push'
+        )
       }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -59,7 +62,10 @@ jobs:
     if: >-
       ${{
         github.event_name == 'workflow_dispatch' ||
-        github.event.workflow_run.conclusion == 'success'
+        (
+          github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.event == 'push'
+        )
       }}
     needs:
       - preflight

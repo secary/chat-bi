@@ -7,6 +7,7 @@ type UserAdminTableProps = {
   loading: boolean;
   busyId: number | null;
   currentUserId: number;
+  currentUsername: string;
   onRoleChange: (row: AppUserRow, role: UserRole) => void;
   onResetPassword: (row: AppUserRow) => void;
   onToggleActive: (row: AppUserRow) => void;
@@ -18,6 +19,7 @@ export function UserAdminTable({
   loading,
   busyId,
   currentUserId,
+  currentUsername,
   onRoleChange,
   onResetPassword,
   onToggleActive,
@@ -57,7 +59,13 @@ export function UserAdminTable({
               rows.map((row) => {
                 const active = isActive(row);
                 const self = row.id === currentUserId;
+                const rootRow = row.username === 'root';
+                const adminRow = row.role === 'admin';
+                const currentUserIsRoot = currentUsername === 'root';
                 const busy = busyId === row.id;
+                const canManageRole = currentUserIsRoot && !rootRow;
+                const canResetPassword = !busy && (!adminRow || currentUserIsRoot || self) && (!rootRow || self);
+                const canToggleActive = !busy && !rootRow && !(self && active) && (!adminRow || currentUserIsRoot);
                 return (
                   <tr key={row.id} className="transition-colors hover:bg-gray-50/70">
                     <td className="px-4 py-3">
@@ -68,13 +76,18 @@ export function UserAdminTable({
                             当前
                           </span>
                         ) : null}
+                        {rootRow ? (
+                          <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] text-amber-700">
+                            Root
+                          </span>
+                        ) : null}
                       </div>
                       <div className="mt-0.5 text-xs text-gray-400">ID {row.id}</div>
                     </td>
                     <td className="px-4 py-3">
                       <select
                         value={row.role}
-                        disabled={busy}
+                        disabled={busy || !canManageRole}
                         onChange={(e) => onRoleChange(row, e.target.value as UserRole)}
                         className="h-8 rounded-lg border border-gray-200 bg-white px-2 text-xs text-gray-700 outline-none transition-colors focus:border-accent disabled:opacity-50"
                       >
@@ -98,7 +111,7 @@ export function UserAdminTable({
                       <div className="flex justify-end gap-2">
                         <button
                           type="button"
-                          disabled={busy}
+                          disabled={!canResetPassword}
                           className="rounded border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
                           onClick={() => onResetPassword(row)}
                         >
@@ -106,7 +119,7 @@ export function UserAdminTable({
                         </button>
                         <button
                           type="button"
-                          disabled={busy || (self && active)}
+                          disabled={!canToggleActive}
                           className="rounded border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
                           onClick={() => onToggleActive(row)}
                         >

@@ -42,10 +42,14 @@ def _user_from_token(token: str) -> Dict[str, Any] | None:
 
 
 def _fallback_dev_user() -> Dict[str, Any]:
-    """免登录开发模式：优先使用管理员账号，便于与前端管理页一致。"""
+    """免登录开发模式：优先使用 root，其次管理员账号。"""
     row = get_by_id(settings.auth_dev_user_id)
-    if row and row.get("is_active") and str(row.get("role")) == "admin":
+    if row and row.get("is_active") and str(row.get("role")) in ("root", "admin"):
         return _row_to_user(row)
+
+    root_row = get_by_username("root")
+    if root_row and root_row.get("is_active") and str(root_row.get("role")) == "root":
+        return _row_to_user(root_row)
 
     admin_row = get_by_username("admin")
     if admin_row and admin_row.get("is_active") and str(admin_row.get("role")) == "admin":
@@ -56,7 +60,7 @@ def _fallback_dev_user() -> Dict[str, Any]:
 
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail="开发免登录模式需要数据库中存在可用用户（优先种子 admin）",
+        detail="开发免登录模式需要数据库中存在可用用户（优先种子 root）",
     )
 
 
@@ -86,7 +90,7 @@ def get_current_user(
 
 
 def require_admin(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
-    if user.get("role") != "admin":
+    if user.get("role") not in ("root", "admin"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="需要管理员权限",

@@ -35,7 +35,7 @@ def test_get_current_user_auth_off_uses_dev_user(monkeypatch: pytest.MonkeyPatch
     assert user["role"] == "admin"
 
 
-def test_fallback_prefers_seed_admin_when_dev_id_not_admin(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_fallback_prefers_seed_root_when_dev_id_not_admin(monkeypatch: pytest.MonkeyPatch) -> None:
     mock_settings = MagicMock()
     mock_settings.auth_enabled = False
     mock_settings.auth_dev_user_id = 2
@@ -52,11 +52,11 @@ def test_fallback_prefers_seed_admin_when_dev_id_not_admin(monkeypatch: pytest.M
         return None
 
     def fake_get_by_username(name: str):
-        if name == "admin":
+        if name == "root":
             return {
                 "id": 1,
-                "username": "admin",
-                "role": "admin",
+                "username": "root",
+                "role": "root",
                 "is_active": 1,
             }
         return None
@@ -67,7 +67,7 @@ def test_fallback_prefers_seed_admin_when_dev_id_not_admin(monkeypatch: pytest.M
     user = auth_deps.get_current_user(credentials=None)
 
     assert user["id"] == 1
-    assert user["role"] == "admin"
+    assert user["role"] == "root"
 
 
 def test_get_current_user_auth_on_requires_credentials(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -23,8 +23,8 @@ cd frontend && npm run lint && npm run test && npm run build
 # 一次性启用 Git 提交前自动排版
 git config core.hooksPath .githooks
 
-# 或直接使用仓库引导脚本
-bash scripts/bootstrap_dev.sh
+# 或直接启动开发脚本，它会配置 hooks 并按需同步缺失依赖
+bash scripts/start_dev.sh
 
 # 只格式化当前已暂存文件
 .venv/bin/python scripts/format_code.py --staged

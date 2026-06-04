@@ -23,7 +23,6 @@ def python_executable() -> str:
 
 MODULE_SUITES: dict[str, list[str]] = {
     "foundation": [
-        "tests/test_bootstrap_dev_script.py",
         "tests/test_config_db_defaults.py",
         "tests/test_connection_repo_db_overrides.py",
         "tests/test_env_loader.py",
@@ -84,6 +83,7 @@ MODULE_SUITES: dict[str, list[str]] = {
         "tests/test_admin_skills_audit_route.py",
         "tests/test_admin_harness_audit_route.py",
         "tests/test_admin_multi_agents.py",
+        "tests/test_admin_users_route.py",
         "tests/test_app_llm_saved.py",
         "tests/test_config_db_defaults.py",
         "tests/test_chatbi_llm_fallback.py",

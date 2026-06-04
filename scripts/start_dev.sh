@@ -8,6 +8,7 @@ BACKEND_PORT="${BACKEND_PORT:-8000}"
 FRONTEND_PORT="${FRONTEND_PORT:-5173}"
 INIT_DB=1
 DB_ONLY=0
+SYNC_DEPS=1
 
 usage() {
   cat <<'USAGE'
@@ -18,6 +19,7 @@ Start ChatBI for local host development: MySQL, backend, and frontend all on hos
 Options:
   --db-only          Initialize/check only the local dev MySQL database.
   --no-db           Do not initialize/check the local dev MySQL database.
+  --no-deps         Do not auto-sync missing Python/frontend dependencies.
   --backend-port N  Backend port. Default: 8000.
   --frontend-port N Frontend port. Default: 5173.
   -h, --help        Show this help.
@@ -41,7 +43,8 @@ python_bin() {
 load_env_file() {
   local env_file="$1"
   if [[ ! -f "${env_file}" ]]; then
-    return 0
+    echo "Missing ${env_file}. Create it before starting local dev." >&2
+    exit 1
   fi
 
   while IFS='=' read -r raw_key raw_value || [[ -n "${raw_key}" ]]; do
@@ -89,6 +92,55 @@ truthy() {
       return 1
       ;;
   esac
+}
+
+configure_git_hooks() {
+  if [[ ! -d "${ROOT}/.git" ]]; then
+    return 0
+  fi
+  if command -v git >/dev/null 2>&1; then
+    git -C "${ROOT}" config core.hooksPath .githooks
+  fi
+  if [[ ! -d "${ROOT}/.githooks" ]]; then
+    log "Warning: .githooks directory is missing."
+  fi
+}
+
+sync_missing_dependencies() {
+  local needs_python=0
+  local needs_frontend=0
+
+  if ! python_bin >/dev/null 2>&1; then
+    needs_python=1
+  fi
+  if [[ ! -d "${ROOT}/frontend/node_modules" ]]; then
+    needs_frontend=1
+  fi
+  if [[ "${needs_python}" -eq 0 && "${needs_frontend}" -eq 0 ]]; then
+    return 0
+  fi
+
+  if [[ "${needs_python}" -eq 1 ]]; then
+    if ! command -v uv >/dev/null 2>&1; then
+      echo "Python virtualenv missing and uv command not found. Install uv or run dependency setup manually." >&2
+      exit 1
+    fi
+    log "Python virtualenv missing; running uv sync"
+    (cd "${ROOT}" && uv sync)
+  fi
+
+  if [[ "${needs_frontend}" -eq 1 ]]; then
+    if ! command -v npm >/dev/null 2>&1; then
+      echo "frontend/node_modules missing and npm command not found. Install Node.js/npm first." >&2
+      exit 1
+    fi
+    if [[ ! -f "${ROOT}/frontend/package-lock.json" ]]; then
+      echo "frontend/package-lock.json missing. Cannot run npm ci." >&2
+      exit 1
+    fi
+    log "frontend/node_modules missing; running npm ci"
+    (cd "${ROOT}/frontend" && npm ci)
+  fi
 }
 
 seed_env_db_connections() {
@@ -226,9 +278,12 @@ while [[ $# -gt 0 ]]; do
     --db-only)
       DB_ONLY=1
       ;;
-    --no-db)
-      INIT_DB=0
-      ;;
+      --no-db)
+        INIT_DB=0
+        ;;
+      --no-deps)
+        SYNC_DEPS=0
+        ;;
     --backend-port)
       if [[ $# -lt 2 ]]; then
         echo "--backend-port requires a value." >&2
@@ -265,6 +320,11 @@ if ! [[ "${BACKEND_PORT}" =~ ^[0-9]+$ && "${FRONTEND_PORT}" =~ ^[0-9]+$ ]]; then
   exit 2
 fi
 
+if [[ "${DB_ONLY}" -eq 0 && "${SYNC_DEPS}" -eq 1 ]]; then
+  configure_git_hooks
+  sync_missing_dependencies
+fi
+
 if [[ "${INIT_DB}" -eq 1 ]]; then
   init_local_mysql
 fi
@@ -276,12 +336,12 @@ fi
 
 PYTHON_BIN="$(python_bin || true)"
 if [[ -z "${PYTHON_BIN}" ]]; then
-  echo "Python virtualenv not found. Run: bash scripts/bootstrap_dev.sh --sync" >&2
+  echo "Python virtualenv not found. Run: bash scripts/start_dev.sh" >&2
   exit 1
 fi
 
 if [[ ! -d "${ROOT}/frontend/node_modules" ]]; then
-  echo "frontend/node_modules missing. Run: bash scripts/bootstrap_dev.sh --sync" >&2
+  echo "frontend/node_modules missing. Run: bash scripts/start_dev.sh" >&2
   exit 1
 fi
 
@@ -303,6 +363,8 @@ log "Starting backend on http://127.0.0.1:${BACKEND_PORT}"
   cd "${ROOT}"
   export PYTHONPATH=.
   export CHATBI_AUTH_ENABLED="${CHATBI_AUTH_ENABLED:-false}"
+  export CHATBI_SEED_USERS_RESET_PASSWORD="${CHATBI_SEED_USERS_RESET_PASSWORD:-true}"
+  export CHATBI_SEED_USERS_PRUNE="${CHATBI_SEED_USERS_PRUNE:-true}"
   "${PYTHON_BIN}" -m uvicorn backend.main:app --reload --host 127.0.0.1 --port "${BACKEND_PORT}"
 ) &
 backend_pid="$!"
@@ -311,7 +373,7 @@ log "Starting frontend on http://localhost:${FRONTEND_PORT}"
 (
   cd "${ROOT}/frontend"
   export VITE_PROXY_TARGET="${VITE_PROXY_TARGET:-http://127.0.0.1:${BACKEND_PORT}}"
-  export VITE_AUTH_ENABLED="${VITE_AUTH_ENABLED:-false}"
+  export VITE_AUTH_ENABLED="${VITE_AUTH_ENABLED:-${CHATBI_AUTH_ENABLED:-false}}"
   npm run dev -- --host 0.0.0.0 --port "${FRONTEND_PORT}"
 ) &
 frontend_pid="$!"

@@ -17,6 +17,9 @@ python scripts/e2e_smoke.py --cases S1,M1,C1
 # 开启鉴权时传 token
 python scripts/e2e_smoke.py --token "Bearer xxx"
 
+# 开启鉴权时也可以自动登录获取 token
+python scripts/e2e_smoke.py --username admin --password admin123
+
 # 指定后端地址（脚本默认 8000）
 python scripts/e2e_smoke.py --url http://localhost:8000
 

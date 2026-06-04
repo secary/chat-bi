@@ -84,6 +84,8 @@ jobs:
       PRE_E2E_CASES: ${{ vars.PRE_E2E_CASES || 'S1,S4,E1' }}
       PRE_E2E_TIMEOUT_SECONDS: ${{ vars.PRE_E2E_TIMEOUT_SECONDS || '120' }}
       PRE_E2E_TOKEN: ${{ secrets.PRE_E2E_TOKEN }}
+      PRE_E2E_USERNAME: ${{ secrets.PRE_E2E_USERNAME }}
+      PRE_E2E_PASSWORD: ${{ secrets.PRE_E2E_PASSWORD }}
       PRE_ENV_FILE: ${{ secrets.PRE_ENV_FILE }}
       HEALTH_TIMEOUT_SECONDS: ${{ vars.PRE_HEALTH_TIMEOUT_SECONDS || '120' }}
       SKIP_BUILD: ${{ inputs.skip_build || 'false' }}
@@ -175,6 +177,8 @@ jobs:
       - name: Run pre E2E smoke
         env:
           CHATBI_E2E_TOKEN: ${{ secrets.PRE_E2E_TOKEN }}
+          CHATBI_E2E_USERNAME: ${{ secrets.PRE_E2E_USERNAME }}
+          CHATBI_E2E_PASSWORD: ${{ secrets.PRE_E2E_PASSWORD }}
         run: |
           set -euo pipefail
           python scripts/e2e_smoke.py \

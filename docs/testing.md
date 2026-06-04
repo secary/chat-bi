@@ -41,6 +41,7 @@ bash scripts/start_dev.sh
 python scripts/e2e_smoke.py
 python scripts/e2e_smoke.py --cases S1,S4,E1
 CHATBI_E2E_URL=http://localhost:8000 python scripts/e2e_smoke.py
+CHATBI_E2E_USERNAME=admin CHATBI_E2E_PASSWORD=admin123 python scripts/e2e_smoke.py
 ```
 
 详细手动验证清单见 [e2e-manual.md](e2e-manual.md)。

@@ -117,6 +117,34 @@ CASES: list[Case] = [
 # ── SSE 读取 ──────────────────────────────────────────────────────────────────
 
 
+def _login_token(base_url: str, username: str, password: str, timeout: int) -> str:
+    url = base_url.rstrip("/") + "/auth/login"
+    payload = json.dumps({"username": username, "password": password}).encode()
+    req = urllib.request.Request(
+        url,
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+    token = str(data.get("access_token") or "")
+    token_type = str(data.get("token_type") or "bearer")
+    if not token:
+        raise RuntimeError("登录响应缺少 access_token")
+    return f"{token_type.capitalize()} {token}"
+
+
+def _resolve_token(args: argparse.Namespace) -> str | None:
+    if args.token:
+        return args.token if args.token.lower().startswith("bearer ") else f"Bearer {args.token}"
+    if not args.username and not args.password:
+        return None
+    if not args.username or not args.password:
+        raise RuntimeError("自动登录需要同时提供 username 和 password")
+    return _login_token(args.url, args.username, args.password, args.timeout)
+
+
 def _stream_events(url: str, message: str, token: str | None, multi_agents: bool, timeout: int):
     payload = json.dumps(
         {
@@ -201,7 +229,6 @@ def _run_case(case: Case, base_url: str, token: str | None, timeout: int):
         if s in all_text:
             errors.append(f"text 事件中不应出现 {s!r}")
 
-    # 断言有图表
     if case.expect_chart and not has_chart:
         errors.append("期望有 chart 事件，但未收到")
 
@@ -217,11 +244,19 @@ def main():
     parser.add_argument(
         "--token",
         default=os.getenv("CHATBI_E2E_TOKEN"),
-        help='如开启鉴权，传 "Bearer xxx"；也可用 CHATBI_E2E_TOKEN',
+        help='如开启鉴权，传 "Bearer xxx" 或裸 token；也可用 CHATBI_E2E_TOKEN',
     )
+    parser.add_argument("--username", default=os.getenv("CHATBI_E2E_USERNAME"))
+    parser.add_argument("--password", default=os.getenv("CHATBI_E2E_PASSWORD"))
     parser.add_argument("--cases", default=None, help="逗号分隔的用例 ID，如 S1,M1,C1")
     parser.add_argument("--timeout", type=int, default=120, help="每条用例超时秒数")
     args = parser.parse_args()
+
+    try:
+        token = _resolve_token(args)
+    except (RuntimeError, urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as e:
+        print(f"{RED}E2E 登录失败：{e}{RESET}")
+        sys.exit(1)
 
     filter_ids = (
         {item.strip() for item in args.cases.split(",") if item.strip()} if args.cases else None
@@ -242,7 +277,7 @@ def main():
     for case in cases:
         print(f"  {GRAY}[{case.id}]{RESET} {case.label} ", end="", flush=True)
         t0 = time.time()
-        ok, errors = _run_case(case, args.url, args.token, args.timeout)
+        ok, errors = _run_case(case, args.url, token, args.timeout)
         elapsed = time.time() - t0
 
         if ok:

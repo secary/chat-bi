@@ -41,6 +41,26 @@ class E2ESmokeScriptTest(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("text 事件中应出现 '关键结论'", errors)
 
+    def test_resolve_token_adds_bearer_to_raw_token(self):
+        args = mock.Mock(token="abc123", username=None, password=None)
+
+        self.assertEqual(MODULE._resolve_token(args), "Bearer abc123")
+
+    def test_resolve_token_logs_in_with_credentials(self):
+        args = mock.Mock(
+            token=None,
+            username="admin",
+            password="secret",
+            url="http://example.test/api",
+            timeout=3,
+        )
+
+        with mock.patch.object(MODULE, "_login_token", return_value="Bearer fresh") as login:
+            token = MODULE._resolve_token(args)
+
+        self.assertEqual(token, "Bearer fresh")
+        login.assert_called_once_with("http://example.test/api", "admin", "secret", 3)
+
 
 if __name__ == "__main__":
     unittest.main()

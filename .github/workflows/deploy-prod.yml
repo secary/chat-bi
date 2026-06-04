@@ -12,13 +12,6 @@ name: ChatBI Production CD
         default: false
         required: false
         type: boolean
-  workflow_run:
-    workflows:
-      - ChatBI CI
-    branches:
-      - main
-    types:
-      - completed
 
 permissions:
   contents: read
@@ -30,21 +23,13 @@ concurrency:
 jobs:
   preflight:
     name: Preflight checks
-    if: >-
-      ${{
-        github.event_name == 'workflow_dispatch' ||
-        (
-          github.event.workflow_run.conclusion == 'success' &&
-          github.event.workflow_run.event == 'push'
-        )
-      }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.ref }}
+          ref: ${{ inputs.ref }}
 
       - name: Validate launch script syntax
         run: bash -n scripts/launch.sh
@@ -59,14 +44,6 @@ jobs:
 
   deploy:
     name: Deploy production
-    if: >-
-      ${{
-        github.event_name == 'workflow_dispatch' ||
-        (
-          github.event.workflow_run.conclusion == 'success' &&
-          github.event.workflow_run.event == 'push'
-        )
-      }}
     needs:
       - preflight
     runs-on: ubuntu-latest
@@ -87,7 +64,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.ref }}
+          ref: ${{ inputs.ref }}
 
       - name: Validate deployment settings
         run: |

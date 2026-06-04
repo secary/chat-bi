@@ -61,10 +61,9 @@ CHATBI_MEMORY_DISABLED=1
 
 触发方式：
 
-- `workflow_run`：`ChatBI CI` 在 `main` 分支成功后自动部署。
 - `workflow_dispatch`：手动选择 ref 部署；可勾选 `skip_build` 来追加 `--no-build`。
 
-`workflow_run` 触发时已经要求 `ChatBI CI` 成功；`workflow_dispatch` 手动发布时也会先跑上述 preflight，通过后才会连接服务器。
+生产 CD 不再监听 `main` 分支的 CI 完成事件，合并到 `main` 后不会自动部署。手动发布时会先跑上述 preflight，通过后才会连接服务器。
 
 需要在 GitHub 仓库配置：
 
@@ -80,7 +79,7 @@ CHATBI_MEMORY_DISABLED=1
 | Secret | `PROD_ENV_FILE` | 可选，生产 `.env` 完整内容 |
 | Variable | `PROD_HEALTH_TIMEOUT_SECONDS` | 可选，健康检查超时秒数；默认 `120` |
 
-workflow 已绑定 GitHub Environment `chatbi-prod`。建议在该环境开启 required reviewers，这样即使 `main` CI 成功，也需要审批后才会真正发版。
+workflow 已绑定 GitHub Environment `chatbi-prod`。建议在该环境开启 required reviewers，作为手动发版前的额外审批门禁。
 
 如果服务器只暴露在 Tailscale 内网，`PROD_SSH_HOST` 可以直接填服务器的 `100.x.y.z` 地址或 MagicDNS 名称，GitHub runner 会先加入 tailnet 再 SSH。
 

@@ -1,3 +1,5 @@
+| 277  | Docker 前端构建阶段补充复制 `docs/help`，修复容器内 `helpDocs.ts` 导入 Markdown 原始内容时找不到文件的问题，并同步 dev 镜像路径 | `docker compose build chatbi-app`；`git diff --check` |
+| 276  | 关闭合并到 `main` 后自动触发生产部署：`deploy-prod.yml` 移除 `workflow_run` 入口，仅保留 `workflow_dispatch` 手动部署，并同步更新 CI/CD 文档与 Agent 项目地图 | `ruby -e 'require "yaml"; YAML.load_file(".github/workflows/deploy-prod.yml")'`；`git diff --check` |
 | 275  | 帮助页保留“帮助文档”和当前主题标题，移除无意义的来源说明，并在渲染正文时跳过 Markdown 首个 H1 避免标题重复 | `.venv/bin/python scripts/format_code.py frontend/src/pages/HelpPage.tsx frontend/src/lib/helpDocs.ts`；`npm run build`；`git diff --check` |
 | 274  | 页面级 guide 迁入 `docs/help/*.md`，删除 `docs/tech-guide.md` 与 `docs/user-guide.md` 中转索引，前端通过 `?raw` 直接导入 Markdown 并按 topic/角色展示 | `.venv/bin/python scripts/format_code.py frontend/src/pages/HelpPage.tsx frontend/src/lib/helpDocs.ts`；`npm run build`；`git diff --check` |
 | 273  | `AGENTS.md` 明确 `docs/current-sprint.md` 只保留最新 30 条记录，超过时删除最旧记录，并同步裁剪当前 sprint 记录 | 文档规则调整；`git diff --check` |
@@ -26,5 +28,3 @@
 | 250  | 生产 CD 绑定实际 GitHub Environment 名称 `chatbi-prod`，确保部署 job 能读取该环境下的 secrets，并同步更新 CI/CD 文档 | `git diff --check`；`ruby -e 'require "yaml"; ARGV.each { |path| YAML.load_file(path); puts "ok #{path}" }' .github/workflows/deploy-prod.yml` |
 | 249  | 生产 CD 接入 Tailscale 方案 A：部署 job 在 SSH 前用 `tailscale/github-action@v4` 临时加入 tailnet，并通过 `TAILSCALE_AUTHKEY` 与 `PROD_SSH_HOST` ping 校验访问生产机 | `git diff --check`；`ruby -e 'require "yaml"; ARGV.each { |path| YAML.load_file(path); puts "ok #{path}" }' .github/workflows/deploy-prod.yml` |
 | 248  | 生产 CD 增加部署前 preflight：在连接服务器前验证 `launch.sh` 语法、prod compose 配置，并用标准库 unittest 跑 launch 脚本专项测试；文档同步说明手动发布也会先验证 | `bash -n scripts/launch.sh`；`docker compose -f docker-compose.prod.yml config`；`PYTHONPATH=. .venv/bin/python -m unittest tests.test_launch_script`；`git diff --check`；`ruby -e 'require "yaml"; ARGV.each { |path| YAML.load_file(path); puts "ok #{path}" }' .github/workflows/deploy-prod.yml` |
-| 247  | 新增生产 CD workflow：基于 `scripts/launch.sh` 通过 GitHub Actions SSH/rsync 同步代码到服务器，保留或注入生产 `.env`，并在远端执行 `launch.sh --no-open` 完成 compose 构建与健康检查；同步更新 CI/CD 文档 | 文档/workflow 改动，未跑测试；`git diff --check` |
-| 246  | 数据源接入页移除左侧“暂无已保存数据源”空状态占位；无保存数据源时“新建数据源”按钮直接贴近当前生效连接卡片 | `.venv/bin/python scripts/format_code.py frontend/src/pages/DataSourcesPage.tsx`；`npm run build`；`git diff --check` |

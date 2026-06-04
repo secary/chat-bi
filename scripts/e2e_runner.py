@@ -7,7 +7,10 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from scripts.e2e_cases import Case, CaseStep
+try:
+    from scripts.e2e_cases import Case, CaseStep
+except ModuleNotFoundError:
+    from e2e_cases import Case, CaseStep
 
 ROOT = Path(__file__).resolve().parents[1]
 

@@ -1,6 +1,9 @@
 name: ChatBI Pre CD
 
 "on":
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       skip_build:
@@ -20,13 +23,6 @@ name: ChatBI Pre CD
         description: Per-case E2E timeout in seconds
         default: ""
         required: false
-  workflow_run:
-    workflows:
-      - ChatBI CI
-    branches:
-      - main
-    types:
-      - completed
 
 permissions:
   contents: read
@@ -38,21 +34,13 @@ concurrency:
 jobs:
   preflight:
     name: Preflight checks
-    if: >-
-      ${{
-        github.event_name == 'workflow_dispatch' ||
-        (
-          github.event.workflow_run.conclusion == 'success' &&
-          github.event.workflow_run.event == 'push'
-        )
-      }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || 'main' }}
+          ref: ${{ github.event_name == 'push' && github.sha || 'main' }}
 
       - name: Validate launch script syntax
         run: bash -n scripts/launch.sh
@@ -67,14 +55,6 @@ jobs:
 
   deploy:
     name: Deploy pre
-    if: >-
-      ${{
-        github.event_name == 'workflow_dispatch' ||
-        (
-          github.event.workflow_run.conclusion == 'success' &&
-          github.event.workflow_run.event == 'push'
-        )
-      }}
     needs:
       - preflight
     runs-on: ubuntu-latest
@@ -102,7 +82,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || 'main' }}
+          ref: ${{ github.event_name == 'push' && github.sha || 'main' }}
 
       - name: Validate deployment settings
         run: |

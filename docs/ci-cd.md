@@ -1,16 +1,15 @@
 # CI/CD
 
-ChatBI 当前落地的是 CI 自动测试：同事开发前后端功能或修复 bug 时，push 到功能分支或提 PR 会自动跑后端、前端检查。
+ChatBI 当前落地的是 CI 自动测试：同事开发前后端功能或修复 bug 时，创建或更新到 `main` 的 PR 会自动跑后端、前端检查。
 
 ## 触发条件
 
 `.github/workflows/ci.yml` 会在以下场景触发：
 
 - Pull Request 到 `main`（含 draft PR，覆盖所有功能分支）
-- push 到 `main`（合并后验证）
 - GitHub 手动 `workflow_dispatch`（无 PR 时手动触发）
 
-同一分支重复推送会自动取消旧任务，只保留最新一次。
+同一 PR 分支重复推送会自动取消旧任务，只保留最新一次。
 
 ## 后端 CI
 
@@ -46,6 +45,20 @@ CHATBI_MEMORY_DISABLED=1
 ## 本地提交前建议
 
 与 CI 保持一致的完整检查命令见 [docs/testing.md](testing.md#提交前本地检查)。
+
+## 预发 CD
+
+`.github/workflows/deploy-pre.yml` 在 PR 合并到 `main` 后由 `push` 事件直接触发，不再等待 `main` 上的 CI。它会部署到 GitHub Environment `chatbi-pre`，并在部署后运行 E2E smoke。
+
+手动 `workflow_dispatch` 固定部署 `main`，可通过 `e2e_groups`、`e2e_cases`、`e2e_timeout` 临时扩大或收窄 E2E 范围，例如 `e2e_groups=all` 做完整预发验收。
+
+同一时间只保留最新一次 pre 部署：
+
+```yaml
+concurrency:
+  group: chatbi-pre-cd
+  cancel-in-progress: true
+```
 
 ## 生产 CD
 

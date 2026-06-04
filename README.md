@@ -56,7 +56,7 @@ bash scripts/launch.sh --no-build --no-open
 
 ## CD 示例
 
-仓库已提供 `.github/workflows/deploy-prod.yml`，会在 `ChatBI CI` 的 `main` 分支任务成功后部署，也支持手动 `workflow_dispatch`。
+仓库已提供 `.github/workflows/deploy-prod.yml`，生产部署仅支持手动 `workflow_dispatch`。
 
 GitHub Environment 名称：
 

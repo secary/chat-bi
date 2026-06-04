@@ -20,6 +20,10 @@ from backend.user_repo import (
 )
 
 router = APIRouter(prefix="/admin/users", tags=["admin-users"])
+ROOT_USERNAME = "root"
+ROOT_ROLE = "root"
+ADMIN_ROLE = "admin"
+USER_ROLE = "user"
 
 
 class UserCreate(BaseModel):
@@ -34,6 +38,27 @@ class UserPatch(BaseModel):
     password: Optional[str] = Field(default=None, max_length=256)
     role: Optional[str] = Field(default=None, max_length=32)
     is_active: Optional[bool] = None
+
+
+def _is_root_user(row: Dict[str, Any] | None) -> bool:
+    return bool(
+        row and (str(row.get("username")) == ROOT_USERNAME or str(row.get("role")) == ROOT_ROLE)
+    )
+
+
+def _is_admin_user(row: Dict[str, Any] | None) -> bool:
+    return bool(row and str(row.get("role")) == ADMIN_ROLE)
+
+
+def _current_admin_is_root(admin: Dict[str, Any]) -> bool:
+    return str(admin.get("username")) == ROOT_USERNAME or str(admin.get("role")) == ROOT_ROLE
+
+
+def _validate_role(value: str) -> str:
+    role = value.strip()
+    if role not in (ROOT_ROLE, ADMIN_ROLE, USER_ROLE):
+        raise HTTPException(status_code=400, detail="非法角色")
+    return role
 
 
 @router.get("")
@@ -52,19 +77,50 @@ def post_user(
     body: UserCreate, request: Request, admin: Dict[str, Any] = Depends(require_admin)
 ) -> dict:
     trace_id = request_trace_id(request)
-    if get_by_username(body.username.strip()):
+    username = body.username.strip()
+    if username == ROOT_USERNAME:
+        log_event(
+            trace_id,
+            "admin.users",
+            "create_failed",
+            "root username is reserved",
+            payload={"admin_user_id": int(admin["id"]), "username": username},
+            level="WARN",
+        )
+        raise HTTPException(status_code=400, detail="root 是系统内置超级管理员")
+    if get_by_username(username):
         log_event(
             trace_id,
             "admin.users",
             "create_failed",
             "username exists",
-            payload={"admin_user_id": int(admin["id"]), "username": body.username.strip()},
+            payload={"admin_user_id": int(admin["id"]), "username": username},
             level="WARN",
         )
         raise HTTPException(status_code=400, detail="用户名已存在")
     hid = hash_password(body.password)
-    role = body.role.strip() if body.role.strip() in ("admin", "user") else "user"
-    uid = create_user(body.username.strip(), hid, role)
+    role = _validate_role(body.role)
+    if role == ROOT_ROLE:
+        log_event(
+            trace_id,
+            "admin.users",
+            "create_failed",
+            "root role is reserved",
+            payload={"admin_user_id": int(admin["id"]), "username": username},
+            level="WARN",
+        )
+        raise HTTPException(status_code=400, detail="root 账号是系统唯一内置账号")
+    if role == ADMIN_ROLE and not _current_admin_is_root(admin):
+        log_event(
+            trace_id,
+            "admin.users",
+            "create_failed",
+            "only root can create administrators",
+            payload={"admin_user_id": int(admin["id"]), "username": username},
+            level="WARN",
+        )
+        raise HTTPException(status_code=403, detail="只有 root 可以创建管理员")
+    uid = create_user(username, hid, role)
     log_event(
         trace_id,
         "admin.users",
@@ -72,7 +128,7 @@ def post_user(
         payload={
             "admin_user_id": int(admin["id"]),
             "target_user_id": uid,
-            "username": body.username.strip(),
+            "username": username,
             "role": role,
         },
     )
@@ -98,7 +154,8 @@ def patch_user(
             level="WARN",
         )
         raise HTTPException(status_code=400, detail="不能禁用当前登录管理员")
-    if not get_by_id(user_id):
+    target = get_by_id(user_id)
+    if not target:
         log_event(
             trace_id,
             "admin.users",
@@ -108,15 +165,55 @@ def patch_user(
             level="WARN",
         )
         raise HTTPException(status_code=404, detail="用户不存在")
+    current_is_root = _current_admin_is_root(admin)
+    target_is_root = _is_root_user(target)
+    target_is_admin = _is_admin_user(target)
+
+    if target_is_root:
+        if not current_is_root:
+            log_event(
+                trace_id,
+                "admin.users",
+                "update_failed",
+                "only root can update root",
+                payload={"admin_user_id": int(admin["id"]), "target_user_id": user_id},
+                level="WARN",
+            )
+            raise HTTPException(status_code=403, detail="只有 root 可以管理 root 账号")
+        if "role" in payload or "is_active" in payload:
+            log_event(
+                trace_id,
+                "admin.users",
+                "update_failed",
+                "root role and status are immutable",
+                payload={"admin_user_id": int(admin["id"]), "target_user_id": user_id},
+                level="WARN",
+            )
+            raise HTTPException(status_code=400, detail="root 不能降级或停用")
+
+    if target_is_admin and not current_is_root:
+        changed_fields = set(payload.keys())
+        if user_id != admin["id"] or changed_fields - {"password"}:
+            log_event(
+                trace_id,
+                "admin.users",
+                "update_failed",
+                "only root can manage administrators",
+                payload={"admin_user_id": int(admin["id"]), "target_user_id": user_id},
+                level="WARN",
+            )
+            raise HTTPException(status_code=403, detail="只有 root 可以管理管理员")
+
     ph: Optional[str] = None
     if payload.get("password"):
         ph = hash_password(str(payload["password"]))
     role_val: Optional[str] = None
     if "role" in payload and payload["role"] is not None:
-        r = str(payload["role"]).strip()
-        if r not in ("admin", "user"):
-            raise HTTPException(status_code=400, detail="非法角色")
-        role_val = r
+        role_val = _validate_role(str(payload["role"]))
+        if role_val == ROOT_ROLE:
+            raise HTTPException(status_code=400, detail="root 账号是系统唯一内置账号")
+        if role_val == ADMIN_ROLE and not current_is_root:
+            raise HTTPException(status_code=403, detail="只有 root 可以授予管理员角色")
     update_user(
         user_id,
         password_hash=ph,
@@ -154,7 +251,8 @@ def delete_user_route(
             level="WARN",
         )
         raise HTTPException(status_code=400, detail="不能删除当前登录用户")
-    if not get_by_id(user_id):
+    target = get_by_id(user_id)
+    if not target:
         log_event(
             trace_id,
             "admin.users",
@@ -164,6 +262,26 @@ def delete_user_route(
             level="WARN",
         )
         raise HTTPException(status_code=404, detail="用户不存在")
+    if _is_root_user(target):
+        log_event(
+            trace_id,
+            "admin.users",
+            "deactivate_failed",
+            "root is immutable",
+            payload={"admin_user_id": int(admin["id"]), "target_user_id": user_id},
+            level="WARN",
+        )
+        raise HTTPException(status_code=400, detail="root 不能删除或停用")
+    if _is_admin_user(target) and not _current_admin_is_root(admin):
+        log_event(
+            trace_id,
+            "admin.users",
+            "deactivate_failed",
+            "only root can deactivate administrators",
+            payload={"admin_user_id": int(admin["id"]), "target_user_id": user_id},
+            level="WARN",
+        )
+        raise HTTPException(status_code=403, detail="只有 root 可以停用管理员")
     update_user(user_id, is_active=False)
     log_event(
         trace_id,

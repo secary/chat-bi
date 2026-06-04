@@ -17,7 +17,7 @@ OPENAI_API_KEY=你的模型Key
 LLM_MODEL=openai/你的模型名
 API_BASE=https://你的模型服务地址
 CHATBI_JWT_SECRET=请替换为强随机密钥
-CHATBI_SEED_USERS=admin:强密码:admin
+CHATBI_SEED_USERS=root:强密码:root
 ```
 
 ### 3. 可选：配置国内源

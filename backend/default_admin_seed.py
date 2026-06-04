@@ -8,7 +8,7 @@ from typing import Literal
 
 from backend.auth_password import hash_password
 from backend.config import Settings, settings
-from backend.user_repo import create_user, get_by_username, update_user
+from backend.user_repo import create_user, get_by_username, list_users, update_user
 
 logger = logging.getLogger(__name__)
 SeedResult = Literal["created", "updated", "exists", "skipped", "failed"]
@@ -23,7 +23,7 @@ class SeedUser:
 
 def _normalize_role(role: str) -> str:
     value = role.strip().lower()
-    return value if value in ("admin", "user") else "user"
+    return value if value in ("root", "admin", "user") else "user"
 
 
 def parse_seed_users(raw: str) -> list[SeedUser]:
@@ -107,6 +107,23 @@ def _seed_configured_user_list(
     return results
 
 
+def _deactivate_users_not_in_seed(users: list[SeedUser]) -> list[SeedResult]:
+    seed_names = {user.username for user in users}
+    results: list[SeedResult] = []
+    for row in list_users():
+        username = str(row.get("username") or "")
+        if username in seed_names or not row.get("is_active"):
+            continue
+        try:
+            update_user(int(row["id"]), is_active=False)
+            logger.info("Configured seed pruned user: %s", username)
+            results.append("updated")
+        except Exception:
+            logger.exception("Configured seed prune failed: %s", username)
+            results.append("failed")
+    return results
+
+
 def seed_configured_users(current_settings: Settings = settings) -> list[SeedResult]:
     """Create or normalize additional app users from CHATBI_SEED_USERS."""
     return _seed_configured_user_list(
@@ -118,4 +135,7 @@ def seed_configured_users(current_settings: Settings = settings) -> list[SeedRes
 def seed_startup_users(current_settings: Settings = settings) -> list[SeedResult]:
     """Seed all users configured for application startup."""
     configured_users = parse_seed_users(current_settings.seed_users_raw)
-    return _seed_configured_user_list(configured_users, current_settings)
+    results = _seed_configured_user_list(configured_users, current_settings)
+    if configured_users and current_settings.seed_users_prune:
+        results.extend(_deactivate_users_not_in_seed(configured_users))
+    return results

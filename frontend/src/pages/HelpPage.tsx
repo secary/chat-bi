@@ -3,11 +3,12 @@ import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/useAuth';
 import { FormattedMarkdown } from '../lib/formattedMarkdown';
 import { helpDocTopics, type DocTopicId } from '../lib/helpDocs';
+import { isAdminRole } from '../lib/roles';
 
 export function HelpPage() {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = isAdminRole(user?.role);
   const visibleTopics = useMemo(() => helpDocTopics.filter((topic) => !topic.adminOnly || isAdmin), [isAdmin]);
   const requestedTopic = searchParams.get('topic') as DocTopicId | null;
   const activeTopic = visibleTopics.find((topic) => topic.id === requestedTopic) ?? visibleTopics[0];

@@ -128,6 +128,11 @@ class Settings:
             in ("1", "true", "yes", "on")
         )
     )
+    seed_users_prune: bool = field(
+        default_factory=lambda: (
+            os.getenv("CHATBI_SEED_USERS_PRUNE", "0").strip().lower() in ("1", "true", "yes", "on")
+        )
+    )
 
     project_root: Path = _PROJECT_ROOT
     skills_dir: Path = field(init=False)

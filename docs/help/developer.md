@@ -4,9 +4,8 @@
 
 ## 本地开发
 
-- 首次或依赖变动：bash scripts/bootstrap_dev.sh --sync。
-- 日常进入：bash scripts/bootstrap_dev.sh。
 - 启动开发服务：bash scripts/start_dev.sh。
+- 首次或依赖变动时，start_dev 会按需执行 uv sync / npm ci。
 
 ## 测试与格式化
 

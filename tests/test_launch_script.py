@@ -20,14 +20,6 @@ class LaunchScriptTest(unittest.TestCase):
             "CHATBI_SEED_USERS=admin:admin123:admin\n",
             encoding="utf-8",
         )
-        (repo / "scripts/bootstrap_dev.sh").write_text(
-            "#!/usr/bin/env bash\n" 'echo "bootstrap $*" >> "$START_PROD_LOG"\n' "exit 0\n",
-            encoding="utf-8",
-            newline="\n",
-        )
-        (repo / "scripts/bootstrap_dev.sh").chmod(
-            (repo / "scripts/bootstrap_dev.sh").stat().st_mode | stat.S_IEXEC
-        )
         script_source = ROOT / "scripts/launch.sh"
         target = repo / "scripts/launch.sh"
         target.write_text(script_source.read_text(encoding="utf-8"), encoding="utf-8")

@@ -12,6 +12,7 @@ RUN npm ci --registry=${NPM_REGISTRY} \
 FROM frontend-deps AS frontend-build
 
 COPY frontend ./
+COPY docs/help /docs/help
 ARG VITE_API_BASE_URL=/api
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 RUN npm run build
@@ -55,6 +56,7 @@ COPY --from=frontend-deps /app/node_modules /app/frontend/node_modules
 COPY backend /app/backend
 COPY skills /app/skills
 COPY frontend /app/frontend
+COPY docs/help /app/docs/help
 COPY deploy/docker-entrypoint.dev.sh /entrypoint.sh
 
 RUN chmod +x /entrypoint.sh

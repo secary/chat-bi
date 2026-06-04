@@ -14,6 +14,10 @@ python scripts/e2e_smoke.py
 # 只跑指定用例
 python scripts/e2e_smoke.py --cases S1,M1,C1
 
+# 按功能组运行：smoke/query/metadata/comparison/advisor/chart/upload/edge/all
+python scripts/e2e_smoke.py --groups smoke,metadata
+python scripts/e2e_smoke.py --groups upload
+
 # 开启鉴权时传 token
 python scripts/e2e_smoke.py --token "Bearer xxx"
 
@@ -82,7 +86,7 @@ CHATBI_E2E_URL=http://localhost:8000 python scripts/e2e_smoke.py --cases S1,S4,E
 |---|------|------|
 | E1 | `你好` 或 `谢谢` | 直接文字回复；SSE 流中**不出现** `agent.skill.started` 事件 |
 | E2 | `2024年销售额`（年份不存在） | 提示无对应年份数据，不编造数字 |
-| E3 | 上传 `data/chatbi_sales.csv` 后发送 `分析这份数据并画图` | 触发 `chatbi-file-ingestion`；SSE 流中**不出现** `chatbi-semantic-query` |
+| U1 | 上传 `data/chatbi_sales.csv` → 推断可采纳指标 → `采纳全部指标并画图` | 触发 `chatbi-file-ingestion`、`chatbi-auto-analysis`；收到 `analysis_proposal`，采纳后收到图表或看板 |
 
 ---
 

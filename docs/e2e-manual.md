@@ -17,6 +17,7 @@ python scripts/e2e_smoke.py --cases S1,M1,C1
 # 按功能组运行：smoke/query/metadata/comparison/advisor/chart/upload/edge/all
 python scripts/e2e_smoke.py --groups smoke,metadata
 python scripts/e2e_smoke.py --groups upload
+python scripts/e2e_smoke.py --groups all
 
 # 开启鉴权时传 token
 python scripts/e2e_smoke.py --token "Bearer xxx"

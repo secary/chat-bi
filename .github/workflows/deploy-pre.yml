@@ -3,18 +3,28 @@ name: ChatBI Pre CD
 "on":
   workflow_dispatch:
     inputs:
-      ref:
-        description: Git ref to deploy
-        default: main
-        required: true
       skip_build:
         description: Reuse existing Docker images on the server
         default: false
         required: false
         type: boolean
+      e2e_groups:
+        description: E2E groups to run; default uses PRE_E2E_GROUPS or smoke
+        default: ""
+        required: false
+      e2e_cases:
+        description: E2E case IDs to run; overrides groups when set
+        default: ""
+        required: false
+      e2e_timeout:
+        description: Per-case E2E timeout in seconds
+        default: ""
+        required: false
   workflow_run:
     workflows:
       - ChatBI CI
+    branches:
+      - main
     types:
       - completed
 
@@ -33,8 +43,7 @@ jobs:
         github.event_name == 'workflow_dispatch' ||
         (
           github.event.workflow_run.conclusion == 'success' &&
-          github.event.workflow_run.event == 'pull_request' &&
-          github.event.workflow_run.head_repository.full_name == github.repository
+          github.event.workflow_run.event == 'push'
         )
       }}
     runs-on: ubuntu-latest
@@ -43,7 +52,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.ref }}
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || 'main' }}
 
       - name: Validate launch script syntax
         run: bash -n scripts/launch.sh
@@ -63,8 +72,7 @@ jobs:
         github.event_name == 'workflow_dispatch' ||
         (
           github.event.workflow_run.conclusion == 'success' &&
-          github.event.workflow_run.event == 'pull_request' &&
-          github.event.workflow_run.head_repository.full_name == github.repository
+          github.event.workflow_run.event == 'push'
         )
       }}
     needs:
@@ -81,9 +89,9 @@ jobs:
       PRE_DEPLOY_PATH: ${{ vars.PRE_DEPLOY_PATH || secrets.PRE_DEPLOY_PATH }}
       PRE_APP_URL: ${{ vars.PRE_APP_URL || secrets.PRE_APP_URL || 'http://localhost:5173' }}
       PRE_E2E_URL: ${{ vars.PRE_E2E_URL || secrets.PRE_E2E_URL }}
-      PRE_E2E_CASES: ${{ vars.PRE_E2E_CASES }}
-      PRE_E2E_GROUPS: ${{ vars.PRE_E2E_GROUPS || 'smoke' }}
-      PRE_E2E_TIMEOUT_SECONDS: ${{ vars.PRE_E2E_TIMEOUT_SECONDS || '120' }}
+      PRE_E2E_CASES: ${{ inputs.e2e_cases || vars.PRE_E2E_CASES }}
+      PRE_E2E_GROUPS: ${{ inputs.e2e_groups || vars.PRE_E2E_GROUPS || 'smoke' }}
+      PRE_E2E_TIMEOUT_SECONDS: ${{ inputs.e2e_timeout || vars.PRE_E2E_TIMEOUT_SECONDS || '120' }}
       PRE_E2E_TOKEN: ${{ secrets.PRE_E2E_TOKEN }}
       PRE_E2E_USERNAME: ${{ secrets.PRE_E2E_USERNAME }}
       PRE_E2E_PASSWORD: ${{ secrets.PRE_E2E_PASSWORD }}
@@ -94,7 +102,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.ref }}
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || 'main' }}
 
       - name: Validate deployment settings
         run: |

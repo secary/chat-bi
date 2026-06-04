@@ -51,7 +51,7 @@ ChatBI 是银行场景的对话式数据分析 Demo，支持中文问数、语�
 - 开发环境 seed 由 `.env.dev` 的 `CHATBI_SEED_USERS` 控制；`start_dev.sh` 默认刷新 seed 用户并停用未列入 seed 的旧用户。
 
 ## 部署流
-- PR: `ChatBI CI` 通过后触发 `ChatBI Pre CD`，部署到 `chatbi-pre` 并跑 E2E smoke。
+- main: PR 合并后 `ChatBI CI` 在 `main` 上通过再触发 `ChatBI Pre CD`，部署到 `chatbi-pre` 并跑 E2E smoke。
 - prod: `ChatBI Production CD` 仅支持 `workflow_dispatch` 手动部署到 `chatbi-prod`，不会在合并到 `main` 后自动触发。
 - pre 环境使用 `PRE_*` secrets/variables；prod 环境使用 `PROD_*` secrets/variables。
 - Tailscale 仅按环境需要配置，例如 pre 使用 `PRE_TAILSCALE_AUTHKEY`。

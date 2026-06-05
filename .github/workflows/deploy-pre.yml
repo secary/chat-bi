@@ -4,6 +4,17 @@ name: ChatBI Pre CD
   push:
     branches:
       - main
+    paths:
+      - Dockerfile
+      - docker-compose.yml
+      - .dockerignore
+      - pyproject.toml
+      - uv.lock
+      - backend/**
+      - frontend/**
+      - skills/**
+      - deploy/**
+      - docs/help/**
   workflow_dispatch:
     inputs:
       skip_build:

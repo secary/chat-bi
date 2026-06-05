@@ -148,6 +148,14 @@ def set_active_llm_profile(body: ActiveBody, request: Request) -> dict:
     return {"ok": True}
 
 
+def _test_log_payload(**payload: object) -> dict:
+    message = str(payload.get("message") or "")
+    ok = payload.get("ok")
+    if ok is not False or not message:
+        payload.pop("message", None)
+    return dict(payload)
+
+
 async def _probe_litellm_params(params: dict) -> tuple[bool, str]:
     from litellm import acompletion
 
@@ -161,10 +169,42 @@ async def _probe_litellm_params(params: dict) -> tuple[bool, str]:
         )
         return True, "ok"
     except Exception as exc:
-        msg = f"{type(exc).__name__}: {exc}"
-        if len(msg) > 500:
-            msg = msg[:500] + "…"
-        return False, msg
+        return False, _friendly_probe_error(exc)
+
+
+def _friendly_probe_error(exc: Exception) -> str:
+    raw = str(exc)
+    lower = f"{type(exc).__name__}: {raw}".lower()
+    if any(
+        token in lower for token in ("authentication", "unauthorized", "invalid api key", "401")
+    ):
+        return "请填写正确的 API Key。"
+    if any(token in lower for token in ("model_not_found", "not found", "unknown model", "404")):
+        return "请填写正确的模型名。"
+    if any(token in lower for token in ("timeout", "timed out")):
+        return "请填写正确的 Base URL。"
+    if any(
+        token in lower
+        for token in (
+            "connection",
+            "connecterror",
+            "name resolution",
+            "dns",
+            "no address associated",
+            "connection refused",
+        )
+    ):
+        return "请填写正确的 Base URL。"
+    if any(token in lower for token in ("rate limit", "ratelimit", "quota", "insufficient", "429")):
+        return "请填写正确的 API Key。"
+    if any(token in lower for token in ("badrequest", "bad request", "invalid request", "400")):
+        return "请填写正确的模型名、Base URL 和 API Key。"
+    detail = raw.strip()
+    if len(detail) > 180:
+        detail = detail[:180] + "…"
+    if detail:
+        return f"连接测试失败：{detail}"
+    return "请填写正确的模型名、Base URL 和 API Key。"
 
 
 async def _probe_profile(profile_id: int) -> tuple[bool, str]:
@@ -203,7 +243,7 @@ async def probe_llm_profile(body: LlmProfileProbe, request: Request) -> dict:
         trace_id,
         "admin.llm_settings",
         "profile_probe_tested",
-        payload={"model": model, "ok": ok},
+        payload=_test_log_payload(model=model, ok=ok, message=message),
     )
     return {"ok": ok, "message": message}
 
@@ -216,7 +256,7 @@ async def test_llm_profile(profile_id: int, request: Request) -> dict:
         trace_id,
         "admin.llm_settings",
         "profile_tested",
-        payload={"profile_id": profile_id, "ok": ok},
+        payload=_test_log_payload(profile_id=profile_id, ok=ok, message=message),
     )
     return {"ok": ok, "message": message}
 

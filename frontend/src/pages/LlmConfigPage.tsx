@@ -13,6 +13,7 @@ import { logger } from '../lib/logger';
 
 type SaveState = 'idle' | 'saving' | 'testing' | 'success' | 'error';
 type ToastState = 'success' | 'error';
+type LlmFormValidation = { ok: true } | { ok: false; message: string };
 
 const ENV_DEFAULT_PROFILE_ID = 0;
 const MASKED_API_KEY = '••••••••••••••••';
@@ -48,6 +49,65 @@ function normalizeModelPrefix(prefix: string): string {
   const trimmed = prefix.trim();
   if (!trimmed) return '';
   return trimmed.endsWith('/') ? trimmed : `${trimmed}/`;
+}
+
+function joinChineseList(items: string[]): string {
+  if (items.length <= 1) return items[0] || '';
+  return `${items.slice(0, -1).join('、')}和${items[items.length - 1]}`;
+}
+
+function validateApiBase(value: string): string | null {
+  try {
+    const parsed = new URL(value);
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return '请填写正确的 Base URL。';
+    }
+    if (!parsed.hostname.includes('.')) {
+      return '请填写正确的 Base URL。';
+    }
+    return null;
+  } catch {
+    return '请填写正确的 Base URL。';
+  }
+}
+
+function validateLlmForm(params: {
+  modelPrefix: string;
+  modelName: string;
+  apiBase: string;
+  apiKey: string;
+  needsApiKey: boolean;
+}): LlmFormValidation {
+  const missing: string[] = [];
+  if (!params.modelName.trim()) missing.push('模型名');
+  if (!params.apiBase.trim()) missing.push('Base URL');
+  if (params.needsApiKey && !params.apiKey.trim()) missing.push('API Key');
+  if (missing.length) {
+    return { ok: false, message: `请填写${joinChineseList(missing)}。` };
+  }
+
+  const normalizedPrefix = normalizeModelPrefix(params.modelPrefix);
+  if (!normalizedPrefix) {
+    return { ok: false, message: '请选择模型名前缀。' };
+  }
+  if (/\s/.test(params.modelName.trim())) {
+    return { ok: false, message: '请填写正确的模型名。' };
+  }
+
+  const apiBaseError = validateApiBase(params.apiBase.trim());
+  if (apiBaseError) return { ok: false, message: apiBaseError };
+
+  if (params.needsApiKey) {
+    const key = params.apiKey.trim();
+    if (/\s/.test(key)) {
+      return { ok: false, message: '请填写正确的 API Key。' };
+    }
+    if (key.length < 8) {
+      return { ok: false, message: '请填写正确的 API Key。' };
+    }
+  }
+
+  return { ok: true };
 }
 
 export function LlmConfigPage() {
@@ -124,8 +184,15 @@ export function LlmConfigPage() {
 
   const saveAndEnable = async () => {
     const needsApiKey = !editingProfileId;
-    if (!selectedModel || !selectedApiBase || (needsApiKey && !apiKey.trim())) {
-      showOutcome('error', '请填写模型名、Base URL 和 API Key。');
+    const validation = validateLlmForm({
+      modelPrefix,
+      modelName,
+      apiBase,
+      apiKey,
+      needsApiKey,
+    });
+    if (!validation.ok) {
+      showOutcome('error', validation.message);
       return;
     }
     setState('saving');

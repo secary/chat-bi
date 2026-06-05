@@ -1,6 +1,6 @@
 | ID | Gap / 变更 | 验证 |
 |---:|---|---|
-| 285  | `PACKAGE_MIRROR_CN=1` 改为 Docker 构建时自动探测依赖源：apt、pip/uv、npm 分别按国内候选源逐个检测可用性并选择第一个可用源；Python 依赖安装降低并发并增加超时/重试 | `docker compose config --quiet`；`git diff --check` |
+| 285  | `PACKAGE_MIRROR_CN=1` 改为 Docker 构建时自动探测依赖源；Python 生产依赖改为导出无 URL 的 requirements 后按选中镜像安装，dev 工具迁入 dependency group 并在镜像中排除 | `uv lock`；`UV_CACHE_DIR=/tmp/chatbi-uv-cache uv export --frozen --no-dev --no-hashes --no-emit-project --no-header`；`docker compose config --quiet`；`git diff --check` |
 | 284  | Docker 构建源收敛为 `PACKAGE_MIRROR_CN=1/0` 小开关：开启时 apt 与 pip/uv 使用清华源，npm 使用 npmmirror，部署文档和 env 示例移除散落 URL 配置 | `.venv/bin/python scripts/format_code.py scripts/launch.sh tests/test_launch_script.py`；`PYTHONPATH=. .venv/bin/python scripts/run_tests.py foundation -- -q tests/test_launch_script.py`；`docker compose config --quiet`；`git diff --check` |
 | 283  | CI/CD 策略调整为“PR 阶段跑 CI，合并 `main` 后直接跑 Pre CD”：`ci.yml` 移除 `push main` 触发，`deploy-pre.yml` 改为 `push main` 直接部署并保留手动 E2E 参数 | `ruby -e 'require "yaml"; YAML.load_file(".github/workflows/ci.yml"); YAML.load_file(".github/workflows/deploy-pre.yml")'`；`git diff --check` |
 | 282  | Pre CD 自动触发从 PR CI 成功改为 PR 合并后的 `main` push CI 成功：`workflow_run` 限定 `main` 分支且 job 条件检查 `event == push`，继续保留全局覆盖旧 run | `ruby -e 'require "yaml"; YAML.load_file(".github/workflows/deploy-pre.yml")'`；`git diff --check` |

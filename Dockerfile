@@ -118,6 +118,8 @@ RUN case "${PACKAGE_MIRROR_CN}" in \
     esac \
     && echo "Using PyPI index: ${pip_index}" \
     && pip install --no-cache-dir --index-url "${pip_index}" --timeout 120 --retries 5 uv \
+    && uv export --frozen --no-dev --no-hashes --no-emit-project --no-header --output-file /tmp/requirements.txt \
+    && uv venv .venv --no-progress \
     && UV_DEFAULT_INDEX="${pip_index}" \
         UV_INDEX_URL="${pip_index}" \
         UV_HTTP_TIMEOUT=120 \
@@ -125,7 +127,7 @@ RUN case "${PACKAGE_MIRROR_CN}" in \
         UV_CONCURRENT_DOWNLOADS=4 \
         UV_CONCURRENT_BUILDS=2 \
         UV_CONCURRENT_INSTALLS=4 \
-        uv sync --frozen --no-install-project --no-progress
+        uv pip install --python .venv/bin/python --requirements /tmp/requirements.txt --no-progress
 
 FROM backend-base AS dev
 

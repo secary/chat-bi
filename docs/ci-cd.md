@@ -96,16 +96,8 @@ workflow 已绑定 GitHub Environment `chatbi-prod`。建议在该环境开启 r
 
 如果服务器只暴露在 Tailscale 内网，`PROD_SSH_HOST` 可以直接填服务器的 `100.x.y.z` 地址或 MagicDNS 名称，GitHub runner 会先加入 tailnet 再 SSH。
 
-如果生产机访问 Docker Hub 或海外包源超时，可在远端 `.env` 或 `PROD_ENV_FILE` 里按 `.env.dev` 同名变量覆盖镜像和构建源：
+如果生产机访问海外包源超时，可在远端 `.env` 或 `PROD_ENV_FILE` 里开启清华源：
 
 ```text
-MYSQL_IMAGE=m.daocloud.io/docker.io/library/mysql:8.0
-PYTHON_IMAGE=m.daocloud.io/docker.io/library/python:3.11-slim
-NODE_IMAGE=m.daocloud.io/docker.io/library/node:22-bookworm-slim
-DEBIAN_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/debian
-DEBIAN_SECURITY_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/debian-security
-PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
-NPM_REGISTRY=https://registry.npmmirror.com
+PACKAGE_MIRROR_CN=1
 ```
-
-也可以换成公司内网镜像仓库中同步好的 `node:22-bookworm-slim` 和 `python:3.11-slim`。

@@ -28,7 +28,17 @@ class LaunchScriptTest(unittest.TestCase):
     def create_fake_bin(self, repo: Path) -> Path:
         bin_dir = repo / "fake-bin"
         bin_dir.mkdir()
-        for name in ("docker", "curl", "open"):
+        docker = bin_dir / "docker"
+        docker.write_text(
+            "#!/usr/bin/env bash\n"
+            'echo "docker $* PACKAGE_MIRROR_CN=${PACKAGE_MIRROR_CN:-}" >> "$START_PROD_LOG"\n'
+            "exit 0\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+        docker.chmod(docker.stat().st_mode | stat.S_IEXEC)
+
+        for name in ("curl", "open"):
             executable = bin_dir / name
             executable.write_text(
                 "#!/usr/bin/env bash\n" f'echo "{name} $*" >> "$START_PROD_LOG"\n' "exit 0\n",
@@ -149,3 +159,31 @@ class LaunchScriptTest(unittest.TestCase):
             self.assertNotIn("--build", log)
             self.assertIn("curl -fsS http://127.0.0.1:9999/health", log)
             self.assertNotIn("open ", log)
+
+    def test_launch_china_package_mirror_flag(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir) / "repo"
+            repo.mkdir()
+            self.create_minimal_repo(repo)
+            (repo / ".env").write_text(
+                "PACKAGE_MIRROR_CN=1\n",
+                encoding="utf-8",
+            )
+            bin_dir = self.create_fake_bin(repo)
+            log_path = repo / "start-prod.log"
+
+            result = subprocess.run(
+                ["bash", "scripts/launch.sh", "--no-open"],
+                cwd=repo,
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    "PATH": f"{bin_dir}:{'/usr/bin:/bin'}",
+                    "START_PROD_LOG": str(log_path),
+                },
+            )
+
+            log = log_path.read_text(encoding="utf-8")
+            self.assertIn("Using China package mirror: 1", result.stdout)
+            self.assertIn("PACKAGE_MIRROR_CN=1", log)

@@ -5,6 +5,9 @@ from typing import Any, Dict, List
 
 def evaluate_audit_rules(events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     issues: List[Dict[str, Any]] = []
+    agent_events_present = any(
+        str(event.get("span_name") or "").startswith("agent.") for event in events
+    )
     schema_rejects = _count(events, "agent.harness", "schema_rejected")
     policy_rejects = _count(events, "agent.harness", "policy_rejected")
     skill_failed = _count(events, "agent.skill", "failed")
@@ -22,6 +25,7 @@ def evaluate_audit_rules(events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     dependency_warnings = _dependency_warnings(events)
     summary_dependency_unmet = _summary_dependency_unmet(events)
     decision_content_issues = _decision_content_issues(events)
+    llm_config_failure = _llm_config_failure(events)
 
     if schema_rejects:
         issues.append(
@@ -75,12 +79,20 @@ def evaluate_audit_rules(events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 "Manager 在依赖未满足时仍进入了汇总阶段。",
             )
         )
+    if llm_config_failure:
+        issues.append(
+            _issue(
+                "LLM_CONFIG_TEST_FAILED",
+                "error",
+                llm_config_failure,
+            )
+        )
     issues.extend(decision_content_issues)
-    if authorized == 0:
+    if agent_events_present and authorized == 0:
         issues.append(_issue("NO_AUTHORIZED_ACTION", "warning", "未发现 Harness 放行记录。"))
     if _repeated_executions(events):
         issues.append(_issue("REPEATED_SKILL", "warning", "检测到重复执行同一 skill。"))
-    if not issues and executed == 0:
+    if agent_events_present and not issues and executed == 0:
         issues.append(_issue("NO_SKILL_EXECUTION", "info", "本次请求未执行任何 skill。"))
     return issues
 
@@ -175,3 +187,19 @@ def _decision_content_issues(events: List[Dict[str, Any]]) -> List[Dict[str, Any
                 )
             )
     return found
+
+
+def _llm_config_failure(events: List[Dict[str, Any]]) -> str:
+    for event in reversed(events):
+        if event["span_name"] != "admin.llm_settings":
+            continue
+        if event["event_name"] not in {"profile_probe_tested", "profile_tested"}:
+            continue
+        payload = event.get("payload") or {}
+        if payload.get("ok") is not False:
+            continue
+        message = str(payload.get("message") or "").strip()
+        if message:
+            return f"LLM 配置测试失败：{message}"
+        return "LLM 配置测试失败，请检查模型名、Base URL 和 API Key。"
+    return ""

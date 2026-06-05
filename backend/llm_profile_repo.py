@@ -131,7 +131,8 @@ def reorder(ordered_ids: List[int]) -> None:
 
 def set_active_profile(profile_id: Optional[int]) -> None:
     admin_execute(
-        f"UPDATE {LLM_SETTINGS} SET active_profile_id = %s WHERE id = 1",
+        f"INSERT INTO {LLM_SETTINGS} (id, active_profile_id) VALUES (1, %s) "
+        "ON DUPLICATE KEY UPDATE active_profile_id = VALUES(active_profile_id)",
         (profile_id,),
     )
 

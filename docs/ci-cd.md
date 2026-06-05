@@ -98,8 +98,10 @@ workflow 已绑定 GitHub Environment `chatbi-prod`。建议在该环境开启 r
 
 如果服务器只暴露在 Tailscale 内网，`PROD_SSH_HOST` 可以直接填服务器的 `100.x.y.z` 地址或 MagicDNS 名称，GitHub runner 会先加入 tailnet 再 SSH。
 
-如果生产机访问海外包源超时，可在远端 `.env` 或 `PROD_ENV_FILE` 里开启清华源：
+如果生产机访问海外包源超时，可在远端 `.env` 或 `PROD_ENV_FILE` 里开启国内源自动择优：
 
 ```text
 PACKAGE_MIRROR_CN=1
 ```
+
+Docker 构建时会探测候选源并选择可用源；apt 与 pip/uv 优先国内高校/云厂商镜像，npm 优先 npmmirror、华为云，再回落官方源。Python 依赖安装会降低并发、增加超时和重试，适配较慢的部署网络。

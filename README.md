@@ -22,16 +22,10 @@ CHATBI_SEED_USERS=root:强密码:root
 
 ### 3. 可选：配置国内源
 
-如果服务器访问 Docker Hub 或海外包源不稳定，可在 `.env` 里使用国内源：
+如果服务器访问海外包源不稳定，可在 `.env` 里开启清华源：
 
 ```dotenv
-MYSQL_IMAGE=m.daocloud.io/docker.io/library/mysql:8.0
-PYTHON_IMAGE=m.daocloud.io/docker.io/library/python:3.11-slim
-NODE_IMAGE=m.daocloud.io/docker.io/library/node:22-bookworm-slim
-DEBIAN_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/debian
-DEBIAN_SECURITY_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/debian-security
-PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
-NPM_REGISTRY=https://registry.npmmirror.com
+PACKAGE_MIRROR_CN=1
 ```
 
 ### 4. 启动服务

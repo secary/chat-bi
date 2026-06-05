@@ -1,12 +1,18 @@
 ARG NODE_IMAGE=node:22-bookworm-slim
 ARG PYTHON_IMAGE=python:3.11-slim
+ARG PACKAGE_MIRROR_CN=0
 FROM ${NODE_IMAGE} AS frontend-deps
 
 WORKDIR /app
 
-ARG NPM_REGISTRY=https://registry.npmjs.org
+ARG PACKAGE_MIRROR_CN
 COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci --registry=${NPM_REGISTRY} \
+RUN case "${PACKAGE_MIRROR_CN}" in \
+        0) npm_registry="https://registry.npmjs.org" ;; \
+        1) npm_registry="https://mirrors.tuna.tsinghua.edu.cn/npm/" ;; \
+        *) echo "Unsupported PACKAGE_MIRROR_CN=${PACKAGE_MIRROR_CN}. Use 0 or 1." >&2; exit 2 ;; \
+    esac \
+    && npm ci --registry="${npm_registry}" \
     && touch node_modules/.install-stamp
 
 FROM frontend-deps AS frontend-build
@@ -22,13 +28,21 @@ FROM ${PYTHON_IMAGE} AS backend-base
 
 WORKDIR /app
 
-ARG DEBIAN_MIRROR=http://deb.debian.org/debian
-ARG DEBIAN_SECURITY_MIRROR=http://deb.debian.org/debian-security
-RUN sed -i \
-        -e "s|http://deb.debian.org/debian-security|${DEBIAN_SECURITY_MIRROR}|g" \
-        -e "s|http://security.debian.org/debian-security|${DEBIAN_SECURITY_MIRROR}|g" \
-        -e "s|http://deb.debian.org/debian|${DEBIAN_MIRROR}|g" \
-        -e "s|http://ftp.debian.org/debian|${DEBIAN_MIRROR}|g" \
+ARG PACKAGE_MIRROR_CN
+RUN case "${PACKAGE_MIRROR_CN}" in \
+        0) \
+            debian_mirror="http://deb.debian.org/debian"; \
+            debian_security_mirror="http://deb.debian.org/debian-security" ;; \
+        1) \
+            debian_mirror="https://mirrors.tuna.tsinghua.edu.cn/debian"; \
+            debian_security_mirror="https://mirrors.tuna.tsinghua.edu.cn/debian-security" ;; \
+        *) echo "Unsupported PACKAGE_MIRROR_CN=${PACKAGE_MIRROR_CN}. Use 0 or 1." >&2; exit 2 ;; \
+    esac \
+    && sed -i \
+        -e "s|http://deb.debian.org/debian-security|${debian_security_mirror}|g" \
+        -e "s|http://security.debian.org/debian-security|${debian_security_mirror}|g" \
+        -e "s|http://deb.debian.org/debian|${debian_mirror}|g" \
+        -e "s|http://ftp.debian.org/debian|${debian_mirror}|g" \
         /etc/apt/sources.list /etc/apt/sources.list.d/*.sources 2>/dev/null || true \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -44,11 +58,14 @@ RUN sed -i \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml uv.lock /app/
-ARG PIP_INDEX_URL=https://pypi.org/simple
-ENV UV_DEFAULT_INDEX=${PIP_INDEX_URL} \
-    UV_INDEX_URL=${PIP_INDEX_URL}
-RUN pip install --no-cache-dir --index-url ${PIP_INDEX_URL} uv \
-    && uv sync --frozen --no-install-project
+ARG PACKAGE_MIRROR_CN
+RUN case "${PACKAGE_MIRROR_CN}" in \
+        0) pip_index="https://pypi.org/simple" ;; \
+        1) pip_index="https://pypi.tuna.tsinghua.edu.cn/simple" ;; \
+        *) echo "Unsupported PACKAGE_MIRROR_CN=${PACKAGE_MIRROR_CN}. Use 0 or 1." >&2; exit 2 ;; \
+    esac \
+    && pip install --no-cache-dir --index-url "${pip_index}" uv \
+    && UV_DEFAULT_INDEX="${pip_index}" UV_INDEX_URL="${pip_index}" uv sync --frozen --no-install-project
 
 FROM backend-base AS dev
 

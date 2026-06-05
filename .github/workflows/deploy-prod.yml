@@ -109,6 +109,7 @@ jobs:
             --exclude '.env.prod' \
             --exclude '.venv/' \
             --exclude 'frontend/node_modules/' \
+            --exclude 'tests/' \
             --exclude 'data/' \
             -e "ssh -i ~/.ssh/chatbi_cd -p ${PROD_SSH_PORT}" \
             ./ "${PROD_SSH_USER}@${PROD_SSH_HOST}:${remote_path}/"

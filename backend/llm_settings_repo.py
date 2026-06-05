@@ -41,6 +41,24 @@ def save_merged(
     )
 
 
+def activate_env_defaults() -> None:
+    """Clear DB overrides so the runtime falls back to environment defaults."""
+    vals = (None, None, None, None)
+    row = get_row()
+    if row:
+        admin_execute(
+            f"UPDATE {LLM_SETTINGS} SET model = %s, api_base = %s, api_key = %s, "
+            "active_profile_id = %s WHERE id = 1",
+            vals,
+        )
+        return
+    admin_execute(
+        f"INSERT INTO {LLM_SETTINGS} (id, model, api_base, api_key, active_profile_id) "
+        "VALUES (1, %s, %s, %s, %s)",
+        vals,
+    )
+
+
 def _pick(new_val: Optional[str], old_val: Any) -> Any:
     if new_val is None:
         return old_val

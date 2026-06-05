@@ -8,11 +8,14 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from backend.app_llm import profile_row_to_litellm_params
+from backend.config import settings
 from backend.http_utils import request_trace_id
 from backend import llm_profile_repo
+from backend import llm_settings_repo
 from backend.trace import log_event
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+ENV_DEFAULT_PROFILE_ID = 0
 
 
 class LlmProfileCreate(BaseModel):
@@ -128,15 +131,19 @@ def reorder_llm_profiles(body: ReorderBody, request: Request) -> dict:
 @router.put("/llm-profiles/active")
 def set_active_llm_profile(body: ActiveBody, request: Request) -> dict:
     trace_id = request_trace_id(request)
-    if body.profile_id is not None:
+    if body.profile_id in (None, ENV_DEFAULT_PROFILE_ID):
+        llm_settings_repo.activate_env_defaults()
+        profile_id = ENV_DEFAULT_PROFILE_ID
+    else:
         if not llm_profile_repo.get_by_id(body.profile_id):
             raise HTTPException(status_code=404, detail="档案不存在")
-    llm_profile_repo.set_active_profile(body.profile_id)
+        llm_profile_repo.set_active_profile(body.profile_id)
+        profile_id = body.profile_id
     log_event(
         trace_id,
         "admin.llm_settings",
         "active_profile_set",
-        payload={"profile_id": body.profile_id},
+        payload={"profile_id": profile_id},
     )
     return {"ok": True}
 
@@ -161,6 +168,8 @@ async def _probe_litellm_params(params: dict) -> tuple[bool, str]:
 
 
 async def _probe_profile(profile_id: int) -> tuple[bool, str]:
+    if profile_id == ENV_DEFAULT_PROFILE_ID:
+        return await _probe_litellm_params(dict(settings.llm_params))
     row = llm_profile_repo.get_by_id(profile_id)
     if not row:
         return False, "档案不存在"

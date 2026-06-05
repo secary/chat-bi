@@ -69,7 +69,7 @@ export function LoginPage() {
         >
           {loading ? '登录中…' : '登录'}
         </button>
-        <p className="mt-4 text-center text-xs text-gray-400">演示默认账号：admin / admin123</p>
+        <p className="mt-4 text-center text-xs text-gray-400">演示默认账号：0mou / 0mou123</p>
       </form>
     </div>
   );

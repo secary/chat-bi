@@ -1,4 +1,7 @@
-| 284  | Docker 构建源收敛为 `PACKAGE_MIRROR_CN=1/0` 小开关：开启时 apt、pip/uv、npm 全部使用清华源，部署文档和 env 示例移除散落 URL 配置 | `.venv/bin/python scripts/format_code.py scripts/launch.sh tests/test_launch_script.py`；`PYTHONPATH=. .venv/bin/python scripts/run_tests.py foundation -- -q tests/test_launch_script.py`；`docker compose config --quiet`；`git diff --check` |
+| ID | Gap / 变更 | 验证 |
+|---:|---|---|
+| 285  | `PACKAGE_MIRROR_CN=1` 改为 Docker 构建时自动探测依赖源：apt、pip/uv、npm 分别按国内候选源逐个检测可用性并选择第一个可用源，全部不可用时回落官方源 | `docker compose config --quiet`；`git diff --check` |
+| 284  | Docker 构建源收敛为 `PACKAGE_MIRROR_CN=1/0` 小开关：开启时 apt 与 pip/uv 使用清华源，npm 使用 npmmirror，部署文档和 env 示例移除散落 URL 配置 | `.venv/bin/python scripts/format_code.py scripts/launch.sh tests/test_launch_script.py`；`PYTHONPATH=. .venv/bin/python scripts/run_tests.py foundation -- -q tests/test_launch_script.py`；`docker compose config --quiet`；`git diff --check` |
 | 283  | CI/CD 策略调整为“PR 阶段跑 CI，合并 `main` 后直接跑 Pre CD”：`ci.yml` 移除 `push main` 触发，`deploy-pre.yml` 改为 `push main` 直接部署并保留手动 E2E 参数 | `ruby -e 'require "yaml"; YAML.load_file(".github/workflows/ci.yml"); YAML.load_file(".github/workflows/deploy-pre.yml")'`；`git diff --check` |
 | 282  | Pre CD 自动触发从 PR CI 成功改为 PR 合并后的 `main` push CI 成功：`workflow_run` 限定 `main` 分支且 job 条件检查 `event == push`，继续保留全局覆盖旧 run | `ruby -e 'require "yaml"; YAML.load_file(".github/workflows/deploy-pre.yml")'`；`git diff --check` |
 | 281  | Pre CD 手动触发新增 `e2e_groups`、`e2e_cases`、`e2e_timeout` 输入且固定部署 `main`，默认仍跑 `smoke`；并发恢复为单一 pre 环境全局取消旧 run，避免多分支管理复杂度 | `ruby -e 'require "yaml"; YAML.load_file(".github/workflows/deploy-pre.yml")'`；`git diff --check` |
@@ -27,4 +30,3 @@
 | 258  | README 移除“本地开发”整章，首页只保留生产部署、CD 示例和文档入口 | `git diff --check` |
 | 257  | README CD example 去个人化：`PROD_SSH_HOST` 首选“你的服务器 IP”，移除个人 SSH 用户示例，Tailscale 改成仅内网可达时的可选配置；workflow 同步为未配置 `TAILSCALE_AUTHKEY` 时跳过 Tailscale | `ruby -e 'require "yaml"; YAML.load_file(".github/workflows/deploy-prod.yml")'`；`git diff --check` |
 | 256  | 首页 README 缩减为生产部署与 CD example：保留默认 compose 启动、生产 `.env`/国内源、GitHub Environment secrets、手动发布步骤和文档入口，移除长篇能力/架构/开发说明 | `git diff --check` |
-| 255  | 默认 compose 去掉 prod 命名：`docker-compose.prod.yml` 重命名为 `docker-compose.yml`，项目名改为 `chatbi`，`launch.sh`、CD preflight、文档和 launch 测试都改为默认 `docker compose` | `.venv/bin/python scripts/format_code.py scripts tests/test_launch_script.py`；`PYTHONPATH=. .venv/bin/python scripts/run_tests.py foundation -- -q tests/test_launch_script.py`；`docker compose config --quiet`；`git diff --check` |

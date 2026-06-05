@@ -45,7 +45,8 @@ RUN sed -i \
 
 COPY pyproject.toml uv.lock /app/
 ARG PIP_INDEX_URL=https://pypi.org/simple
-ENV UV_INDEX_URL=${PIP_INDEX_URL}
+ENV UV_DEFAULT_INDEX=${PIP_INDEX_URL} \
+    UV_INDEX_URL=${PIP_INDEX_URL}
 RUN pip install --no-cache-dir --index-url ${PIP_INDEX_URL} uv \
     && uv sync --frozen --no-install-project
 

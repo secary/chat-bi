@@ -75,5 +75,24 @@ class AdminLlmProfilesProbeTest(unittest.IsolatedAsyncioTestCase):
         )
 
 
+class AdminLlmProfilesProbeErrorTest(unittest.TestCase):
+    def test_friendly_probe_error_maps_common_failures(self) -> None:
+        from backend.routes.admin_llm_profiles_route import _friendly_probe_error
+
+        cases = [
+            (RuntimeError("AuthenticationError: invalid api key"), "请填写正确的 API Key。"),
+            (RuntimeError("model_not_found: unknown model"), "请填写正确的模型名。"),
+            (RuntimeError("ConnectError: connection refused"), "请填写正确的 Base URL。"),
+            (RuntimeError("RateLimitError: quota exceeded"), "请填写正确的 API Key。"),
+            (
+                RuntimeError("BadRequestError: invalid request"),
+                "请填写正确的模型名、Base URL 和 API Key。",
+            ),
+        ]
+        for exc, expected in cases:
+            with self.subTest(expected=expected):
+                self.assertIn(expected, _friendly_probe_error(exc))
+
+
 if __name__ == "__main__":
     unittest.main()

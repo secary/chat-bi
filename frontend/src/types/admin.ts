@@ -104,6 +104,7 @@ export interface LlmProfilePublic {
   model: string;
   api_base: string | null;
   api_key_set: boolean;
+  is_env_default?: boolean;
   sort_order: number;
   health_status: string;
   health_detail: string | null;

@@ -196,6 +196,33 @@ class HarnessAuditTest(unittest.TestCase):
         codes = {item["code"] for item in report["issues"]}
         self.assertIn("EMPTY_SPECIALIST_OUTCOME", codes)
 
+    def test_build_audit_report_includes_llm_config_flow_and_failure(self):
+        events = [
+            {
+                "span_name": "admin.llm_settings",
+                "event_name": "viewed",
+                "payload": {"effective_model": "openai/x"},
+            },
+            {
+                "span_name": "admin.llm_settings",
+                "event_name": "profile_probe_tested",
+                "payload": {
+                    "model": "openai/x",
+                    "ok": False,
+                    "message": "API Key 校验失败，请确认密钥是否完整、是否属于当前服务商。",
+                },
+            },
+        ]
+        with patch("backend.agent.harness_audit.list_trace_events", return_value=events):
+            report = build_audit_report("t-llm")
+
+        self.assertEqual(report["status"], "error")
+        codes = {item["code"] for item in report["issues"]}
+        self.assertIn("LLM_CONFIG_TEST_FAILED", codes)
+        flows = {flow["flow_key"]: flow for flow in report["business_flows"]}
+        self.assertEqual(flows["llm_config"]["status"], "error")
+        self.assertIn("API Key 校验失败", flows["llm_config"]["summary"])
+
     def test_build_audit_report_flags_summary_with_unmet_dependency(self):
         events = [
             {

@@ -8,11 +8,14 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from backend.app_llm import profile_row_to_litellm_params
+from backend.config import settings
 from backend.http_utils import request_trace_id
 from backend import llm_profile_repo
+from backend import llm_settings_repo
 from backend.trace import log_event
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+ENV_DEFAULT_PROFILE_ID = 0
 
 
 class LlmProfileCreate(BaseModel):
@@ -128,17 +131,29 @@ def reorder_llm_profiles(body: ReorderBody, request: Request) -> dict:
 @router.put("/llm-profiles/active")
 def set_active_llm_profile(body: ActiveBody, request: Request) -> dict:
     trace_id = request_trace_id(request)
-    if body.profile_id is not None:
+    if body.profile_id in (None, ENV_DEFAULT_PROFILE_ID):
+        llm_settings_repo.activate_env_defaults()
+        profile_id = ENV_DEFAULT_PROFILE_ID
+    else:
         if not llm_profile_repo.get_by_id(body.profile_id):
             raise HTTPException(status_code=404, detail="档案不存在")
-    llm_profile_repo.set_active_profile(body.profile_id)
+        llm_profile_repo.set_active_profile(body.profile_id)
+        profile_id = body.profile_id
     log_event(
         trace_id,
         "admin.llm_settings",
         "active_profile_set",
-        payload={"profile_id": body.profile_id},
+        payload={"profile_id": profile_id},
     )
     return {"ok": True}
+
+
+def _test_log_payload(**payload: object) -> dict:
+    message = str(payload.get("message") or "")
+    ok = payload.get("ok")
+    if ok is not False or not message:
+        payload.pop("message", None)
+    return dict(payload)
 
 
 async def _probe_litellm_params(params: dict) -> tuple[bool, str]:
@@ -154,13 +169,47 @@ async def _probe_litellm_params(params: dict) -> tuple[bool, str]:
         )
         return True, "ok"
     except Exception as exc:
-        msg = f"{type(exc).__name__}: {exc}"
-        if len(msg) > 500:
-            msg = msg[:500] + "…"
-        return False, msg
+        return False, _friendly_probe_error(exc)
+
+
+def _friendly_probe_error(exc: Exception) -> str:
+    raw = str(exc)
+    lower = f"{type(exc).__name__}: {raw}".lower()
+    if any(
+        token in lower for token in ("authentication", "unauthorized", "invalid api key", "401")
+    ):
+        return "请填写正确的 API Key。"
+    if any(token in lower for token in ("model_not_found", "not found", "unknown model", "404")):
+        return "请填写正确的模型名。"
+    if any(token in lower for token in ("timeout", "timed out")):
+        return "请填写正确的 Base URL。"
+    if any(
+        token in lower
+        for token in (
+            "connection",
+            "connecterror",
+            "name resolution",
+            "dns",
+            "no address associated",
+            "connection refused",
+        )
+    ):
+        return "请填写正确的 Base URL。"
+    if any(token in lower for token in ("rate limit", "ratelimit", "quota", "insufficient", "429")):
+        return "请填写正确的 API Key。"
+    if any(token in lower for token in ("badrequest", "bad request", "invalid request", "400")):
+        return "请填写正确的模型名、Base URL 和 API Key。"
+    detail = raw.strip()
+    if len(detail) > 180:
+        detail = detail[:180] + "…"
+    if detail:
+        return f"连接测试失败：{detail}"
+    return "请填写正确的模型名、Base URL 和 API Key。"
 
 
 async def _probe_profile(profile_id: int) -> tuple[bool, str]:
+    if profile_id == ENV_DEFAULT_PROFILE_ID:
+        return await _probe_litellm_params(dict(settings.llm_params))
     row = llm_profile_repo.get_by_id(profile_id)
     if not row:
         return False, "档案不存在"
@@ -194,7 +243,7 @@ async def probe_llm_profile(body: LlmProfileProbe, request: Request) -> dict:
         trace_id,
         "admin.llm_settings",
         "profile_probe_tested",
-        payload={"model": model, "ok": ok},
+        payload=_test_log_payload(model=model, ok=ok, message=message),
     )
     return {"ok": ok, "message": message}
 
@@ -207,7 +256,7 @@ async def test_llm_profile(profile_id: int, request: Request) -> dict:
         trace_id,
         "admin.llm_settings",
         "profile_tested",
-        payload={"profile_id": profile_id, "ok": ok},
+        payload=_test_log_payload(profile_id=profile_id, ok=ok, message=message),
     )
     return {"ok": ok, "message": message}
 

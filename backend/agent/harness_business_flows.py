@@ -5,6 +5,7 @@ from typing import Any, Dict, List
 from backend.agent.harness_business_flows_decision import (
     summarize_decision_content_audit_flow,
 )
+from backend.agent.harness_business_flows_llm import summarize_llm_config_flow
 from backend.agent.harness_business_flows_semantic import summarize_semantic_query_flow
 
 _UPLOAD_SKILLS = {"chatbi-file-ingestion", "chatbi-auto-analysis"}
@@ -21,6 +22,9 @@ def summarize_business_flows(events: List[Dict[str, Any]]) -> List[Dict[str, Any
     decision_content_flow = summarize_decision_content_audit_flow(events)
     if decision_content_flow:
         flows.append(decision_content_flow)
+    llm_config_flow = summarize_llm_config_flow(events)
+    if llm_config_flow:
+        flows.append(llm_config_flow)
     return flows
 
 

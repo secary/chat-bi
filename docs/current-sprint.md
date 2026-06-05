@@ -1,7 +1,7 @@
 | ID | Gap / 变更 | 验证 |
 |---:|---|---|
-| 285  | Pre CD 新增自动构建策略：push 到 `main` 时仅在 Dockerfile、compose、依赖、后端、前端、skills、deploy 或帮助文档等镜像输入路径变化时重建，否则自动 `--no-build` 复用服务器已有镜像 | `ruby -e 'require "yaml"; YAML.load_file(".github/workflows/deploy-pre.yml")'`；`git diff --check` |
-| 284  | Docker 构建源收敛为 `PACKAGE_MIRROR_CN=1/0` 小开关：开启时 apt、pip/uv、npm 全部使用清华源，部署文档和 env 示例移除散落 URL 配置 | `.venv/bin/python scripts/format_code.py scripts/launch.sh tests/test_launch_script.py`；`PYTHONPATH=. .venv/bin/python scripts/run_tests.py foundation -- -q tests/test_launch_script.py`；`docker compose config --quiet`；`git diff --check` |
+| 285  | `PACKAGE_MIRROR_CN=1` 改为 Docker 构建时自动探测依赖源：apt、pip/uv、npm 分别按国内候选源逐个检测可用性并选择第一个可用源，全部不可用时回落官方源 | `docker compose config --quiet`；`git diff --check` |
+| 284  | Docker 构建源收敛为 `PACKAGE_MIRROR_CN=1/0` 小开关：开启时 apt 与 pip/uv 使用清华源，npm 使用 npmmirror，部署文档和 env 示例移除散落 URL 配置 | `.venv/bin/python scripts/format_code.py scripts/launch.sh tests/test_launch_script.py`；`PYTHONPATH=. .venv/bin/python scripts/run_tests.py foundation -- -q tests/test_launch_script.py`；`docker compose config --quiet`；`git diff --check` |
 | 283  | CI/CD 策略调整为“PR 阶段跑 CI，合并 `main` 后直接跑 Pre CD”：`ci.yml` 移除 `push main` 触发，`deploy-pre.yml` 改为 `push main` 直接部署并保留手动 E2E 参数 | `ruby -e 'require "yaml"; YAML.load_file(".github/workflows/ci.yml"); YAML.load_file(".github/workflows/deploy-pre.yml")'`；`git diff --check` |
 | 282  | Pre CD 自动触发从 PR CI 成功改为 PR 合并后的 `main` push CI 成功：`workflow_run` 限定 `main` 分支且 job 条件检查 `event == push`，继续保留全局覆盖旧 run | `ruby -e 'require "yaml"; YAML.load_file(".github/workflows/deploy-pre.yml")'`；`git diff --check` |
 | 281  | Pre CD 手动触发新增 `e2e_groups`、`e2e_cases`、`e2e_timeout` 输入且固定部署 `main`，默认仍跑 `smoke`；并发恢复为单一 pre 环境全局取消旧 run，避免多分支管理复杂度 | `ruby -e 'require "yaml"; YAML.load_file(".github/workflows/deploy-pre.yml")'`；`git diff --check` |

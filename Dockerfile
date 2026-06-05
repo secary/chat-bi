@@ -117,8 +117,15 @@ RUN case "${PACKAGE_MIRROR_CN}" in \
         *) echo "Unsupported PACKAGE_MIRROR_CN=${PACKAGE_MIRROR_CN}. Use 0 or 1." >&2; exit 2 ;; \
     esac \
     && echo "Using PyPI index: ${pip_index}" \
-    && pip install --no-cache-dir --index-url "${pip_index}" uv \
-    && UV_DEFAULT_INDEX="${pip_index}" UV_INDEX_URL="${pip_index}" uv sync --frozen --no-install-project
+    && pip install --no-cache-dir --index-url "${pip_index}" --timeout 120 --retries 5 uv \
+    && UV_DEFAULT_INDEX="${pip_index}" \
+        UV_INDEX_URL="${pip_index}" \
+        UV_HTTP_TIMEOUT=120 \
+        UV_HTTP_RETRIES=5 \
+        UV_CONCURRENT_DOWNLOADS=4 \
+        UV_CONCURRENT_BUILDS=2 \
+        UV_CONCURRENT_INSTALLS=4 \
+        uv sync --frozen --no-install-project --no-progress
 
 FROM backend-base AS dev
 

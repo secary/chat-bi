@@ -102,4 +102,4 @@ workflow 已绑定 GitHub Environment `chatbi-prod`。建议在该环境开启 r
 PACKAGE_MIRROR_CN=1
 ```
 
-Docker 构建时会探测候选源并选择可用源；apt 与 pip/uv 优先国内高校/云厂商镜像，npm 优先 npmmirror、华为云，再回落官方源。
+Docker 构建时会探测候选源并选择可用源；apt 与 pip/uv 优先国内高校/云厂商镜像，npm 优先 npmmirror、华为云，再回落官方源。Python 依赖安装会降低并发、增加超时和重试，适配较慢的部署网络。

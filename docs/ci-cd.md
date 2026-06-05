@@ -70,13 +70,15 @@ concurrency:
 2. 部署前执行 preflight：`bash -n scripts/launch.sh`、`docker compose config`、`python -m unittest tests.test_launch_script`。
 3. 如果配置了 `TAILSCALE_AUTHKEY`，用 `tailscale/github-action@v4` 将 GitHub-hosted runner 临时接入 tailnet，并 ping `PROD_SSH_HOST` 验证可达。
 4. 通过 SSH 创建远端部署目录。
-5. 用 `rsync --delete` 同步仓库文件到服务器，但排除 `.env`、`.env.dev`、`.env.prod`、`.venv`、`frontend/node_modules`、`data`。
+5. 用 `rsync --delete` 同步仓库文件到服务器，但排除 `.env`、`.env.dev`、`.env.prod`、`.venv`、`frontend/node_modules`、`tests`、`data`。
 6. 如果配置了 `PROD_ENV_FILE` secret，则覆盖远端 `.env`；否则保留远端已有 `.env`，若远端没有 `.env`，`launch.sh` 会从 `.env.example` 生成。
 7. 在服务器执行 `bash scripts/launch.sh --no-open --url <PROD_APP_URL> --timeout <PROD_HEALTH_TIMEOUT_SECONDS>`，由脚本负责 `docker compose up -d --build` 和 `/health` 检查。
 
 触发方式：
 
 - `workflow_dispatch`：手动选择 ref 部署；可勾选 `skip_build` 来追加 `--no-build`。
+
+Pre CD 的远端同步会保留 `tests/`，方便预发机上手工调试或补跑测试；prod CD 会排除 `tests/`，避免生产服务器保留测试目录。
 
 生产 CD 不再监听 `main` 分支的 CI 完成事件，合并到 `main` 后不会自动部署。手动发布时会先跑上述 preflight，通过后才会连接服务器。
 
@@ -98,10 +100,4 @@ workflow 已绑定 GitHub Environment `chatbi-prod`。建议在该环境开启 r
 
 如果服务器只暴露在 Tailscale 内网，`PROD_SSH_HOST` 可以直接填服务器的 `100.x.y.z` 地址或 MagicDNS 名称，GitHub runner 会先加入 tailnet 再 SSH。
 
-如果生产机访问海外包源超时，可在远端 `.env` 或 `PROD_ENV_FILE` 里开启国内源自动择优：
-
-```text
-PACKAGE_MIRROR_CN=1
-```
-
-Docker 构建时会探测候选源并选择可用源；apt 与 pip/uv 优先国内高校/云厂商镜像，npm 优先 npmmirror、华为云，再回落官方源。Python 依赖安装会降低并发、增加超时和重试，适配较慢的部署网络。
+Docker 构建默认使用国内依赖源：apt 与 pip/uv 使用清华源，npm 使用 npmmirror，并强制将 lockfile 里的 npm tarball 地址替换到该源。Python 依赖安装会降低并发、增加超时和重试，适配较慢的部署网络。

@@ -42,48 +42,6 @@ ensure_env_file() {
   log "No env file found; copied .env.example to .env"
 }
 
-read_env_value() {
-  local key="$1"
-  local line
-
-  if [[ -n "${!key:-}" ]]; then
-    printf '%s' "${!key}"
-    return 0
-  fi
-
-  if [[ ! -f "${ROOT}/.env" ]]; then
-    return 0
-  fi
-
-  while IFS= read -r line; do
-    if [[ "${line}" == "${key}="* ]]; then
-      printf '%s' "${line#*=}"
-      return 0
-    fi
-  done <"${ROOT}/.env"
-}
-
-configure_package_mirror() {
-  local package_mirror_cn
-  package_mirror_cn="$(read_env_value PACKAGE_MIRROR_CN)"
-  package_mirror_cn="${package_mirror_cn:-0}"
-
-  case "${package_mirror_cn}" in
-    0)
-      export PACKAGE_MIRROR_CN=0
-      ;;
-    1)
-      export PACKAGE_MIRROR_CN=1
-      ;;
-    *)
-      echo "Unsupported PACKAGE_MIRROR_CN=${package_mirror_cn}. Use 0 or 1." >&2
-      exit 2
-      ;;
-  esac
-
-  log "Using China package mirror: ${PACKAGE_MIRROR_CN}"
-}
-
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --no-build)
@@ -139,7 +97,6 @@ if [[ ! -f "${COMPOSE_FILE}" ]]; then
 fi
 
 ensure_env_file
-configure_package_mirror
 
 cd "${ROOT}"
 

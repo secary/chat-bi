@@ -20,28 +20,20 @@ CHATBI_JWT_SECRET=请替换为强随机密钥
 CHATBI_SEED_USERS=root:强密码:root
 ```
 
-### 3. 可选：配置国内源
-
-如果服务器访问海外包源不稳定，可在 `.env` 里开启国内源自动择优：
-
-```dotenv
-PACKAGE_MIRROR_CN=1
-```
-
-Docker 构建时会探测候选源并选择可用源；apt 与 pip/uv 优先国内高校/云厂商镜像，npm 优先 npmmirror、华为云，再回落官方源。Python 依赖安装会降低并发、增加超时和重试，适配较慢的部署网络。
-
-### 4. 启动服务
+### 3. 启动服务
 
 ```bash
 bash scripts/launch.sh --no-open
 ```
 
-### 5. 访问服务
+Docker 构建默认使用国内依赖源：apt 与 pip/uv 使用清华源，npm 使用 npmmirror，并强制将 lockfile 里的 npm tarball 地址替换到该源。
+
+### 4. 访问服务
 
 - 应用：`http://服务器地址:5173`
 - MySQL：`服务器地址:3307`
 
-### 6. 常用操作
+### 5. 常用操作
 
 ```bash
 docker compose ps

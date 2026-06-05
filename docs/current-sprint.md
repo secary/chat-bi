@@ -1,5 +1,10 @@
 | ID | Gap / 变更 | 验证 |
 |---:|---|---|
+| 290  | LLM 配置结果浮窗改为固定文案：成功显示“配置成功”，失败显示“配置失败”，失败详情继续保留在表单上方错误提示中 | `.venv/bin/python scripts/format_code.py frontend/src/pages/LlmConfigPage.tsx`；`npm run lint`；`npm run test`；`npm run build` |
+| 289  | LLM 配置成功提示改为居中浮窗自动消失，错误提示移动到已保存模型与配置表单之间，避免成功消息挤占表单内部空间 | `.venv/bin/python scripts/format_code.py frontend/src/pages/LlmConfigPage.tsx`；`npm run lint`；`npm run test`；`npm run build` |
+| 288  | LLM 配置表单将模型名拆成“模型前缀下拉 + 模型名输入”，常用前缀按固定顺序展示，保存时仍拼接为 LiteLLM 完整模型名 | `.venv/bin/python scripts/format_code.py frontend/src/pages/LlmConfigPage.tsx`；`npm run lint`；`npm run test`；`npm run build` |
+| 287  | LLM 已保存模型增加“默认配置”卡片，支持切回环境默认模型并提供测试按钮；激活默认配置时清空 DB 覆盖项，避免 prod 新增配置后默认模型不可切回 | `.venv/bin/python scripts/format_code.py backend/llm_settings_repo.py backend/llm_profile_repo.py backend/routes/admin_llm_route.py backend/routes/admin_llm_profiles_route.py tests/test_admin_llm_settings_route.py scripts/run_tests.py frontend/src/pages/LlmConfigPage.tsx frontend/src/types/admin.ts`；`PYTHONPATH=. .venv/bin/python scripts/run_tests.py admin -- -q tests/test_admin_llm_settings_route.py tests/test_admin_llm_profiles_probe.py tests/test_app_llm_saved.py tests/test_llm_profile_repo.py`；`npm run lint`；`npm run test`；`npm run build` |
+| 286  | LLM 配置页移除厂商预设选项卡，保存表单改为直接填写模型名、Base URL、API Key 和备注名；帮助文档同步更新 | `.venv/bin/python scripts/format_code.py frontend/src/pages/LlmConfigPage.tsx`；`npm run lint`；`npm run test`；`npm run build` |
 | 285  | `PACKAGE_MIRROR_CN=1` 改为 Docker 构建时自动探测依赖源；Python 生产依赖改为导出无 URL 的 requirements 后按选中镜像安装，dev 工具迁入 dependency group 并在镜像中排除 | `uv lock`；`UV_CACHE_DIR=/tmp/chatbi-uv-cache uv export --frozen --no-dev --no-hashes --no-emit-project --no-header`；`docker compose config --quiet`；`git diff --check` |
 | 284  | Docker 构建源收敛为 `PACKAGE_MIRROR_CN=1/0` 小开关：开启时 apt 与 pip/uv 使用清华源，npm 使用 npmmirror，部署文档和 env 示例移除散落 URL 配置 | `.venv/bin/python scripts/format_code.py scripts/launch.sh tests/test_launch_script.py`；`PYTHONPATH=. .venv/bin/python scripts/run_tests.py foundation -- -q tests/test_launch_script.py`；`docker compose config --quiet`；`git diff --check` |
 | 283  | CI/CD 策略调整为“PR 阶段跑 CI，合并 `main` 后直接跑 Pre CD”：`ci.yml` 移除 `push main` 触发，`deploy-pre.yml` 改为 `push main` 直接部署并保留手动 E2E 参数 | `ruby -e 'require "yaml"; YAML.load_file(".github/workflows/ci.yml"); YAML.load_file(".github/workflows/deploy-pre.yml")'`；`git diff --check` |
@@ -25,8 +30,3 @@
 | 263  | 新增普通用户手册、管理员手册和开发者手册源文档，并在前端新增“帮助文档”页面按角色展示普通用户、管理员、开发者内容；根 README 不调整 | `.venv/bin/python scripts/format_code.py frontend/src/App.tsx frontend/src/components/AppLayout.tsx frontend/src/pages/HelpPage.tsx frontend/src/lib/helpDocs.ts`；`npm run build`；`git diff --check` |
 | 262  | 生产 CD workflow 与文档对齐：`TAILSCALE_AUTHKEY` 改为可选，未配置时跳过 Tailscale 并直接走普通 SSH | `ruby -e 'require "yaml"; YAML.load_file(".github/workflows/deploy-prod.yml")'`；`git diff --check` |
 | 261  | 后端通用 `env_loader` 严格排除 `.env.dev`，开发配置只由 `scripts/start_dev.sh` 显式加载，避免生产手动后端进程被 dev 配置覆盖 | `.venv/bin/python scripts/format_code.py backend/env_loader.py tests/test_env_loader.py`；`PYTHONPATH=. .venv/bin/python scripts/run_tests.py foundation -- -q tests/test_env_loader.py tests/test_start_dev_script.py tests/test_launch_script.py tests/test_config_db_defaults.py` |
-| 260  | README 第一章改为“通过 Docker 直接部署”，章节标题不编号，章内部署流程拆成 1-6 步 | 文档改动，未跑测试；`git diff --check` |
-| 259  | README 将手动部署入口明确为与 CD 平级的“本地直接部署”章节，保留 `scripts/launch.sh --no-open` 作为默认 compose 部署入口 | `git diff --check` |
-| 258  | README 移除“本地开发”整章，首页只保留生产部署、CD 示例和文档入口 | `git diff --check` |
-| 257  | README CD example 去个人化：`PROD_SSH_HOST` 首选“你的服务器 IP”，移除个人 SSH 用户示例，Tailscale 改成仅内网可达时的可选配置；workflow 同步为未配置 `TAILSCALE_AUTHKEY` 时跳过 Tailscale | `ruby -e 'require "yaml"; YAML.load_file(".github/workflows/deploy-prod.yml")'`；`git diff --check` |
-| 256  | 首页 README 缩减为生产部署与 CD example：保留默认 compose 启动、生产 `.env`/国内源、GitHub Environment secrets、手动发布步骤和文档入口，移除长篇能力/架构/开发说明 | `git diff --check` |

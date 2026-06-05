@@ -7,8 +7,8 @@ name: ChatBI Pre CD
   workflow_dispatch:
     inputs:
       skip_build:
-        description: Reuse existing Docker images on the server
-        default: false
+        description: Skip rebuild when the current changes do not affect Docker images
+        default: true
         required: false
         type: boolean
       e2e_groups:
@@ -77,12 +77,13 @@ jobs:
       PRE_E2E_PASSWORD: ${{ secrets.PRE_E2E_PASSWORD }}
       PRE_ENV_FILE: ${{ secrets.PRE_ENV_FILE }}
       HEALTH_TIMEOUT_SECONDS: ${{ vars.PRE_HEALTH_TIMEOUT_SECONDS || '120' }}
-      SKIP_BUILD: ${{ inputs.skip_build || 'false' }}
+      ALLOW_BUILD_REUSE: ${{ github.event_name != 'workflow_dispatch' || inputs.skip_build }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
         with:
           ref: ${{ github.event_name == 'push' && github.sha || 'main' }}
+          fetch-depth: 0
 
       - name: Validate deployment settings
         run: |
@@ -94,6 +95,64 @@ jobs:
           test -n "${PRE_E2E_URL}" || { echo "Missing variable or secret PRE_E2E_URL"; exit 1; }
           [[ "${HEALTH_TIMEOUT_SECONDS}" =~ ^[0-9]+$ ]] || { echo "PRE_HEALTH_TIMEOUT_SECONDS must be an integer"; exit 1; }
           [[ "${PRE_E2E_TIMEOUT_SECONDS}" =~ ^[0-9]+$ ]] || { echo "PRE_E2E_TIMEOUT_SECONDS must be an integer"; exit 1; }
+
+      - name: Decide Docker rebuild
+        id: rebuild
+        env:
+          PUSH_BASE_SHA: ${{ github.event_name == 'push' && github.event.before || '' }}
+        run: |
+          set -euo pipefail
+
+          if [[ "${ALLOW_BUILD_REUSE}" != "true" ]]; then
+            echo "build_required=true" >> "${GITHUB_OUTPUT}"
+            echo "Manual run requested a forced image rebuild."
+            exit 0
+          fi
+
+          base_sha=""
+          if [[ -n "${PUSH_BASE_SHA}" && "${PUSH_BASE_SHA}" != "0000000000000000000000000000000000000000" ]]; then
+            if git cat-file -e "${PUSH_BASE_SHA}^{commit}" 2>/dev/null; then
+              base_sha="${PUSH_BASE_SHA}"
+            fi
+          fi
+
+          if [[ -z "${base_sha}" ]]; then
+            base_sha="$(git rev-parse HEAD^ 2>/dev/null || true)"
+          fi
+
+          if [[ -z "${base_sha}" ]]; then
+            echo "build_required=true" >> "${GITHUB_OUTPUT}"
+            echo "No base commit found; rebuilding conservatively."
+            exit 0
+          fi
+
+          build_required=false
+          while IFS= read -r changed_path; do
+            case "${changed_path}" in
+              Dockerfile|docker-compose.yml|.dockerignore|pyproject.toml|uv.lock)
+                echo "Image-affecting change detected: ${changed_path}"
+                build_required=true
+                break
+                ;;
+              frontend/package.json|frontend/package-lock.json)
+                echo "Image-affecting change detected: ${changed_path}"
+                build_required=true
+                break
+                ;;
+              backend/*|frontend/*|skills/*|deploy/*|docs/help/*)
+                echo "Image-affecting change detected: ${changed_path}"
+                build_required=true
+                break
+                ;;
+            esac
+          done < <(git diff --name-only "${base_sha}" HEAD)
+
+          echo "build_required=${build_required}" >> "${GITHUB_OUTPUT}"
+          if [[ "${build_required}" == "true" ]]; then
+            echo "Docker image rebuild is required for this change set."
+          else
+            echo "No Docker image-affecting changes detected; existing image can be reused if present."
+          fi
 
       - name: Connect to Tailscale
         if: ${{ env.PRE_TAILSCALE_AUTHKEY != '' }}
@@ -155,8 +214,19 @@ jobs:
           app_url="$(printf '%q' "${PRE_APP_URL}")"
           timeout="$(printf '%q' "${HEALTH_TIMEOUT_SECONDS}")"
           build_flag=""
-          if [[ "${SKIP_BUILD}" == "true" ]]; then
-            build_flag="--no-build"
+          if [[ "${{ steps.rebuild.outputs.build_required }}" == "false" ]]; then
+            image_id="$(ssh -i ~/.ssh/chatbi_cd -p "${PRE_SSH_PORT}" \
+              "${PRE_SSH_USER}@${PRE_SSH_HOST}" \
+              "cd ${remote_dir} && docker compose images -q chatbi-app 2>/dev/null || true")"
+            image_id="${image_id//$'\r'/}"
+            if [[ -n "${image_id}" ]]; then
+              echo "Found existing chatbi-app image on pre server; reusing it for this hot-update change set."
+              build_flag="--no-build"
+            else
+              echo "No existing chatbi-app image found on pre server; building a fresh image."
+            fi
+          else
+            echo "Docker image-affecting changes detected; building a fresh image."
           fi
 
           ssh -i ~/.ssh/chatbi_cd -p "${PRE_SSH_PORT}" \

@@ -50,9 +50,9 @@ CHATBI_MEMORY_DISABLED=1
 
 `.github/workflows/deploy-pre.yml` 在 PR 合并到 `main` 后由 `push` 事件直接触发，不再等待 `main` 上的 CI。它会部署到 GitHub Environment `chatbi-pre`，并在部署后运行 E2E smoke。
 
-Pre CD 会先按当前提交的变更文件判断是否需要重建 Docker 镜像。`backend/`、`frontend/`、`skills/`、`deploy/`、`docs/help/`、`Dockerfile`、`docker-compose.yml`、`.dockerignore`、Python/前端依赖清单等会进入镜像或影响构建上下文的变更会触发重建；只改 E2E 脚本、workflow、普通文档等不进入镜像的内容时，会优先复用预发服务器已有的 `chatbi-app` 镜像并直接进入 E2E，若远端没有旧镜像则自动回退构建。
+Pre CD 的 `push` 触发限定为会进入 Docker 镜像或影响构建上下文的路径：`backend/`、`frontend/`、`skills/`、`deploy/`、`docs/help/`、`Dockerfile`、`docker-compose.yml`、`.dockerignore`、Python/前端依赖清单等。只改 E2E 脚本、workflow、普通文档等不进入镜像的内容时，不会自动触发 pre 部署。
 
-手动 `workflow_dispatch` 固定部署 `main`，默认启用上述复用判断；取消勾选 `skip_build` 可强制重建。手动触发还可通过 `e2e_groups`、`e2e_cases`、`e2e_timeout` 临时扩大或收窄 E2E 范围，例如 `e2e_groups=all` 做完整预发验收。
+手动 `workflow_dispatch` 固定部署 `main`，可勾选 `skip_build` 复用服务器已有镜像。手动触发还可通过 `e2e_groups`、`e2e_cases`、`e2e_timeout` 临时扩大或收窄 E2E 范围，例如 `e2e_groups=all` 做完整预发验收。
 
 同一时间只保留最新一次 pre 部署：
 

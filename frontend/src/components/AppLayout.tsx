@@ -80,7 +80,7 @@ export function AppLayout() {
       <main className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
         <NavLink
           to={helpLink}
-          className="absolute right-6 top-5 z-20 text-sm font-medium text-accent transition-colors duration-150 hover:text-accent/80"
+          className="absolute right-6 top-16 z-20 text-sm font-medium text-accent transition-colors duration-150 hover:text-accent/80"
         >
           文档
         </NavLink>

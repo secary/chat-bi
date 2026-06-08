@@ -92,7 +92,7 @@ Pre CD 的远端同步会保留 `tests/`，方便预发机上手工调试或补�
 | Secret | `TAILSCALE_AUTHKEY` | 可选；仅服务器只在 Tailscale 内网可达时配置，建议使用 tagged、reusable、ephemeral，设备审批场景下还要 pre-approved |
 | Secret | `PROD_SSH_PORT` | SSH 端口；不配置则默认 `22` |
 | Secret 或 Variable | `PROD_DEPLOY_PATH` | 服务器上的部署目录 |
-| Secret 或 Variable | `PROD_APP_URL` | 健康检查和访问地址；不配置则默认 `http://localhost:5173` |
+| Secret 或 Variable | `PROD_APP_URL` | 健康检查和访问地址；不配置则默认 `http://localhost:5174` |
 | Secret | `PROD_ENV_FILE` | 可选，生产 `.env` 完整内容 |
 | Variable | `PROD_HEALTH_TIMEOUT_SECONDS` | 可选，健康检查超时秒数；默认 `120` |
 

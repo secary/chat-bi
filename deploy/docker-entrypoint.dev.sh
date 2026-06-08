@@ -22,7 +22,7 @@ trap term_handler INT TERM
         npm ci
         touch node_modules/.install-stamp
     fi
-    npm run dev -- --host 0.0.0.0 --port 5173
+    npm run dev -- --host 0.0.0.0 --port 5174
 ) &
 frontend_pid="$!"
 

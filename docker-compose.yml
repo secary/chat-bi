@@ -52,7 +52,7 @@ services:
       CHATBI_LOG_DB_PORT: 3306
       CHATBI_MYSQL_CMD: mysql
     ports:
-      - "5173:80"
+      - "5174:80"
     depends_on:
       chatbi-db:
         condition: service_healthy

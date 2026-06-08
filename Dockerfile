@@ -67,7 +67,7 @@ COPY deploy/docker-entrypoint.dev.sh /entrypoint.sh
 
 RUN chmod +x /entrypoint.sh
 
-EXPOSE 5173 8226
+EXPOSE 5174 8226
 
 ENTRYPOINT ["/entrypoint.sh"]
 

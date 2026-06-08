@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 BACKEND_PORT="${BACKEND_PORT:-8226}"
-FRONTEND_PORT="${FRONTEND_PORT:-5173}"
+FRONTEND_PORT="${FRONTEND_PORT:-5174}"
 INIT_DB=1
 DB_ONLY=0
 SYNC_DEPS=1
@@ -21,7 +21,7 @@ Options:
   --no-db           Do not initialize/check the local dev MySQL database.
   --no-deps         Do not auto-sync missing Python/frontend dependencies.
   --backend-port N  Backend port. Default: 8226.
-  --frontend-port N Frontend port. Default: 5173.
+  --frontend-port N Frontend port. Default: 5174.
   -h, --help        Show this help.
 USAGE
 }

@@ -39,7 +39,7 @@ CHATBI_E2E_URL=http://localhost:8226 python scripts/e2e_smoke.py --cases S1,S4,E
 ## 准备（浏览器手动验证）
 
 1. 启动完整环境：`bash scripts/start_dev.sh`
-2. 浏览器打开 `http://localhost:5173`
+2. 浏览器打开 `http://localhost:5174`
 3. 打开 DevTools → Network，过滤 `/chat`，观察 SSE 流中 `thinking` 步骤的 skill 名称
 
 ---

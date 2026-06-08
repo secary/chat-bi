@@ -179,7 +179,7 @@ async def chat(
     # Create abort event for this trace_id before processing
     get_abort_event(trace_id)
     skill_db = resolve_skill_db_env(req.db_connection_id)
-    memory_block = format_memory_for_prompt(int(user["id"]))
+    memory_block = format_memory_for_prompt(int(user["id"]), exclude_session_id=req.session_id)
 
     messages: List[Dict[str, str]]
     persist_sid: Optional[int] = None

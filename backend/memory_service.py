@@ -57,11 +57,16 @@ def _fallback_long_term(prior: str, session_summary: str) -> str:
     return "\n\n".join(parts)
 
 
-def format_memory_for_prompt(user_id: int) -> str:
+def format_memory_for_prompt(user_id: int, exclude_session_id: int | None = None) -> str:
     if _MEMORY_OFF:
         return ""
     row = get_long_term_row(user_id)
-    summaries = list_recent_session_summaries(user_id, 5)
+    summaries = list_recent_session_summaries(user_id, 8)
+    if exclude_session_id is not None:
+        summaries = [
+            s for s in summaries if int(s.get("source_session_id") or 0) != exclude_session_id
+        ]
+    summaries = summaries[:5]
     parts: List[str] = []
     if row and str(row.get("content") or "").strip():
         parts.append("## 长期偏好与习惯\n" + str(row["content"])[:2000])

@@ -2,6 +2,7 @@
 
 | 状态 | 优先级 | 事项 | 当前完成度 / 下一步 |
 |---|---|---|---|
+| 已完成 | P1 | 当前会话记忆去重 | 已完成 Gap 319：`/chat` 构建 memory block 时排除当前会话摘要，避免与 context window 的当前会话摘要重复注入 |
 | 已完成 | P1 | 空白新聊天复用 | 已完成 Gap 318：创建或读取会话列表时复用/保留当前用户最新空白“新聊天”，兼容清理旧“新对话”，避免未输入时堆叠多个默认会话 |
 | 已完成 | P2 | 左上角品牌区返回首页 | 已完成 Gap 317：侧边栏 logo + 品牌名改为可点击入口，点击后创建空会话并回到对话欢迎页 |
 | 已完成 | P2 | 欢迎页去除功能预览卡片 | 已完成 Gap 316：移除欢迎页 5 个预览卡片，保留核心输入区和最近会话列表，减少首屏干扰 |
@@ -16,6 +17,7 @@
 
 | ID | Gap / 变更 | 验证 |
 |---:|---|---|
+| 319  | 当前会话记忆去重：`format_memory_for_prompt` 增加 `exclude_session_id`，`/chat` 调用时排除当前会话摘要，让当前会话摘要只由 `ConversationContextBuilder` 注入一次；长期记忆和其它近期会话摘要仍保留 | `.venv/bin/python scripts/format_code.py backend/memory_service.py backend/routes/chat_route.py tests/test_memory_service_off.py docs/current-sprint.md`；`PYTHONPATH=. .venv/bin/python -m pytest tests/test_memory_service_off.py tests/test_memory_service_fallback.py tests/test_chat_route_disconnect.py -q`；`PYTHONPATH=. .venv/bin/python scripts/run_tests.py auth-memory -- -q`；`PYTHONPATH=. .venv/bin/python scripts/run_tests.py agent -- -q tests/test_chat_route_disconnect.py tests/test_context_window.py tests/test_agent_runner_contract.py`；`git diff --check` |
 | 318  | 空白新聊天复用：默认会话名改为“新聊天”；`POST /sessions` 改用 `create_or_reuse_default_session`，`GET /sessions` 也会先执行 `prune_empty_default_sessions`；当当前用户已有未输入任何消息的默认“新聊天”或旧“新对话”时只保留最新一条、改名为“新聊天”并删除更旧空白默认会话；自定义标题仍创建独立会话 | `.venv/bin/python scripts/format_code.py backend/session_repo.py backend/routes/sessions_route.py tests/test_session_repo_payload.py docs/current-sprint.md`；`PYTHONPATH=. .venv/bin/python -m pytest tests/test_session_repo_payload.py -q`；`PYTHONPATH=. .venv/bin/python scripts/run_tests.py agent -- -q tests/test_session_repo_payload.py tests/test_context_window.py tests/test_chat_route_disconnect.py`；`git diff --check` |
 | 317  | 左上角品牌区返回首页：`AppLayout` 中 logo + “零眸智能”品牌块改为可点击入口，点击时带 `home` 导航信号；`ChatPage` 收到后创建空会话、进入欢迎页并清理 URL，避免已在 `/` 时点击无变化 | `npm run lint`；`npm run test`；`npm run build`；`git diff --check` |
 | 316  | 欢迎页去除功能预览卡片：移除 `ChatWelcomeHero` 中 5 个视觉预览卡片和对应预览渲染函数，让首屏聚焦输入框与最近会话列表 | `npm run lint`；`npm run test`；`npm run build`；`git diff --check` |

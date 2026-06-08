@@ -157,3 +157,13 @@ class LaunchScriptTest(unittest.TestCase):
             self.assertNotIn("--build", log)
             self.assertIn("curl -fsS http://127.0.0.1:9999/health", log)
             self.assertNotIn("open ", log)
+
+    def test_deploy_workflows_use_frontend_default_port(self) -> None:
+        for path in (
+            ROOT / ".github/workflows/deploy-pre.yml",
+            ROOT / ".github/workflows/deploy-prod.yml",
+        ):
+            workflow = path.read_text(encoding="utf-8")
+
+            self.assertIn("http://localhost:5174", workflow)
+            self.assertNotIn("http://localhost:5173", workflow)

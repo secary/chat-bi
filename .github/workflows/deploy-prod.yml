@@ -56,7 +56,7 @@ jobs:
       PROD_SSH_PORT: ${{ secrets.PROD_SSH_PORT || '22' }}
       TAILSCALE_AUTHKEY: ${{ secrets.TAILSCALE_AUTHKEY }}
       PROD_DEPLOY_PATH: ${{ vars.PROD_DEPLOY_PATH || secrets.PROD_DEPLOY_PATH }}
-      PROD_APP_URL: ${{ vars.PROD_APP_URL || secrets.PROD_APP_URL || 'http://localhost:5173' }}
+      PROD_APP_URL: ${{ vars.PROD_APP_URL || secrets.PROD_APP_URL || 'http://localhost:5174' }}
       PROD_ENV_FILE: ${{ secrets.PROD_ENV_FILE }}
       HEALTH_TIMEOUT_SECONDS: ${{ vars.PROD_HEALTH_TIMEOUT_SECONDS || '120' }}
       SKIP_BUILD: ${{ inputs.skip_build || 'false' }}

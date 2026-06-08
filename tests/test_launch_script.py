@@ -168,6 +168,17 @@ class LaunchScriptTest(unittest.TestCase):
             self.assertIn("http://localhost:5174", workflow)
             self.assertNotIn("http://localhost:5173", workflow)
 
+    def test_pre_workflow_uploads_injected_env(self) -> None:
+        workflow = (ROOT / ".github/workflows/deploy-pre.yml").read_text(encoding="utf-8")
+
+        self.assertIn("PRE_ENV_FILE", workflow)
+        self.assertIn('test -n "${PRE_ENV_FILE}"', workflow)
+        self.assertIn("printf '%s\\n' \"${PRE_ENV_FILE}\"", workflow)
+        self.assertIn("scp -i ~/.ssh/chatbi_cd", workflow)
+        self.assertNotIn("test -f .env.test", workflow)
+        self.assertNotIn("cp .env.test", workflow)
+        self.assertNotIn("keeping the remote .env", workflow)
+
     def test_compose_defaults_use_build_mirrors(self) -> None:
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
         dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")

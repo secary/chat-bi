@@ -208,6 +208,7 @@ async def chat(
                 memory_block=memory_block or None,
                 multi_agents=req.multi_agents,
                 session_id=persist_sid,
+                user_id=int(user["id"]),
             ):
                 next_disconnected = _next_disconnect_state(
                     disconnected, await request.is_disconnected()

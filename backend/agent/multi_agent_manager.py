@@ -325,12 +325,13 @@ async def call_manager_plan_llm(
     round_index: int = 1,
     progress_digest: str = "",
     session_id: Optional[int] = None,
+    user_id: Optional[int] = None,
 ) -> Optional[Dict[str, Any]]:
     """Returns parsed Manager JSON or None on failure."""
     followup = round_index > 1
     latest_user = _latest_user_content(messages)
     if session_id:
-        body = build_manager_context(session_id, latest_user, messages)
+        body = build_manager_context(session_id, latest_user, messages, user_id=user_id)
     else:
         body = _dialogue_tail_for_manager(messages)
     hints = _manager_context_hints(messages)

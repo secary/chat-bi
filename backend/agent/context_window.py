@@ -67,6 +67,7 @@ class ConversationContextBuilder:
         session_id: Optional[int],
         current_query: str,
         all_messages: Optional[List[dict]] = None,
+        user_id: Optional[int] = None,
     ) -> str:
         """
         Build hybrid context for the current query.
@@ -82,8 +83,8 @@ class ConversationContextBuilder:
         """
         parts: List[str] = []
 
-        if session_id:
-            session_summary = self._get_session_summary(session_id)
+        if session_id and user_id is not None:
+            session_summary = self._get_session_summary(user_id, session_id)
             if session_summary:
                 parts.append(f"## 会话摘要\n{session_summary}")
 
@@ -107,6 +108,7 @@ class ConversationContextBuilder:
         session_id: Optional[int],
         current_query: str,
         all_messages: List[dict],
+        user_id: Optional[int] = None,
     ) -> str:
         """
         Build context specifically for ReAct agent loop.
@@ -114,8 +116,8 @@ class ConversationContextBuilder:
         because it maintains its own working list.
         """
         session_summary = ""
-        if session_id:
-            session_summary = self._get_session_summary(session_id)
+        if session_id and user_id is not None:
+            session_summary = self._get_session_summary(user_id, session_id)
         recent_turns = self._format_recent_turns(all_messages)
 
         parts: List[str] = []
@@ -126,10 +128,10 @@ class ConversationContextBuilder:
 
         return "\n\n".join(parts)
 
-    def _get_session_summary(self, session_id: int) -> str:
+    def _get_session_summary(self, user_id: int, session_id: int) -> str:
         """Get the most recent session summary for this session."""
         try:
-            summaries = list_recent_session_summaries(user_id=0, limit=10)
+            summaries = list_recent_session_summaries(user_id=user_id, limit=10)
             for s in summaries:
                 if s.get("source_session_id") == session_id:
                     content = str(s.get("content") or "")[: self.max_summary_chars]
@@ -226,6 +228,7 @@ def build_manager_context(
     session_id: Optional[int],
     current_query: str,
     messages: List[dict],
+    user_id: Optional[int] = None,
 ) -> str:
     """
     Convenience function to build context for Manager LLM.
@@ -239,13 +242,14 @@ def build_manager_context(
         Hybrid context string for Manager LLM
     """
     builder = ConversationContextBuilder()
-    return builder.build_context(session_id, current_query, messages)
+    return builder.build_context(session_id, current_query, messages, user_id=user_id)
 
 
 def build_react_context(
     session_id: Optional[int],
     current_query: str,
     messages: List[dict],
+    user_id: Optional[int] = None,
 ) -> str:
     """
     Convenience function to build context for ReAct agent.
@@ -259,4 +263,4 @@ def build_react_context(
         Hybrid context string for ReAct agent
     """
     builder = ConversationContextBuilder()
-    return builder.build_context_for_react(session_id, current_query, messages)
+    return builder.build_context_for_react(session_id, current_query, messages, user_id=user_id)

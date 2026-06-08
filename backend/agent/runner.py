@@ -216,6 +216,7 @@ async def _stream_single_with_post_audit(
     skill_db_overrides: Optional[Dict[str, str]],
     memory_block: Optional[str],
     session_id: Optional[int],
+    user_id: Optional[int],
 ) -> AsyncGenerator[Dict[str, Any], None]:
     result_sink: Dict[str, Any] = {}
     emitted_types: List[str] = []
@@ -229,6 +230,7 @@ async def _stream_single_with_post_audit(
             memory_block=memory_block,
             result_sink=result_sink,
             session_id=session_id,
+            user_id=user_id,
         )
         if settings.agent_react
         else _stream_chat_legacy(
@@ -288,6 +290,7 @@ async def stream_chat(
     memory_block: Optional[str] = None,
     multi_agents: Union[bool, str] = "auto",
     session_id: Optional[int] = None,
+    user_id: Optional[int] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """Agent entry point: routes to multi-agent, ReAct, or legacy execution mode."""
     force_multi = multi_agents is True
@@ -324,6 +327,7 @@ async def stream_chat(
             skill_db_overrides=skill_db_overrides,
             memory_block=memory_block,
             session_id=session_id,
+            user_id=user_id,
             controlled_intent=decision.intent if decision else None,
         ):
             yield event
@@ -335,6 +339,7 @@ async def stream_chat(
         skill_db_overrides=skill_db_overrides,
         memory_block=memory_block,
         session_id=session_id,
+        user_id=user_id,
     ):
         yield event
 
@@ -501,6 +506,8 @@ async def stream_specialist(
     specialist_agent_id: Optional[str] = None,
     initial_last_result: Optional[Dict[str, Any]] = None,
     initial_last_skill_name: Optional[str] = None,
+    session_id: Optional[int] = None,
+    user_id: Optional[int] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """
     Runs one specialist pass for a single agent in multi-agent mode.
@@ -519,6 +526,8 @@ async def stream_specialist(
             result_sink=result_sink,
             subagent_react=subagent_mode,
             specialist_agent_id=specialist_agent_id,
+            session_id=session_id,
+            user_id=user_id,
             initial_last_result=initial_last_result,
             initial_last_skill_name=initial_last_skill_name,
         ):

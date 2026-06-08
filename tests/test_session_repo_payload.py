@@ -93,6 +93,36 @@ class SessionRepoPayloadUiTest(unittest.TestCase):
         self.assertIn("/tmp/chatbi-uploads/abc_loans.csv", llm_rows[0]["content"])
         self.assertIn("帮我分析逾期分布", llm_rows[0]["content"])
 
+    def test_list_messages_for_llm_can_scope_by_user(self) -> None:
+        captured = {}
+
+        def fake_fetch_all(sql: str, params: tuple) -> list:
+            captured["sql"] = sql
+            captured["params"] = params
+            return []
+
+        with patch("backend.session_repo.app_fetch_all", side_effect=fake_fetch_all):
+            out = list_messages_for_llm(11, user_id=7)
+
+        self.assertEqual(out, [])
+        self.assertIn("app_chat_session", captured["sql"])
+        self.assertEqual(captured["params"], (11, 7, 20))
+
+    def test_load_messages_ui_can_scope_by_user(self) -> None:
+        captured = {}
+
+        def fake_fetch_all(sql: str, params: tuple) -> list:
+            captured["sql"] = sql
+            captured["params"] = params
+            return []
+
+        with patch("backend.session_repo.app_fetch_all", side_effect=fake_fetch_all):
+            out = load_messages_ui(12, user_id=8)
+
+        self.assertEqual(out, [])
+        self.assertIn("app_chat_session", captured["sql"])
+        self.assertEqual(captured["params"], (12, 8))
+
 
 if __name__ == "__main__":
     unittest.main()

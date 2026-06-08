@@ -99,6 +99,7 @@ MODULE_SUITES: dict[str, list[str]] = {
         "tests/test_default_admin_seed.py",
         "tests/test_auth_password.py",
         "tests/test_auth_tokens.py",
+        "tests/test_memory_service_fallback.py",
         "tests/test_memory_repo_prompts.py",
         "tests/test_memory_service_off.py",
     ],

@@ -97,7 +97,7 @@ class ConversationContextBuilder:
             if relevant_history:
                 parts.append(f"## 相关历史\n{relevant_history}")
         elif session_id:
-            recent_turns = self._get_recent_turns(session_id)
+            recent_turns = self._get_recent_turns(session_id, user_id=user_id)
             if recent_turns:
                 parts.append(f"## 最近对话\n{recent_turns}")
 
@@ -141,9 +141,13 @@ class ConversationContextBuilder:
             pass
         return ""
 
-    def _get_recent_turns(self, session_id: int) -> str:
+    def _get_recent_turns(self, session_id: int, user_id: Optional[int] = None) -> str:
         """Get recent conversation turns from DB."""
-        messages = list_messages_for_llm(session_id, self.max_recent_turns * 2)
+        messages = list_messages_for_llm(
+            session_id,
+            self.max_recent_turns * 2,
+            user_id=user_id,
+        )
         return self._format_recent_turns(messages)
 
     def _format_recent_turns(self, messages: List[dict]) -> str:

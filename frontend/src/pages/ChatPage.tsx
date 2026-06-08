@@ -55,13 +55,20 @@ export function ChatPage() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
     void (async () => {
+      setBooting(true);
+      setSessions([]);
+      setSessionId(null);
       const list = await refreshSessions();
+      if (cancelled) return;
       if (list.length === 0) {
         try {
           const created = await createSessionApi();
+          if (cancelled) return;
           setSessionId(created.id);
           await refreshSessions();
+          if (cancelled) return;
         } catch (e) {
           logger.error('create session', e);
         }
@@ -70,7 +77,10 @@ export function ChatPage() {
       }
       setBooting(false);
     })();
-  }, [refreshSessions]);
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshSessions, user?.id]);
 
   useEffect(() => {
     if (!isAdminRole(user?.role)) return;

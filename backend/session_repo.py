@@ -79,14 +79,28 @@ def delete_session(session_id: int, user_id: int) -> None:
     )
 
 
-def list_messages_for_llm(session_id: int, max_messages: int = 20) -> List[Dict[str, Any]]:
+def list_messages_for_llm(
+    session_id: int,
+    max_messages: int = 20,
+    user_id: Optional[int] = None,
+) -> List[Dict[str, Any]]:
     """Return recent turns for the agent, preserving structured follow-up payloads."""
-    rows = app_fetch_all(
-        f"SELECT m.role, m.content, m.payload_json FROM {CHAT_MESSAGE} m "
-        f"INNER JOIN (SELECT id FROM {CHAT_MESSAGE} WHERE session_id = %s "
-        "ORDER BY id DESC LIMIT %s) t ON m.id = t.id ORDER BY m.id ASC",
-        (session_id, max_messages),
-    )
+    if user_id is None:
+        rows = app_fetch_all(
+            f"SELECT m.role, m.content, m.payload_json FROM {CHAT_MESSAGE} m "
+            f"INNER JOIN (SELECT id FROM {CHAT_MESSAGE} WHERE session_id = %s "
+            "ORDER BY id DESC LIMIT %s) t ON m.id = t.id ORDER BY m.id ASC",
+            (session_id, max_messages),
+        )
+    else:
+        rows = app_fetch_all(
+            f"SELECT m.role, m.content, m.payload_json FROM {CHAT_MESSAGE} m "
+            f"INNER JOIN (SELECT cm.id FROM {CHAT_MESSAGE} cm "
+            f"INNER JOIN {CHAT_SESSION} s ON s.id = cm.session_id "
+            "WHERE cm.session_id = %s AND s.user_id = %s "
+            "ORDER BY cm.id DESC LIMIT %s) t ON m.id = t.id ORDER BY m.id ASC",
+            (session_id, user_id, max_messages),
+        )
     out: List[Dict[str, Any]] = []
     for row in rows:
         role = str(row["role"])
@@ -133,12 +147,20 @@ def insert_message(
             return int(cur.lastrowid)
 
 
-def load_messages_ui(session_id: int) -> List[Dict[str, Any]]:
-    rows = app_fetch_all(
-        f"SELECT id, role, content, payload_json, created_at FROM {CHAT_MESSAGE} "
-        "WHERE session_id = %s ORDER BY id ASC",
-        (session_id,),
-    )
+def load_messages_ui(session_id: int, user_id: Optional[int] = None) -> List[Dict[str, Any]]:
+    if user_id is None:
+        rows = app_fetch_all(
+            f"SELECT id, role, content, payload_json, created_at FROM {CHAT_MESSAGE} "
+            "WHERE session_id = %s ORDER BY id ASC",
+            (session_id,),
+        )
+    else:
+        rows = app_fetch_all(
+            f"SELECT m.id, m.role, m.content, m.payload_json, m.created_at "
+            f"FROM {CHAT_MESSAGE} m INNER JOIN {CHAT_SESSION} s ON s.id = m.session_id "
+            "WHERE m.session_id = %s AND s.user_id = %s ORDER BY m.id ASC",
+            (session_id, user_id),
+        )
     result: List[Dict[str, Any]] = []
     for row in rows:
         entry: Dict[str, Any] = {

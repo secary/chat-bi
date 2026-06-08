@@ -28,6 +28,35 @@ def _title_from_user_message(message: str) -> str:
     return collapsed[:80] or "对话摘要"
 
 
+def _compact_excerpt(text: str, limit: int) -> str:
+    collapsed = re.sub(r"\s+", " ", text).strip()
+    if len(collapsed) <= limit:
+        return collapsed
+    return collapsed[:limit].rstrip() + "..."
+
+
+def _fallback_session_summary(user_message: str, assistant_text: str) -> str:
+    question = _compact_excerpt(user_message, 240)
+    answer = _compact_excerpt(assistant_text, 600)
+    lines = ["本轮会话由规则摘要保存，LLM 记忆整理暂不可用。"]
+    if question:
+        lines.append(f"用户问题：{question}")
+    if answer:
+        lines.append(f"助手回答摘录：{answer}")
+    return "\n".join(lines)
+
+
+def _fallback_long_term(prior: str, session_summary: str) -> str:
+    parts: List[str] = []
+    prior = _compact_excerpt(prior, 4000)
+    if prior:
+        parts.append(prior)
+    summary = _compact_excerpt(session_summary, 1200)
+    if summary:
+        parts.append("近期会话补充：\n" + summary)
+    return "\n\n".join(parts)
+
+
 def format_memory_for_prompt(user_id: int) -> str:
     if _MEMORY_OFF:
         return ""
@@ -73,36 +102,98 @@ async def refresh_memory_after_turn(
 ) -> None:
     if _MEMORY_OFF:
         return
+    title = _title_from_user_message(user_message)
+    summary = ""
     try:
         summary = await _llm_text(
             "你是 BI 助手记忆模块。用中文写一段不超过 400 字的会话摘要，"
             "突出用户关心的指标、维度、时间范围与结论，不要编造数字。",
             f"用户问题：{user_message[:2000]}\n\n助手回答摘录：{assistant_text[:6000]}",
         )
-        if not summary:
-            return
-        title = _title_from_user_message(user_message)
+    except Exception as exc:
+        log_event(
+            trace_id,
+            "memory.service",
+            "session_summary_llm_failed",
+            str(exc),
+            level="WARN",
+        )
+    if not summary:
+        summary = _fallback_session_summary(user_message, assistant_text)
+        log_event(
+            trace_id,
+            "memory.service",
+            "session_summary_fallback_used",
+            level="WARN",
+        )
+    if not summary.strip():
+        return
+
+    try:
         insert_session_summary(user_id, session_id, title, summary[:8000])
         trim_session_summaries(user_id, 30)
-
-        summaries = list_recent_session_summaries(user_id, 15)
-        blob = "\n---\n".join(
-            f"{s.get('title') or ''}: {str(s.get('content') or '')[:600]}" for s in summaries
+    except Exception as exc:
+        log_event(
+            trace_id,
+            "memory.service",
+            "session_summary_persist_failed",
+            str(exc),
+            level="WARN",
         )
+        return
+
+    summaries: List[dict] = []
+    prior_txt = ""
+    try:
+        summaries = list_recent_session_summaries(user_id, 15)
         prior = get_long_term_row(user_id)
         prior_txt = str(prior.get("content") or "")[:4000] if prior else ""
+    except Exception as exc:
+        log_event(
+            trace_id,
+            "memory.service",
+            "memory_context_load_failed",
+            str(exc),
+            level="WARN",
+        )
+
+    blob = "\n---\n".join(
+        f"{s.get('title') or ''}: {str(s.get('content') or '')[:600]}" for s in summaries
+    )
+    if not blob:
+        blob = f"{title}: {summary[:600]}"
+
+    try:
         merged = await _llm_text(
             "你是记忆整理器。将「近期会话摘要」与「旧长期记忆」合并为一段不超过 1200 字"
             "的中文「用户查询习惯与稳定偏好」，去除重复，保留可复用的分析口径偏好；不要编造业务数字。",
             f"旧长期记忆：\n{prior_txt}\n\n近期会话摘要：\n{blob[:12000]}",
         )
-        if merged:
-            upsert_long_term(user_id, merged[:12000])
     except Exception as exc:
         log_event(
             trace_id,
             "memory.service",
-            "refresh_failed",
+            "long_term_llm_failed",
+            str(exc),
+            level="WARN",
+        )
+        merged = _fallback_long_term(prior_txt, summary)
+        if merged:
+            log_event(
+                trace_id,
+                "memory.service",
+                "long_term_fallback_used",
+                level="WARN",
+            )
+    if not merged:
+        return
+    try:
+        upsert_long_term(user_id, merged[:12000])
+    except Exception as exc:
+        log_event(
+            trace_id,
+            "memory.service",
+            "long_term_persist_failed",
             str(exc),
             level="WARN",
         )

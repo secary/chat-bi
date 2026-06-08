@@ -122,6 +122,7 @@ export function useChat(sessionId: number | null, dbConnectionId?: number | null
       setMessages([]);
       return;
     }
+    setMessages([]);
     let cancelled = false;
     void getSessionMessagesApi(sessionId)
       .then((rows) => {
@@ -135,6 +136,7 @@ export function useChat(sessionId: number | null, dbConnectionId?: number | null
       })
       .catch((err: unknown) => {
         logger.error('load messages', err);
+        if (!cancelled) setMessages([]);
       });
     return () => {
       cancelled = true;

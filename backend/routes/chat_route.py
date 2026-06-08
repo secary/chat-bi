@@ -151,7 +151,7 @@ async def chat(
         sess = get_session_for_user(req.session_id, int(user["id"]))
         if not sess:
             raise HTTPException(status_code=404, detail="会话不存在")
-        prior = list_messages_for_llm(req.session_id)
+        prior = list_messages_for_llm(req.session_id, user_id=int(user["id"]))
         user_content_for_agent = _message_with_upload_context(req.message, req.uploads)
         messages = prior + [{"role": "user", "content": user_content_for_agent}]
         persist_sid = req.session_id

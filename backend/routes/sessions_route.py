@@ -75,7 +75,7 @@ def get_messages(
 ) -> List[dict]:
     if not get_session_for_user(session_id, user["id"]):
         raise HTTPException(status_code=404, detail="会话不存在")
-    rows = load_messages_ui(session_id)
+    rows = load_messages_ui(session_id, user_id=user["id"])
     log_event(
         request_trace_id(request),
         "sessions",

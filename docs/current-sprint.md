@@ -1,5 +1,8 @@
 | ID | Gap / 变更 | 验证 |
 |---:|---|---|
+| 300  | 生产与容器开发镜像内部后端端口统一改为 8226：uvicorn、nginx 反代和 Dockerfile dev expose 同步调整，外部 nginx 80 / compose 5173 入口保持不变 | `bash -n deploy/docker-entrypoint.prod.sh deploy/docker-entrypoint.dev.sh`；`docker compose config --quiet`；`git diff --check` |
+| 299  | 本地开发后端默认端口从 8000 改为 8226，避开 macOS/VS Code 常见端口占用；同步 Vite 默认代理、E2E smoke 本地默认 URL 与测试文档 | `.venv/bin/python scripts/format_code.py scripts/start_dev.sh scripts/e2e_smoke.py tests/test_start_dev_script.py`；`bash -n scripts/start_dev.sh`；`PYTHONPATH=. .venv/bin/python scripts/run_tests.py foundation -- -q tests/test_start_dev_script.py tests/test_e2e_smoke_script.py`；`npm run build`；`git diff --check` |
+| 298  | `scripts/start_dev.sh` 在本地数据库初始化后默认按 `.env.dev` 的 `CHATBI_SEED_USERS` 刷新应用用户，默认重置密码并裁剪未列入 seed 的旧用户；即使后端未成功启动，开发库用户也会先对齐 env.dev | `.venv/bin/python scripts/format_code.py scripts/start_dev.sh tests/test_start_dev_script.py`；`bash -n scripts/start_dev.sh`；`PYTHONPATH=. .venv/bin/python scripts/run_tests.py foundation -- -q tests/test_start_dev_script.py`；`git diff --check` |
 | 297  | 对话页顶部 trace 状态与“去审计”入口拆成两个独立控件，trace ID 在自身胶囊内截断，避免长 trace 与审计按钮重叠 | `.venv/bin/python scripts/format_code.py frontend/src/pages/ChatPage.tsx`；`npm run lint`；`npm run build`；`git diff --check` |
 | 296  | 用户管理表格 root 权限判断改为页面传入的 `currentUserIsRoot`，统一支持 `role=root` 的当前用户管理普通管理员；目标用户也按用户名或角色识别 root，避免 `root_user` 被当作普通用户操作 | `.venv/bin/python scripts/format_code.py frontend/src/components/UserAdminTable.tsx frontend/src/pages/UserAdminPage.tsx frontend/src/lib/userAdminPermissions.ts frontend/src/lib/userAdminPermissions.test.ts`；`npm run lint`；`npm run test`；`npm run build`；`git diff --check` |
 | 295  | 生产部署排除测试目录：Docker build context 通过 `.dockerignore` 排除 `tests`，prod CD 的 `rsync --delete` 同步也排除 `tests/`；pre CD 保留同步 `tests/` 方便预发机手工调试，文档同步更新生产远端部署排除列表 | `ruby -e 'require "yaml"; YAML.load_file(".github/workflows/deploy-pre.yml"); YAML.load_file(".github/workflows/deploy-prod.yml")'`；`docker compose config --quiet`；`git diff --check` |
@@ -27,6 +30,3 @@
 | 273  | `AGENTS.md` 明确 `docs/current-sprint.md` 只保留最新 30 条记录，超过时删除最旧记录，并同步裁剪当前 sprint 记录 | 文档规则调整；`git diff --check` |
 | 272  | `AGENTS.md` 同步 docs 扁平化后的导航，补充 `helpDocs.ts` 作为页面上下文文档源的维护规则，并修正本地/compose 数据库端口说明 | 文档改动；`git diff --check` |
 | 271  | docs Markdown 扁平化：将 architecture、ci-cd、conventions、agent-runtime、tech-guide、user-guide、testing、e2e-manual、current-sprint 移到 docs 根目录，并同步 README、AGENTS、GitHub agent 和内部链接 | 文档移动/链接更新；`git diff --check` |
-| 270  | docs 目录继续减法：删除重复的后端架构长文、Agent 流程/Prompt 长文和历史设计模板，只保留核心主干文档 | 文档删除；`git diff --check` |
-| 269  | docs 目录做减法：删除此前新增的角色手册与页面级 docs 源文件，保留既有 guide/architecture/testing/ci-cd/conventions/design 主干文档；页面上下文文档继续由前端内置 `helpDocs` 提供 | 文档删除与前端内置文档调整；`git diff --check` |
-| 268  | 按页面上下文展示文档后，移除帮助文档页内的主题切换按钮，避免用户从某页面文档跳到其它管理文档 | `.venv/bin/python scripts/format_code.py frontend/src/pages/HelpPage.tsx`；`npm run build`；`git diff --check` |

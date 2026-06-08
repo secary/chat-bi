@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-BACKEND_PORT="${BACKEND_PORT:-8000}"
+BACKEND_PORT="${BACKEND_PORT:-8226}"
 FRONTEND_PORT="${FRONTEND_PORT:-5173}"
 INIT_DB=1
 DB_ONLY=0
@@ -20,7 +20,7 @@ Options:
   --db-only          Initialize/check only the local dev MySQL database.
   --no-db           Do not initialize/check the local dev MySQL database.
   --no-deps         Do not auto-sync missing Python/frontend dependencies.
-  --backend-port N  Backend port. Default: 8000.
+  --backend-port N  Backend port. Default: 8226.
   --frontend-port N Frontend port. Default: 5173.
   -h, --help        Show this help.
 USAGE
@@ -201,6 +201,36 @@ SQL
   done
 }
 
+seed_env_app_users() {
+  if [[ -z "${CHATBI_SEED_USERS:-}" ]]; then
+    return 0
+  fi
+
+  local seed_python
+  seed_python="$(python_bin || true)"
+  if [[ -z "${seed_python}" ]]; then
+    log "Python virtualenv missing; skipping env seed users"
+    return 0
+  fi
+
+  log "Refreshing env seed users"
+  (
+    cd "${ROOT}"
+    export PYTHONPATH=.
+    export CHATBI_SEED_USERS_RESET_PASSWORD="${CHATBI_SEED_USERS_RESET_PASSWORD:-true}"
+    export CHATBI_SEED_USERS_PRUNE="${CHATBI_SEED_USERS_PRUNE:-true}"
+    "${seed_python}" - <<'PY'
+from backend.config import Settings
+from backend.default_admin_seed import seed_startup_users
+
+results = seed_startup_users(Settings())
+if "failed" in results:
+    raise SystemExit("env seed users failed")
+print("Seed users:", ", ".join(results) if results else "none")
+PY
+  )
+}
+
 init_local_mysql() {
   if ! command -v mysql >/dev/null 2>&1; then
     echo "mysql command not found. Install MySQL client first." >&2
@@ -327,6 +357,7 @@ fi
 
 if [[ "${INIT_DB}" -eq 1 ]]; then
   init_local_mysql
+  seed_env_app_users
 fi
 
 if [[ "${DB_ONLY}" -eq 1 ]]; then

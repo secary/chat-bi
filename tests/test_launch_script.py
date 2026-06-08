@@ -68,9 +68,9 @@ class LaunchScriptTest(unittest.TestCase):
 
             log = log_path.read_text(encoding="utf-8")
             self.assertIn("docker compose up -d --build", log)
-            self.assertIn("curl -fsS http://localhost:5173/health", log)
-            self.assertIn("open http://localhost:5173", log)
-            self.assertIn("ChatBI is ready at http://localhost:5173", result.stdout)
+            self.assertIn("curl -fsS http://localhost:5174/health", log)
+            self.assertIn("open http://localhost:5174", log)
+            self.assertIn("ChatBI is ready at http://localhost:5174", result.stdout)
 
     def test_launch_copies_example_env_when_no_runtime_env_exists(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

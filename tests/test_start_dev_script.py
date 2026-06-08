@@ -60,6 +60,28 @@ class StartDevScriptTest(unittest.TestCase):
         executable.chmod(executable.stat().st_mode | stat.S_IEXEC)
         return bin_dir
 
+    def create_fake_project_python(self, repo: Path) -> Path:
+        bin_dir = repo / ".venv/bin"
+        bin_dir.mkdir(parents=True)
+        executable = bin_dir / "python"
+        executable.write_text(
+            "#!/usr/bin/env bash\n"
+            'echo "python $*" >> "$CHATBI_START_DEV_LOG"\n'
+            'echo "reset=${CHATBI_SEED_USERS_RESET_PASSWORD:-}" >> "$CHATBI_START_DEV_LOG"\n'
+            'echo "prune=${CHATBI_SEED_USERS_PRUNE:-}" >> "$CHATBI_START_DEV_LOG"\n'
+            'if [[ -n "${CHATBI_START_DEV_PY_LOG:-}" ]]; then\n'
+            '  cat >> "$CHATBI_START_DEV_PY_LOG"\n'
+            "else\n"
+            "  cat >/dev/null\n"
+            "fi\n"
+            'echo "Seed users: created, updated"\n'
+            "exit 0\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+        executable.chmod(executable.stat().st_mode | stat.S_IEXEC)
+        return executable
+
     def test_db_only_initializes_local_mysql(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo = Path(temp_dir) / "repo"
@@ -193,6 +215,39 @@ class StartDevScriptTest(unittest.TestCase):
             self.assertIn("'业务库一'", sql_log)
             self.assertIn("'chatbi_demo'", sql_log)
             self.assertIn("Loaded env database connection: 业务库一", result.stdout)
+
+    def test_db_only_refreshes_env_seed_users_when_python_exists(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir) / "repo"
+            repo.mkdir()
+            self.create_minimal_repo(repo)
+            self.create_fake_project_python(repo)
+            bin_dir = self.create_fake_mysql(repo)
+            log_path = repo / "start-dev.log"
+            py_log_path = repo / "start-dev.py"
+
+            result = subprocess.run(
+                ["bash", "scripts/start_dev.sh", "--db-only"],
+                cwd=repo,
+                check=True,
+                capture_output=True,
+                text=True,
+                env={
+                    "CHATBI_FAKE_TABLE_COUNT": "1",
+                    "CHATBI_START_DEV_LOG": str(log_path),
+                    "CHATBI_START_DEV_PY_LOG": str(py_log_path),
+                    "PATH": f"{bin_dir}:{'/usr/bin:/bin'}",
+                },
+            )
+
+            log = log_path.read_text(encoding="utf-8")
+            py_log = py_log_path.read_text(encoding="utf-8")
+            self.assertIn("Refreshing env seed users", result.stdout)
+            self.assertIn("Seed users: created, updated", result.stdout)
+            self.assertIn("python -", log)
+            self.assertIn("reset=true", log)
+            self.assertIn("prune=true", log)
+            self.assertIn("seed_startup_users(Settings())", py_log)
 
     def test_rejects_invalid_port(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

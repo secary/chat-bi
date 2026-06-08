@@ -25,11 +25,11 @@ python scripts/e2e_smoke.py --token "Bearer xxx"
 # 开启鉴权时也可以自动登录获取 token
 python scripts/e2e_smoke.py --username admin --password admin123
 
-# 指定后端地址（脚本默认 8000）
-python scripts/e2e_smoke.py --url http://localhost:8000
+# 指定后端地址（脚本默认 8226）
+python scripts/e2e_smoke.py --url http://localhost:8226
 
 # 也可以用环境变量，便于临时接入 CI 或同事机器
-CHATBI_E2E_URL=http://localhost:8000 python scripts/e2e_smoke.py --cases S1,S4,E1
+CHATBI_E2E_URL=http://localhost:8226 python scripts/e2e_smoke.py --cases S1,S4,E1
 ```
 
 脚本会逐条打印 ✓ / ✗，最终输出通过率。用例覆盖范围见下方各节。
@@ -39,7 +39,7 @@ CHATBI_E2E_URL=http://localhost:8000 python scripts/e2e_smoke.py --cases S1,S4,E
 ## 准备（浏览器手动验证）
 
 1. 启动完整环境：`bash scripts/start_dev.sh`
-2. 浏览器打开 `http://localhost:5173`
+2. 浏览器打开 `http://localhost:5174`
 3. 打开 DevTools → Network，过滤 `/chat`，观察 SSE 流中 `thinking` 步骤的 skill 名称
 
 ---

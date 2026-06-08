@@ -151,19 +151,23 @@ export function ChatPage() {
           </label>
         ) : null}
         {isAdminRole(user?.role) && inspectableTraceId ? (
-          <div className="ml-auto flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs text-gray-600">
-            <span className="text-gray-400">{currentTraceId ? '当前 trace' : '最近 trace'}</span>
+          <div className="ml-auto flex min-w-0 max-w-full items-center gap-2">
             <button
               type="button"
-              className="max-w-[260px] truncate font-mono text-gray-800 transition-colors hover:text-accent"
+              className="flex min-w-0 items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs text-gray-600 transition-colors hover:border-gray-300 hover:bg-gray-100"
               title={inspectableTraceId}
               onClick={() => navigate(`/audits?trace_id=${encodeURIComponent(inspectableTraceId)}`)}
             >
-              {inspectableTraceId}
+              <span className="shrink-0 text-gray-400">
+                {currentTraceId ? '当前 trace' : '最近 trace'}
+              </span>
+              <span className="min-w-0 max-w-[260px] truncate font-mono text-gray-800">
+                {inspectableTraceId}
+              </span>
             </button>
             <button
               type="button"
-              className="rounded-md border border-gray-200 bg-white px-2 py-0.5 text-[11px] text-gray-700 transition-colors hover:bg-gray-100"
+              className="shrink-0 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs text-gray-700 transition-colors hover:bg-gray-100"
               onClick={() => navigate(`/audits?trace_id=${encodeURIComponent(inspectableTraceId)}`)}
             >
               去审计

@@ -3,8 +3,8 @@
 ChatBI E2E smoke test — 需要后端运行中。
 
 用法：
-  python scripts/e2e_smoke.py                          # 默认 http://localhost:8000
-  python scripts/e2e_smoke.py --url http://localhost:8000
+  python scripts/e2e_smoke.py                          # 默认 http://localhost:8226
+  python scripts/e2e_smoke.py --url http://localhost:8226
   python scripts/e2e_smoke.py --token "Bearer xxx"    # 开启鉴权时传 token
   python scripts/e2e_smoke.py --cases S1,M1,C1        # 只跑指定用例
   python scripts/e2e_smoke.py --timeout 90            # 每条用例超时秒数（默认 120）
@@ -160,7 +160,7 @@ def _selected_cases(
 
 def main():
     parser = argparse.ArgumentParser(description="ChatBI E2E smoke test")
-    parser.add_argument("--url", default=os.getenv("CHATBI_E2E_URL", "http://localhost:8000"))
+    parser.add_argument("--url", default=os.getenv("CHATBI_E2E_URL", "http://localhost:8226"))
     parser.add_argument(
         "--token",
         default=os.getenv("CHATBI_E2E_TOKEN"),

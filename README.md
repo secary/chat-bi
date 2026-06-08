@@ -30,7 +30,7 @@ Docker 构建默认使用国内依赖源：apt 与 pip/uv 使用清华源，npm 
 
 ### 4. 访问服务
 
-- 应用：`http://服务器地址:5173`
+- 应用：`http://服务器地址:5174`
 - MySQL：`服务器地址:3307`
 
 ### 5. 常用操作
@@ -62,7 +62,7 @@ chatbi-prod
 | `PROD_DEPLOY_PATH` | `/opt/chat-bi` |
 | `PROD_ENV_FILE` | 可选，完整生产 `.env` 内容 |
 | `PROD_SSH_PORT` | 可选，默认 `22` |
-| `PROD_APP_URL` | 可选，默认 `http://localhost:5173` |
+| `PROD_APP_URL` | 可选，默认 `http://localhost:5174` |
 | `TAILSCALE_AUTHKEY` | 可选，仅服务器只在 Tailscale 内网可达时配置 |
 
 如果服务器使用公网 IP 或普通内网 IP，直接填写 `PROD_SSH_HOST=你的服务器 IP` 即可。只有服务器只暴露在 Tailscale 内网时，才需要额外配置 `TAILSCALE_AUTHKEY`，并将 `PROD_SSH_HOST` 填为对应的 Tailscale IP 或 MagicDNS。

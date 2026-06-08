@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-APP_URL="http://localhost:5173"
+APP_URL="http://localhost:5174"
 COMPOSE_FILE="${ROOT}/docker-compose.yml"
 BUILD=1
 OPEN_BROWSER=1
@@ -19,7 +19,7 @@ Run local self-checks, start the production-style ChatBI stack, wait for /health
 Options:
   --no-build       Start existing images without rebuilding.
   --no-open        Do not open the browser after startup.
-  --url URL        App URL to open and health-check. Default: http://localhost:5173
+  --url URL        App URL to open and health-check. Default: http://localhost:5174
   --timeout SEC    Seconds to wait for /health. Default: 90
   -h, --help       Show this help.
 USAGE

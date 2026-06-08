@@ -38,7 +38,7 @@ services:
         NODE_IMAGE: ${NODE_IMAGE:-node:22-bookworm-slim}
         PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.11-slim}
         # Same-origin /api (see deploy/nginx.app.conf). Not taken from root .env to avoid
-        # stale FRONTEND_API_BASE_URL=http://localhost:8000 breaking the prod bundle.
+        # stale FRONTEND_API_BASE_URL=http://localhost:8226 breaking the prod bundle.
         VITE_API_BASE_URL: /api
     container_name: chatbi-app
     restart: unless-stopped
@@ -52,7 +52,7 @@ services:
       CHATBI_LOG_DB_PORT: 3306
       CHATBI_MYSQL_CMD: mysql
     ports:
-      - "5173:80"
+      - "5174:80"
     depends_on:
       chatbi-db:
         condition: service_healthy

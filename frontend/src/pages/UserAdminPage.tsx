@@ -229,7 +229,7 @@ export function UserAdminPage() {
             loading={loading}
             busyId={busyId}
             currentUserId={user.id}
-            currentUsername={user.username}
+            currentUserIsRoot={currentUserIsRoot}
             onRoleChange={(row, role) => void updateRole(row, role)}
             onResetPassword={(row) => void resetPassword(row)}
             onToggleActive={(row) => void toggleActive(row)}

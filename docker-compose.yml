@@ -2,7 +2,7 @@ name: chatbi
 
 services:
   chatbi-db:
-    image: ${MYSQL_IMAGE:-mysql:8.0}
+    image: m.daocloud.io/docker.io/library/mysql:8.0
     container_name: chatbi-db
     restart: unless-stopped
     environment:
@@ -35,8 +35,6 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        NODE_IMAGE: ${NODE_IMAGE:-node:22-bookworm-slim}
-        PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.11-slim}
         # Same-origin /api (see deploy/nginx.app.conf). Not taken from root .env to avoid
         # stale FRONTEND_API_BASE_URL=http://localhost:8226 breaking the prod bundle.
         VITE_API_BASE_URL: /api

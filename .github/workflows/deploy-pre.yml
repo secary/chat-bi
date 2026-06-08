@@ -51,7 +51,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.event_name == 'push' && github.sha || 'main' }}
+          ref: ${{ github.event_name == 'push' && github.sha || github.ref }}
 
       - name: Validate launch script syntax
         run: bash -n scripts/launch.sh
@@ -93,7 +93,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.event_name == 'push' && github.sha || 'main' }}
+          ref: ${{ github.event_name == 'push' && github.sha || github.ref }}
 
       - name: Validate deployment settings
         run: |
@@ -102,6 +102,7 @@ jobs:
           test -n "${PRE_SSH_USER}" || { echo "Missing secret PRE_SSH_USER"; exit 1; }
           test -n "${PRE_SSH_KEY}" || { echo "Missing secret PRE_SSH_KEY"; exit 1; }
           test -n "${PRE_DEPLOY_PATH}" || { echo "Missing variable or secret PRE_DEPLOY_PATH"; exit 1; }
+          test -n "${PRE_ENV_FILE}" || { echo "Missing secret PRE_ENV_FILE"; exit 1; }
           test -n "${PRE_E2E_URL}" || { echo "Missing variable or secret PRE_E2E_URL"; exit 1; }
           [[ "${HEALTH_TIMEOUT_SECONDS}" =~ ^[0-9]+$ ]] || { echo "PRE_HEALTH_TIMEOUT_SECONDS must be an integer"; exit 1; }
           [[ "${PRE_E2E_TIMEOUT_SECONDS}" =~ ^[0-9]+$ ]] || { echo "PRE_E2E_TIMEOUT_SECONDS must be an integer"; exit 1; }
@@ -147,14 +148,9 @@ jobs:
       - name: Upload pre env file
         run: |
           set -euo pipefail
-          if [[ -z "${PRE_ENV_FILE}" ]]; then
-            echo "PRE_ENV_FILE is not set; keeping the remote .env if it exists."
-            exit 0
-          fi
-
           tmp_env="${RUNNER_TEMP}/chatbi-pre.env"
           remote_env_path="$(printf '%q' "${PRE_DEPLOY_PATH}/.env")"
-          printf '%s\n' "${PRE_ENV_FILE}" > "${tmp_env}"
+          printf '%s\n' "${PRE_ENV_FILE}" | perl -0pe 's/\\n/\n/g' > "${tmp_env}"
           scp -i ~/.ssh/chatbi_cd -P "${PRE_SSH_PORT}" \
             "${tmp_env}" \
             "${PRE_SSH_USER}@${PRE_SSH_HOST}:${remote_env_path}"

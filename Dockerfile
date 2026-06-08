@@ -1,6 +1,4 @@
-ARG NODE_IMAGE=node:22-bookworm-slim
-ARG PYTHON_IMAGE=python:3.11-slim
-FROM ${NODE_IMAGE} AS frontend-deps
+FROM m.daocloud.io/docker.io/library/node:22-bookworm-slim AS frontend-deps
 
 WORKDIR /app
 
@@ -19,7 +17,7 @@ ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 RUN npm run build
 
 
-FROM ${PYTHON_IMAGE} AS backend-base
+FROM m.daocloud.io/docker.io/library/python:3.11-slim AS backend-base
 
 WORKDIR /app
 

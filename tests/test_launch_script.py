@@ -67,7 +67,7 @@ class LaunchScriptTest(unittest.TestCase):
             )
 
             log = log_path.read_text(encoding="utf-8")
-            self.assertIn("docker compose up -d --build", log)
+            self.assertIn("docker compose up -d --force-recreate --build", log)
             self.assertIn("curl -fsS http://localhost:5174/health", log)
             self.assertIn("open http://localhost:5174", log)
             self.assertIn("ChatBI is ready at http://localhost:5174", result.stdout)
@@ -154,6 +154,7 @@ class LaunchScriptTest(unittest.TestCase):
 
             log = log_path.read_text(encoding="utf-8")
             self.assertIn("docker compose up -d", log)
+            self.assertIn("--force-recreate", log)
             self.assertNotIn("--build", log)
             self.assertIn("curl -fsS http://127.0.0.1:9999/health", log)
             self.assertNotIn("open ", log)
@@ -167,3 +168,27 @@ class LaunchScriptTest(unittest.TestCase):
 
             self.assertIn("http://localhost:5174", workflow)
             self.assertNotIn("http://localhost:5173", workflow)
+
+    def test_pre_workflow_uploads_injected_env(self) -> None:
+        workflow = (ROOT / ".github/workflows/deploy-pre.yml").read_text(encoding="utf-8")
+
+        self.assertIn("PRE_ENV_FILE", workflow)
+        self.assertIn('test -n "${PRE_ENV_FILE}"', workflow)
+        self.assertIn("perl -0pe 's/\\\\n/\\n/g'", workflow)
+        self.assertIn("scp -i ~/.ssh/chatbi_cd", workflow)
+        self.assertNotIn("test -f .env.test", workflow)
+        self.assertNotIn("cp .env.test", workflow)
+        self.assertNotIn("keeping the remote .env", workflow)
+
+    def test_compose_defaults_use_build_mirrors(self) -> None:
+        compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+        dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+
+        self.assertIn("m.daocloud.io/docker.io/library/node:22-bookworm-slim", dockerfile)
+        self.assertIn("m.daocloud.io/docker.io/library/python:3.11-slim", dockerfile)
+        self.assertIn("m.daocloud.io/docker.io/library/mysql:8.0", compose)
+        self.assertIn("https://registry.npmmirror.com", dockerfile)
+        self.assertNotIn("NODE_IMAGE", compose + dockerfile)
+        self.assertNotIn("PYTHON_IMAGE", compose + dockerfile)
+        self.assertNotIn("MYSQL_IMAGE", compose)
+        self.assertNotIn("NPM_REGISTRY", compose + dockerfile)

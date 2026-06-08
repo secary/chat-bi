@@ -100,4 +100,4 @@ workflow 已绑定 GitHub Environment `chatbi-prod`。建议在该环境开启 r
 
 如果服务器只暴露在 Tailscale 内网，`PROD_SSH_HOST` 可以直接填服务器的 `100.x.y.z` 地址或 MagicDNS 名称，GitHub runner 会先加入 tailnet 再 SSH。
 
-Docker 构建默认使用国内依赖源：apt 与 pip/uv 使用清华源，npm 使用 npmmirror，并强制将 lockfile 里的 npm tarball 地址替换到该源。Python 依赖安装会降低并发、增加超时和重试，适配较慢的部署网络。
+Docker 构建固定使用国内可用源：基础镜像走 DaoCloud Docker Hub 代理，apt 与 pip/uv 使用清华源，npm 使用支持 Vite 的 npmmirror，并强制将 lockfile 里的 npm tarball 地址替换到该源。Python 依赖安装会降低并发、增加超时和重试，适配较慢的部署网络。

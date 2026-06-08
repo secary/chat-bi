@@ -19,7 +19,9 @@ trap term_handler INT TERM
     cd /app/frontend
     if [ ! -f node_modules/.install-stamp ] || [ package-lock.json -nt node_modules/.install-stamp ]; then
         echo "[frontend] package-lock.json changed - running npm ci..."
-        npm ci
+        npm ci \
+            --registry=https://registry.npmmirror.com \
+            --replace-registry-host=always
         touch node_modules/.install-stamp
     fi
     npm run dev -- --host 0.0.0.0 --port 5174

@@ -26,7 +26,7 @@ CHATBI_SEED_USERS=root:强密码:root
 bash scripts/launch.sh --no-open
 ```
 
-Docker 构建默认使用国内依赖源：apt 与 pip/uv 使用清华源，npm 使用 npmmirror，并强制将 lockfile 里的 npm tarball 地址替换到该源。
+Docker 构建固定使用国内可用源：基础镜像走 DaoCloud Docker Hub 代理，apt 与 pip/uv 使用清华源，npm 使用支持 Vite 的 npmmirror，并强制将 lockfile 里的 npm tarball 地址替换到该源。
 
 ### 4. 访问服务
 

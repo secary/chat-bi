@@ -139,7 +139,12 @@ sync_missing_dependencies() {
       exit 1
     fi
     log "frontend/node_modules missing; running npm ci"
-    (cd "${ROOT}/frontend" && npm ci)
+    (
+      cd "${ROOT}/frontend"
+      npm ci \
+        --registry=https://registry.npmmirror.com \
+        --replace-registry-host=always
+    )
   fi
 }
 

@@ -167,3 +167,16 @@ class LaunchScriptTest(unittest.TestCase):
 
             self.assertIn("http://localhost:5174", workflow)
             self.assertNotIn("http://localhost:5173", workflow)
+
+    def test_compose_defaults_use_build_mirrors(self) -> None:
+        compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+        dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+
+        self.assertIn("m.daocloud.io/docker.io/library/node:22-bookworm-slim", dockerfile)
+        self.assertIn("m.daocloud.io/docker.io/library/python:3.11-slim", dockerfile)
+        self.assertIn("m.daocloud.io/docker.io/library/mysql:8.0", compose)
+        self.assertIn("https://registry.npmmirror.com", dockerfile)
+        self.assertNotIn("NODE_IMAGE", compose + dockerfile)
+        self.assertNotIn("PYTHON_IMAGE", compose + dockerfile)
+        self.assertNotIn("MYSQL_IMAGE", compose)
+        self.assertNotIn("NPM_REGISTRY", compose + dockerfile)

@@ -1,5 +1,20 @@
+## 当前 TODO
+
+| 状态 | 优先级 | 事项 | 当前完成度 / 下一步 |
+|---|---|---|---|
+| 已完成 | P0 | 会话摘要按真实用户注入上下文 | 已完成 Gap 308：`/chat` 将当前用户 ID 透传到 ReAct、Multi-Agent manager / specialist 的上下文构建，修复固定 `user_id=0` 导致摘要读不到或串用户的问题 |
+| 已完成 | P1 | 聊天页顶部 trace / 审计 / 文档入口重叠 | 已完成 Gap 297 + 309：trace 胶囊与“去审计”拆分，文档入口下移到 header 下方 |
+| 待办 | P0 | 记忆刷新失败降级 | 当前记忆刷新完全依赖 LLM，失败后没有降级摘要，可能导致建议问题和长期偏好断档；下一步补 deterministic fallback 摘要与测试 |
+| 待办 | P1 | 会话标题自动命名边界 | 当前每轮都会用最新问题覆盖会话标题，长会话标题会漂移；下一步改为仅在“新对话/默认标题/首轮”时自动命名，用户改名后不再覆盖 |
+| 待办 | P1 | 统一 context budget 策略 | 历史消息、会话摘要、长期记忆存在重复注入风险；下一步统一预算、去重顺序与注入来源优先级 |
+| 待办 | P2 | 发送消息后刷新 session 列表 | 前端发送消息后未及时刷新 session 列表，最近会话排序/标题可能滞后；下一步在会话完成或 assistant 持久化后刷新列表 |
+
 | ID | Gap / 变更 | 验证 |
 |---:|---|---|
+| 313  | TODO：发送消息后刷新 session 列表；前端发送完成后应刷新会话列表，使最近会话排序、标题和欢迎页最近会话卡片及时更新 | 待实现 |
+| 312  | TODO：统一上下文预算策略；梳理历史消息、会话摘要、长期记忆、上传上下文的注入顺序、去重规则与字符预算，降低重复注入和记忆污染 | 待实现 |
+| 311  | TODO：收敛会话标题自动命名；仅在新会话默认标题或首轮时自动命名，避免每轮用户问题覆盖长会话标题，并保留用户手动改名 | 待实现 |
+| 310  | TODO：记忆刷新失败降级；当 LLM 摘要/长期记忆整理失败时，用 deterministic 摘要保存最小可用会话记忆，避免建议问题和长期偏好断档 | 待实现 |
 | 309  | 全局“文档”入口从主内容区右上角下移到 header 下方，避免聊天页顶部 trace 胶囊与“去审计”按钮在窄宽度下和文档入口重叠 | `.venv/bin/python scripts/format_code.py frontend/src/components/AppLayout.tsx`；`npm run lint`；`npm run build`；`git diff --check` |
 | 308  | 会话上下文窗口修正摘要归属：`ConversationContextBuilder` 不再固定用 `user_id=0` 查会话摘要，`/chat` 将当前用户 ID 透传到 single ReAct、多 Agent specialist 与 manager 上下文构建，避免摘要永远读不到或跨用户串记忆 | `.venv/bin/python scripts/format_code.py backend/agent/context_window.py backend/agent/runner.py backend/agent/react_runner.py backend/agent/multi_agent_manager.py backend/agent/multi_agent_runner.py backend/routes/chat_route.py tests/test_context_window.py scripts/run_tests.py`；`PYTHONPATH=. .venv/bin/python scripts/run_tests.py agent -- -q tests/test_context_window.py tests/test_multi_agent_manager.py tests/test_agent_runner_contract.py`；`git diff --check` |
 | 307  | Pre CD 写入 `PRE_ENV_FILE` 时兼容 secret 中的字面量 `\n`，上传前转换成真实换行，避免 `.env` 被写成单行导致后续 `API_BASE/OPENAI_API_KEY` 等配置无法被 dotenv 读取 | `.venv/bin/python scripts/format_code.py tests/test_launch_script.py`；`PYTHONPATH=. .venv/bin/python scripts/run_tests.py foundation -- -q tests/test_launch_script.py`；`ruby -e 'require "yaml"; YAML.load_file(".github/workflows/deploy-pre.yml")'`；`git diff --check` |

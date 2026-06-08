@@ -9,6 +9,9 @@ from typing import Any, Dict, List, Optional
 from backend.db_tables import CHAT_MESSAGE, CHAT_SESSION
 from backend.db_mysql import app_connection, app_execute, app_fetch_all, app_fetch_one
 
+DEFAULT_SESSION_TITLE = "新聊天"
+LEGACY_DEFAULT_SESSION_TITLES = ("新对话",)
+
 
 def _upload_context(content: str, uploads: Any) -> str:
     if not isinstance(uploads, list) or not uploads:
@@ -32,7 +35,7 @@ def _upload_context(content: str, uploads: Any) -> str:
     return "\n".join(lines) + "\n\n" + content
 
 
-def create_session(user_id: int, title: str = "新对话") -> int:
+def create_session(user_id: int, title: str = DEFAULT_SESSION_TITLE) -> int:
     with app_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -40,6 +43,50 @@ def create_session(user_id: int, title: str = "新对话") -> int:
                 (title, user_id),
             )
             return int(cur.lastrowid)
+
+
+def create_or_reuse_default_session(user_id: int, title: str = DEFAULT_SESSION_TITLE) -> int:
+    if not is_default_session_title(title):
+        return create_session(user_id, title)
+
+    keep_id = prune_empty_default_sessions(user_id)
+    if keep_id is None:
+        return create_session(user_id, DEFAULT_SESSION_TITLE)
+    touch_session(keep_id, user_id)
+    return keep_id
+
+
+def prune_empty_default_sessions(user_id: int) -> Optional[int]:
+    empty_defaults = _empty_default_sessions(user_id)
+    if not empty_defaults:
+        return None
+    keep_id = int(empty_defaults[0]["id"])
+    update_session_title(keep_id, user_id, DEFAULT_SESSION_TITLE)
+    for row in empty_defaults[1:]:
+        delete_session(int(row["id"]), user_id)
+    return keep_id
+
+
+def is_default_session_title(title: str) -> bool:
+    normalized = _normalize_title(title)
+    return normalized == DEFAULT_SESSION_TITLE or normalized in LEGACY_DEFAULT_SESSION_TITLES
+
+
+def _normalize_title(title: str) -> str:
+    return " ".join(str(title or "").split()).strip()
+
+
+def _empty_default_sessions(user_id: int) -> List[Dict[str, Any]]:
+    default_titles = (DEFAULT_SESSION_TITLE, *LEGACY_DEFAULT_SESSION_TITLES)
+    placeholders = ", ".join(["%s"] * len(default_titles))
+    return app_fetch_all(
+        f"SELECT s.id, MAX(s.updated_at) AS updated_at FROM {CHAT_SESSION} s "
+        f"LEFT JOIN {CHAT_MESSAGE} m ON m.session_id = s.id "
+        f"WHERE s.user_id = %s AND TRIM(s.title) IN ({placeholders}) "
+        "GROUP BY s.id HAVING COUNT(m.id) = 0 "
+        "ORDER BY updated_at DESC, s.id DESC",
+        (user_id, *default_titles),
+    )
 
 
 def list_sessions(user_id: int, limit: int = 100) -> List[Dict[str, Any]]:

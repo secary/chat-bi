@@ -2,20 +2,28 @@
 
 | 状态 | 优先级 | 事项 | 当前完成度 / 下一步 |
 |---|---|---|---|
+| 已完成 | P1 | 空白新聊天复用 | 已完成 Gap 318：创建或读取会话列表时复用/保留当前用户最新空白“新聊天”，兼容清理旧“新对话”，避免未输入时堆叠多个默认会话 |
+| 已完成 | P2 | 左上角品牌区返回首页 | 已完成 Gap 317：侧边栏 logo + 品牌名改为可点击入口，点击后创建空会话并回到对话欢迎页 |
+| 已完成 | P2 | 欢迎页去除功能预览卡片 | 已完成 Gap 316：移除欢迎页 5 个预览卡片，保留核心输入区和最近会话列表，减少首屏干扰 |
+| 已完成 | P1 | 会话标题自动命名边界 | 已完成 Gap 311：仅默认标题“新聊天”（兼容旧“新对话”）且空会话时用首轮问题自动命名；标题会规则概括首轮内容，后续轮次和手动标题不再被覆盖 |
+| 已完成 | P2 | 欢迎页最近会话列表视觉优化 | 已完成 Gap 315：最近会话从裸表格改为可点击列表项，移除不可操作的“列表/全部”假按钮，增加会话标识、相对日期和空态间距 |
 | 已完成 | P0 | 会话权限与前端残留态收紧 | 已完成 Gap 314：后端消息读取支持 user_id 硬过滤，前端按登录用户重新初始化会话并在消息加载失败时清空旧内容，避免账号切换/无权会话残留旧消息 |
 | 已完成 | P0 | 会话摘要按真实用户注入上下文 | 已完成 Gap 308：`/chat` 将当前用户 ID 透传到 ReAct、Multi-Agent manager / specialist 的上下文构建，修复固定 `user_id=0` 导致摘要读不到或串用户的问题 |
 | 已完成 | P1 | 聊天页顶部 trace / 审计 / 文档入口重叠 | 已完成 Gap 297 + 309：trace 胶囊与“去审计”拆分，文档入口下移到 header 下方 |
 | 已完成 | P0 | 记忆刷新失败降级 | 已完成 Gap 310：LLM 会话摘要失败时保存 deterministic fallback 摘要，长期记忆整理失败时用旧长期记忆 + 本轮摘要做规则合并，避免本轮记忆断档 |
-| 待办 | P1 | 会话标题自动命名边界 | 当前每轮都会用最新问题覆盖会话标题，长会话标题会漂移；下一步改为仅在“新对话/默认标题/首轮”时自动命名，用户改名后不再覆盖 |
 | 待办 | P1 | 统一 context budget 策略 | 历史消息、会话摘要、长期记忆存在重复注入风险；下一步统一预算、去重顺序与注入来源优先级 |
 | 待办 | P2 | 发送消息后刷新 session 列表 | 前端发送消息后未及时刷新 session 列表，最近会话排序/标题可能滞后；下一步在会话完成或 assistant 持久化后刷新列表 |
 
 | ID | Gap / 变更 | 验证 |
 |---:|---|---|
+| 318  | 空白新聊天复用：默认会话名改为“新聊天”；`POST /sessions` 改用 `create_or_reuse_default_session`，`GET /sessions` 也会先执行 `prune_empty_default_sessions`；当当前用户已有未输入任何消息的默认“新聊天”或旧“新对话”时只保留最新一条、改名为“新聊天”并删除更旧空白默认会话；自定义标题仍创建独立会话 | `.venv/bin/python scripts/format_code.py backend/session_repo.py backend/routes/sessions_route.py tests/test_session_repo_payload.py docs/current-sprint.md`；`PYTHONPATH=. .venv/bin/python -m pytest tests/test_session_repo_payload.py -q`；`PYTHONPATH=. .venv/bin/python scripts/run_tests.py agent -- -q tests/test_session_repo_payload.py tests/test_context_window.py tests/test_chat_route_disconnect.py`；`git diff --check` |
+| 317  | 左上角品牌区返回首页：`AppLayout` 中 logo + “零眸智能”品牌块改为可点击入口，点击时带 `home` 导航信号；`ChatPage` 收到后创建空会话、进入欢迎页并清理 URL，避免已在 `/` 时点击无变化 | `npm run lint`；`npm run test`；`npm run build`；`git diff --check` |
+| 316  | 欢迎页去除功能预览卡片：移除 `ChatWelcomeHero` 中 5 个视觉预览卡片和对应预览渲染函数，让首屏聚焦输入框与最近会话列表 | `npm run lint`；`npm run test`；`npm run build`；`git diff --check` |
+| 315  | 欢迎页最近会话列表视觉优化：`ChatWelcomeHero` 的最近会话区域改为整行可点击列表，去掉不可操作的“列表/全部”控件，增加会话标识、标题/元信息层级、相对日期、进入箭头和更清晰的空态 | `npm run lint`；`npm run test`；`npm run build`；`git diff --check` |
 | 314  | 会话权限与前端残留态收紧：`list_messages_for_llm` / `load_messages_ui` 增加可选 `user_id` 过滤，`/chat` 和 `/sessions/{id}/messages` 实际入口均按当前用户读取消息；上下文窗口有用户 ID 时同样按用户过滤；ChatPage 在登录用户变化时重置并重新初始化会话，useChat 切换会话或加载失败时清空旧消息 | `.venv/bin/python scripts/format_code.py backend/session_repo.py backend/routes/sessions_route.py backend/routes/chat_route.py backend/agent/context_window.py tests/test_session_repo_payload.py docs/current-sprint.md`；`PYTHONPATH=. .venv/bin/python -m pytest tests/test_session_repo_payload.py tests/test_context_window.py -q`；`PYTHONPATH=. .venv/bin/python scripts/run_tests.py agent -- -q tests/test_session_repo_payload.py tests/test_context_window.py tests/test_agent_runner_contract.py`；`npm run lint`；`npm run test`；`npm run build`；`git diff --check` |
 | 313  | TODO：发送消息后刷新 session 列表；前端发送完成后应刷新会话列表，使最近会话排序、标题和欢迎页最近会话卡片及时更新 | 待实现 |
 | 312  | TODO：统一上下文预算策略；梳理历史消息、会话摘要、长期记忆、上传上下文的注入顺序、去重规则与字符预算，降低重复注入和记忆污染 | 待实现 |
-| 311  | TODO：收敛会话标题自动命名；仅在新会话默认标题或首轮时自动命名，避免每轮用户问题覆盖长会话标题，并保留用户手动改名 | 待实现 |
+| 311  | 收敛会话标题自动命名：`/chat` 仅在当前会话标题仍为默认“新聊天”（兼容旧“新对话”）且没有历史消息时，用首轮用户问题自动命名；标题由 deterministic 规则概括首轮内容，去除“请/帮我/分析一下/看看”等口语前缀与上传路径噪声；已有消息的长会话和用户手动标题不再被最新问题覆盖 | `.venv/bin/python scripts/format_code.py backend/routes/chat_route.py tests/test_chat_route_disconnect.py docs/current-sprint.md`；`PYTHONPATH=. .venv/bin/python -m pytest tests/test_chat_route_disconnect.py -q`；`PYTHONPATH=. .venv/bin/python scripts/run_tests.py agent -- -q tests/test_chat_route_disconnect.py tests/test_agent_runner_contract.py tests/test_context_window.py`；`git diff --check` |
 | 310  | 记忆刷新失败降级：`refresh_memory_after_turn` 拆分会话摘要与长期记忆刷新；会话摘要 LLM 失败或空结果时保存 deterministic fallback 摘要，长期记忆 LLM 合并失败时用旧长期记忆 + 本轮摘要规则合并，并保留分段日志事件 | `.venv/bin/python scripts/format_code.py backend/memory_service.py tests/test_memory_service_fallback.py scripts/run_tests.py`；`PYTHONPATH=. .venv/bin/python -m pytest tests/test_memory_service_fallback.py -q`；`PYTHONPATH=. .venv/bin/python scripts/run_tests.py auth-memory -- -q` |
 | 309  | 全局“文档”入口从主内容区右上角下移到 header 下方，避免聊天页顶部 trace 胶囊与“去审计”按钮在窄宽度下和文档入口重叠 | `.venv/bin/python scripts/format_code.py frontend/src/components/AppLayout.tsx`；`npm run lint`；`npm run build`；`git diff --check` |
 | 308  | 会话上下文窗口修正摘要归属：`ConversationContextBuilder` 不再固定用 `user_id=0` 查会话摘要，`/chat` 将当前用户 ID 透传到 single ReAct、多 Agent specialist 与 manager 上下文构建，避免摘要永远读不到或跨用户串记忆 | `.venv/bin/python scripts/format_code.py backend/agent/context_window.py backend/agent/runner.py backend/agent/react_runner.py backend/agent/multi_agent_manager.py backend/agent/multi_agent_runner.py backend/routes/chat_route.py tests/test_context_window.py scripts/run_tests.py`；`PYTHONPATH=. .venv/bin/python scripts/run_tests.py agent -- -q tests/test_context_window.py tests/test_multi_agent_manager.py tests/test_agent_runner_contract.py`；`git diff --check` |

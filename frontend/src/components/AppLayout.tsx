@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/useAuth';
 import { authEnabled } from '../lib/authFlags';
 import { helpTopicForPath } from '../lib/helpDocs';
@@ -12,13 +12,19 @@ const linkCls = ({ isActive }: { isActive: boolean }) =>
 export function AppLayout() {
   const { user, logout } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const helpLink = `/help?topic=${helpTopicForPath(location.pathname)}`;
 
   return (
     <div className="flex h-screen bg-white">
       <aside className="flex h-full min-h-0 w-48 shrink-0 flex-col border-r border-gray-100 bg-white py-5">
         <div className="px-4 pb-5">
-          <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="flex items-center gap-2 rounded-lg text-left transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/25"
+            aria-label="返回对话首页"
+            onClick={() => navigate(`/?home=${Date.now()}`)}
+          >
             <img
               src="/logo/lingmou-mark.png"
               alt=""
@@ -26,7 +32,7 @@ export function AppLayout() {
               className="h-7 w-9 shrink-0 object-contain"
             />
             <h1 className="text-base font-semibold text-gray-900">零眸智能</h1>
-          </div>
+          </button>
           <p className="text-xs tracking-wide text-gray-500">对话式数据分析</p>
           {user ? (
             <p className="mt-2 truncate text-xs text-gray-500" title={user.username}>

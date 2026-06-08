@@ -198,7 +198,7 @@ export async function listSessionsApi(): Promise<SessionListApi> {
 }
 
 export async function createSessionApi(
-  title = '新对话',
+  title = '新聊天',
 ): Promise<{ id: number; suggested_prompts: string[] }> {
   return requestJson<{ id: number; suggested_prompts: string[] }>('/sessions', {
     method: 'POST',

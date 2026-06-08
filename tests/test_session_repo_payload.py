@@ -5,7 +5,13 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
-from backend.session_repo import list_messages_for_llm, load_messages_ui
+from backend import session_repo
+from backend.session_repo import (
+    create_or_reuse_default_session,
+    list_messages_for_llm,
+    load_messages_ui,
+    prune_empty_default_sessions,
+)
 
 
 class SessionRepoPayloadUiTest(unittest.TestCase):
@@ -122,6 +128,53 @@ class SessionRepoPayloadUiTest(unittest.TestCase):
         self.assertEqual(out, [])
         self.assertIn("app_chat_session", captured["sql"])
         self.assertEqual(captured["params"], (12, 8))
+
+    def test_create_or_reuse_default_session_reuses_latest_empty_default(self) -> None:
+        executed = []
+
+        with (
+            patch(
+                "backend.session_repo.app_fetch_all",
+                return_value=[{"id": 9}, {"id": 6}, {"id": 4}],
+            ),
+            patch(
+                "backend.session_repo.app_execute",
+                side_effect=lambda sql, params: executed.append((sql, params)),
+            ),
+        ):
+            sid = create_or_reuse_default_session(3, "新聊天")
+
+        self.assertEqual(sid, 9)
+        self.assertEqual(
+            [params for _sql, params in executed], [("新聊天", 9, 3), (6, 3), (4, 3), (9, 3)]
+        )
+
+    def test_create_or_reuse_default_session_keeps_custom_title_as_new(self) -> None:
+        with patch.object(session_repo, "create_session", return_value=22) as create:
+            sid = create_or_reuse_default_session(3, "手动标题")
+
+        self.assertEqual(sid, 22)
+        create.assert_called_once_with(3, "手动标题")
+
+    def test_prune_empty_default_sessions_keeps_latest_only(self) -> None:
+        executed = []
+
+        with (
+            patch(
+                "backend.session_repo.app_fetch_all",
+                return_value=[{"id": 12}, {"id": 10}, {"id": 8}],
+            ),
+            patch(
+                "backend.session_repo.app_execute",
+                side_effect=lambda sql, params: executed.append((sql, params)),
+            ),
+        ):
+            keep_id = prune_empty_default_sessions(5)
+
+        self.assertEqual(keep_id, 12)
+        self.assertEqual(
+            [params for _sql, params in executed], [("新聊天", 12, 5), (10, 5), (8, 5)]
+        )
 
 
 if __name__ == "__main__":

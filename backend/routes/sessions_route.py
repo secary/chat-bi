@@ -11,11 +11,13 @@ from backend.auth_deps import get_current_user
 from backend.http_utils import request_trace_id
 from backend.memory_repo import suggested_prompts_for_user
 from backend.session_repo import (
-    create_session,
+    DEFAULT_SESSION_TITLE,
+    create_or_reuse_default_session,
     delete_session,
     get_session_for_user,
     list_sessions,
     load_messages_ui,
+    prune_empty_default_sessions,
     update_session_title,
 )
 from backend.trace import log_event
@@ -24,7 +26,7 @@ router = APIRouter(prefix="/sessions", tags=["sessions"])
 
 
 class SessionCreate(BaseModel):
-    title: str = Field(default="新对话", max_length=255)
+    title: str = Field(default=DEFAULT_SESSION_TITLE, max_length=255)
 
 
 class SessionPatch(BaseModel):
@@ -43,6 +45,7 @@ class SessionCreateResponse(BaseModel):
 
 @router.get("", response_model=SessionListResponse)
 def get_session_list(request: Request, user: Dict[str, Any] = Depends(get_current_user)) -> dict:
+    prune_empty_default_sessions(user["id"])
     sessions = list_sessions(user["id"])
     prompts = suggested_prompts_for_user(user["id"])
     log_event(
@@ -58,7 +61,7 @@ def get_session_list(request: Request, user: Dict[str, Any] = Depends(get_curren
 def post_session(
     body: SessionCreate, request: Request, user: Dict[str, Any] = Depends(get_current_user)
 ) -> dict:
-    sid = create_session(user["id"], body.title)
+    sid = create_or_reuse_default_session(user["id"], body.title)
     prompts = suggested_prompts_for_user(user["id"])
     log_event(
         request_trace_id(request),

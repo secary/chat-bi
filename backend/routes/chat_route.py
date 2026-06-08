@@ -18,7 +18,9 @@ from backend.http_utils import request_trace_id
 from backend.agent.upload_context import augment_messages_for_upload_followup
 from backend.memory_service import format_memory_for_prompt, refresh_memory_after_turn
 from backend.session_repo import (
+    DEFAULT_SESSION_TITLE,
     get_session_for_user,
+    is_default_session_title,
     insert_message,
     list_messages_for_llm,
     touch_session,
@@ -102,7 +104,42 @@ def _assistant_payload(acc: Dict[str, Any]) -> Dict[str, Any]:
 
 def _session_title_from_message(message: str) -> str:
     collapsed = re.sub(r"\s+", " ", message).strip()
-    return collapsed[:80] or "新对话"
+    title = _compact_session_title(collapsed)
+    return title or DEFAULT_SESSION_TITLE
+
+
+def _compact_session_title(message: str) -> str:
+    text = re.sub(r"/tmp/chatbi-uploads/[A-Za-z0-9._-]+", "上传文件", message).strip()
+    if not text:
+        return ""
+    if "上传文件" in text and ("校验" in text or "结构" in text):
+        return "上传文件结构校验"
+
+    for _ in range(4):
+        next_text = re.sub(
+            r"^(?:请|麻烦|帮我|帮忙|给我|能不能|可以|我想|想|看下|看看|查询一下|查一下|查|"
+            r"统计一下|统计|分析一下|分析|对比一下|对比|说明一下|说明|告诉我)"
+            r"[\s，,。:：]*",
+            "",
+            text,
+        ).strip()
+        if next_text == text:
+            break
+        text = next_text
+
+    text = re.split(r"(?:，|,|；|;|\s)+(?:并|然后|顺便|同时)", text, maxsplit=1)[0]
+    text = re.sub(r"[？?。.!！\s]+$", "", text).strip()
+    text = re.sub(r"(?:可以吗|好吗|怎么样|是什么|如何)$", "", text).strip()
+    text = re.sub(r"[，,；;：:\s]+$", "", text).strip()
+    return text[:24]
+
+
+def _should_auto_update_session_title(
+    current_title: str, prior_messages: List[Dict[str, Any]]
+) -> bool:
+    if not is_default_session_title(current_title):
+        return False
+    return not prior_messages
 
 
 def _next_disconnect_state(disconnected: bool, request_disconnected: bool) -> bool:
@@ -158,11 +195,12 @@ async def chat(
         try:
             user_payload = {"uploads": req.uploads} if req.uploads else None
             insert_message(persist_sid, "user", req.message, user_payload)
-            update_session_title(
-                persist_sid,
-                int(user["id"]),
-                _session_title_from_message(req.message),
-            )
+            if _should_auto_update_session_title(str(sess.get("title") or ""), prior):
+                update_session_title(
+                    persist_sid,
+                    int(user["id"]),
+                    _session_title_from_message(req.message),
+                )
         except Exception as exc:
             log_event(
                 trace_id,

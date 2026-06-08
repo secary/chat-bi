@@ -67,7 +67,7 @@ class LaunchScriptTest(unittest.TestCase):
             )
 
             log = log_path.read_text(encoding="utf-8")
-            self.assertIn("docker compose up -d --build", log)
+            self.assertIn("docker compose up -d --force-recreate --build", log)
             self.assertIn("curl -fsS http://localhost:5174/health", log)
             self.assertIn("open http://localhost:5174", log)
             self.assertIn("ChatBI is ready at http://localhost:5174", result.stdout)
@@ -154,6 +154,7 @@ class LaunchScriptTest(unittest.TestCase):
 
             log = log_path.read_text(encoding="utf-8")
             self.assertIn("docker compose up -d", log)
+            self.assertIn("--force-recreate", log)
             self.assertNotIn("--build", log)
             self.assertIn("curl -fsS http://127.0.0.1:9999/health", log)
             self.assertNotIn("open ", log)
@@ -174,6 +175,9 @@ class LaunchScriptTest(unittest.TestCase):
         self.assertIn("PRE_ENV_FILE", workflow)
         self.assertIn('test -n "${PRE_ENV_FILE}"', workflow)
         self.assertIn("printf '%s\\n' \"${PRE_ENV_FILE}\"", workflow)
+        self.assertIn("PRE_ENV_FILE missing OPENAI_API_KEY", workflow)
+        self.assertIn("PRE_ENV_FILE missing LLM_MODEL", workflow)
+        self.assertIn("PRE_ENV_FILE missing API_BASE", workflow)
         self.assertIn("scp -i ~/.ssh/chatbi_cd", workflow)
         self.assertNotIn("test -f .env.test", workflow)
         self.assertNotIn("cp .env.test", workflow)

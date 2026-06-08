@@ -101,7 +101,7 @@ ensure_env_file
 cd "${ROOT}"
 
 compose_cmd=(docker compose)
-up_cmd=("${compose_cmd[@]}" up -d)
+up_cmd=("${compose_cmd[@]}" up -d --force-recreate)
 if [[ "${BUILD}" -eq 1 ]]; then
   up_cmd+=("--build")
 fi

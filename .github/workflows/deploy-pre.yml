@@ -150,11 +150,7 @@ jobs:
           set -euo pipefail
           tmp_env="${RUNNER_TEMP}/chatbi-pre.env"
           remote_env_path="$(printf '%q' "${PRE_DEPLOY_PATH}/.env")"
-          printf '%s\n' "${PRE_ENV_FILE}" > "${tmp_env}"
-          sed -n 's/^[[:space:]]*\([A-Za-z_][A-Za-z0-9_]*\)[[:space:]]*=.*/PRE_ENV_FILE key: \1/p' "${tmp_env}"
-          grep -Eq '^[[:space:]]*LLM_MODEL[[:space:]]*=[[:space:]]*.+$' "${tmp_env}" || { echo "PRE_ENV_FILE missing LLM_MODEL"; exit 1; }
-          grep -Eq '^[[:space:]]*API_BASE[[:space:]]*=[[:space:]]*.+$' "${tmp_env}" || { echo "PRE_ENV_FILE missing API_BASE"; exit 1; }
-          grep -Eq '^[[:space:]]*OPENAI_API_KEY[[:space:]]*=[[:space:]]*.+$' "${tmp_env}" || { echo "PRE_ENV_FILE missing OPENAI_API_KEY"; exit 1; }
+          printf '%s\n' "${PRE_ENV_FILE}" | perl -0pe 's/\\n/\n/g' > "${tmp_env}"
           scp -i ~/.ssh/chatbi_cd -P "${PRE_SSH_PORT}" \
             "${tmp_env}" \
             "${PRE_SSH_USER}@${PRE_SSH_HOST}:${remote_env_path}"

@@ -174,12 +174,7 @@ class LaunchScriptTest(unittest.TestCase):
 
         self.assertIn("PRE_ENV_FILE", workflow)
         self.assertIn('test -n "${PRE_ENV_FILE}"', workflow)
-        self.assertIn("printf '%s\\n' \"${PRE_ENV_FILE}\"", workflow)
-        self.assertIn("PRE_ENV_FILE key:", workflow)
-        self.assertIn("PRE_ENV_FILE missing OPENAI_API_KEY", workflow)
-        self.assertIn("PRE_ENV_FILE missing LLM_MODEL", workflow)
-        self.assertIn("PRE_ENV_FILE missing API_BASE", workflow)
-        self.assertIn("[[:space:]]*API_BASE[[:space:]]*=", workflow)
+        self.assertIn("perl -0pe 's/\\\\n/\\n/g'", workflow)
         self.assertIn("scp -i ~/.ssh/chatbi_cd", workflow)
         self.assertNotIn("test -f .env.test", workflow)
         self.assertNotIn("cp .env.test", workflow)

@@ -51,7 +51,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.event_name == 'push' && github.sha || 'main' }}
+          ref: ${{ github.event_name == 'push' && github.sha || github.ref }}
 
       - name: Validate launch script syntax
         run: bash -n scripts/launch.sh
@@ -93,7 +93,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.event_name == 'push' && github.sha || 'main' }}
+          ref: ${{ github.event_name == 'push' && github.sha || github.ref }}
 
       - name: Validate deployment settings
         run: |

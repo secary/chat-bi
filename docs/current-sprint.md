@@ -12,11 +12,17 @@
 | 已完成 | P0 | 会话摘要按真实用户注入上下文 | 已完成 Gap 308：`/chat` 将当前用户 ID 透传到 ReAct、Multi-Agent manager / specialist 的上下文构建，修复固定 `user_id=0` 导致摘要读不到或串用户的问题 |
 | 已完成 | P1 | 聊天页顶部 trace / 审计 / 文档入口重叠 | 已完成 Gap 297 + 309：trace 胶囊与“去审计”拆分，文档入口下移到 header 下方 |
 | 已完成 | P0 | 记忆刷新失败降级 | 已完成 Gap 310：LLM 会话摘要失败时保存 deterministic fallback 摘要，长期记忆整理失败时用旧长期记忆 + 本轮摘要做规则合并，避免本轮记忆断档 |
-| 待办 | P1 | 统一 context budget 策略 | 历史消息、会话摘要、长期记忆存在重复注入风险；下一步统一预算、去重顺序与注入来源优先级 |
-| 待办 | P2 | 发送消息后刷新 session 列表 | 前端发送消息后未及时刷新 session 列表，最近会话排序/标题可能滞后；下一步在会话完成或 assistant 持久化后刷新列表 |
+| 待办 | P1 | 统一 context budget 策略 | Gap 312：历史消息、当前会话摘要、相关历史、长期记忆、其它近期摘要和上传上下文分别截断，缺少全局预算、去重顺序与注入来源优先级 |
+| 待办 | P1 | 删除会话同步处理记忆 | Gap 320：删除会话只删 `app_chat_session`，对应 `session_summary` 仍可能作为近期记忆继续注入；下一步删除会话时同步清理或标记失效 |
+| 待办 | P1 | 记忆质量与污染控制 | Gap 321：fallback 摘要和低置信摘要会进入长期记忆合并，缺少来源/质量标记、稳定偏好抽取规则和运营噪声过滤 |
+| 待办 | P2 | 发送消息后刷新 session 列表 | Gap 313：前端发送消息后未及时刷新 session 列表，最近会话排序/标题可能滞后；下一步在会话完成或 assistant 持久化后刷新列表 |
+| 待办 | P2 | 记忆建议词标题统一 | Gap 322：会话标题已规则概括，但记忆摘要标题仍取原始问题前 80 字，建议词依赖噪声过滤；下一步复用统一标题生成逻辑 |
 
 | ID | Gap / 变更 | 验证 |
 |---:|---|---|
+| 322  | TODO：记忆建议词标题统一；`refresh_memory_after_turn` 的摘要 title 仍来自原始用户问题前 80 字，和会话自动标题规则不一致，可能让 suggested prompts 过长、口语化或被噪声过滤误伤；下一步复用统一标题概括逻辑 | 待实现 |
+| 321  | TODO：记忆质量与污染控制；fallback 摘要、空回答摘要、上传路径/工具说明等低质量内容会参与长期记忆合并，缺少来源、置信度、稳定偏好抽取和污染隔离；下一步为摘要增加质量标记并限制进入长期记忆的条件 | 待实现 |
+| 320  | TODO：删除会话同步处理记忆；`DELETE /sessions/{id}` 目前只删除会话记录，已生成的 `session_summary` 仍保留在 `app_user_memory` 并可能被 `format_memory_for_prompt` 当作近期记忆注入；下一步删除或失效对应摘要，并补权限与回归测试 | 待实现 |
 | 319  | 当前会话记忆去重：`format_memory_for_prompt` 增加 `exclude_session_id`，`/chat` 调用时排除当前会话摘要，让当前会话摘要只由 `ConversationContextBuilder` 注入一次；长期记忆和其它近期会话摘要仍保留 | `.venv/bin/python scripts/format_code.py backend/memory_service.py backend/routes/chat_route.py tests/test_memory_service_off.py docs/current-sprint.md`；`PYTHONPATH=. .venv/bin/python -m pytest tests/test_memory_service_off.py tests/test_memory_service_fallback.py tests/test_chat_route_disconnect.py -q`；`PYTHONPATH=. .venv/bin/python scripts/run_tests.py auth-memory -- -q`；`PYTHONPATH=. .venv/bin/python scripts/run_tests.py agent -- -q tests/test_chat_route_disconnect.py tests/test_context_window.py tests/test_agent_runner_contract.py`；`git diff --check` |
 | 318  | 空白新聊天复用：默认会话名改为“新聊天”；`POST /sessions` 改用 `create_or_reuse_default_session`，`GET /sessions` 也会先执行 `prune_empty_default_sessions`；当当前用户已有未输入任何消息的默认“新聊天”或旧“新对话”时只保留最新一条、改名为“新聊天”并删除更旧空白默认会话；自定义标题仍创建独立会话 | `.venv/bin/python scripts/format_code.py backend/session_repo.py backend/routes/sessions_route.py tests/test_session_repo_payload.py docs/current-sprint.md`；`PYTHONPATH=. .venv/bin/python -m pytest tests/test_session_repo_payload.py -q`；`PYTHONPATH=. .venv/bin/python scripts/run_tests.py agent -- -q tests/test_session_repo_payload.py tests/test_context_window.py tests/test_chat_route_disconnect.py`；`git diff --check` |
 | 317  | 左上角品牌区返回首页：`AppLayout` 中 logo + “零眸智能”品牌块改为可点击入口，点击时带 `home` 导航信号；`ChatPage` 收到后创建空会话、进入欢迎页并清理 URL，避免已在 `/` 时点击无变化 | `npm run lint`；`npm run test`；`npm run build`；`git diff --check` |

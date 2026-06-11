@@ -47,7 +47,7 @@ def authorize_action(
             return HarnessPolicyDecision(
                 ok=False,
                 reason="decision-advisor 必须在查询结果或结构化 rows 之后执行。",
-                suggested_text="请先由问数或上传分析专线产出结构化结果，再生成经营建议。",
+                suggested_text="请先通过问数或上传分析技能产出结构化结果，再生成经营建议。",
             )
 
     if skill_name == "chatbi-auto-analysis" and not (
@@ -63,7 +63,7 @@ def authorize_action(
         return HarnessPolicyDecision(
             ok=False,
             reason="file-ingestion 需要上传文件上下文。",
-            suggested_text="当前对话未检测到上传文件，请先上传文件，或改用演示库问数专线处理数据库问题。",
+            suggested_text="当前对话未检测到上传文件，请先上传文件，或改用演示库问数技能处理数据库问题。",
         )
 
     return HarnessPolicyDecision(ok=True)

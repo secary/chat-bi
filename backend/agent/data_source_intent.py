@@ -209,11 +209,3 @@ def format_intent_context_block(
                 f"- 会话中曾出现上传路径：`{upload_path}`（仅供参考，不以历史路径单独决定本轮）。"
             )
     return "\n".join(lines)
-
-
-def format_handoff_data_source_line(intent: DataSourceIntent) -> str:
-    if intent == DataSourceIntent.DEMO_DATABASE:
-        return "【本轮数据源】演示业务库（查演示库，勿用历史上传文件代替）"
-    if intent == DataSourceIntent.UPLOAD_FILE:
-        return "【本轮数据源】上传文件延续（分析/采纳上传表）"
-    return "【本轮数据源】待判断（请根据【用户原述】判断查上传表还是演示库）"

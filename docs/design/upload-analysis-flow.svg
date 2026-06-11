@@ -55,7 +55,7 @@
   <text x="392" y="314" class="small">识别上传 follow-up 上下文</text>
 
   <rect class="box green" x="640" y="240" width="238" height="112"/>
-  <text x="662" y="270" class="boxTitle">3. 路由到上传分析专线</text>
+  <text x="662" y="270" class="boxTitle">3. 路由到上传分析技能链路</text>
   <text x="662" y="294" class="code">_enforce_upload_skill(...)</text>
   <text x="662" y="316" class="small">首轮优先 `chatbi-file-ingestion`</text>
   <text x="662" y="336" class="small">确认/采纳优先 `chatbi-auto-analysis`</text>

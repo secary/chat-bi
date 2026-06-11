@@ -227,27 +227,6 @@ class ConversationContextBuilder:
         return matches >= min(2, len(keywords))
 
 
-def build_manager_context(
-    session_id: Optional[int],
-    current_query: str,
-    messages: List[dict],
-    user_id: Optional[int] = None,
-) -> str:
-    """
-    Convenience function to build context for Manager LLM.
-
-    Args:
-        session_id: The chat session ID (optional)
-        current_query: The current user query
-        messages: All messages in the conversation
-
-    Returns:
-        Hybrid context string for Manager LLM
-    """
-    builder = ConversationContextBuilder()
-    return builder.build_context(session_id, current_query, messages, user_id=user_id)
-
-
 def build_react_context(
     session_id: Optional[int],
     current_query: str,

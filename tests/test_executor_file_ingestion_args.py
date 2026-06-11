@@ -63,7 +63,7 @@ def test_file_ingestion_includes_rows_after_metric_confirmation():
 
 def test_demo_data_skills_prefer_user_original_block_in_composed_message():
     composed = (
-        "【Manager 交办】\n华东华北华南西南\n\n【用户原述】\n各个区域的销售额可以做成柱状图来划分。"
+        "【系统改写】\n华东华北华南西南\n\n【原始用户问题】\n各个区域的销售额可以做成柱状图来划分。"
     )
     messages = [{"role": "user", "content": composed}]
     assert skill_args_for_execution("chatbi-semantic-query", [], messages) == [

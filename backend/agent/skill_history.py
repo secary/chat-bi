@@ -1,4 +1,4 @@
-"""Accumulate and merge multiple skill execution results for finish / Manager summary."""
+"""Accumulate and merge multiple skill execution results for final answers."""
 
 from __future__ import annotations
 

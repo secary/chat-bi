@@ -21,7 +21,7 @@ def evaluate_audit_rules(events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     executed = _count(events, "agent.harness", "action_executing")
     observations = _count(events, "agent.harness", "observation_built")
     finishes = _count(events, "agent.harness", "finish_emitted")
-    empty_specialist_outcomes = _empty_specialist_outcomes(events)
+    empty_legacy_specialist_outcomes = _empty_legacy_specialist_outcomes(events)
     dependency_warnings = _dependency_warnings(events)
     summary_dependency_unmet = _summary_dependency_unmet(events)
     decision_content_issues = _decision_content_issues(events)
@@ -55,12 +55,12 @@ def evaluate_audit_rules(events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         issues.append(
             _issue("MISSING_FINISH_EVENT", "warning", "存在执行记录，但未看到 finish 事件。")
         )
-    if empty_specialist_outcomes:
+    if empty_legacy_specialist_outcomes:
         issues.append(
             _issue(
-                "EMPTY_SPECIALIST_OUTCOME",
+                "EMPTY_LEGACY_SPECIALIST_OUTCOME",
                 "warning",
-                f"有 {empty_specialist_outcomes} 个 specialist 调用结束后未产出有效结果。",
+                f"有 {empty_legacy_specialist_outcomes} 个历史 specialist 事件未产出有效结果。",
             )
         )
     if dependency_warnings:
@@ -76,7 +76,7 @@ def evaluate_audit_rules(events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             _issue(
                 "SUMMARY_WITH_UNMET_DEPENDENCY",
                 "warning",
-                "Manager 在依赖未满足时仍进入了汇总阶段。",
+                "历史汇总事件显示依赖未满足时仍进入了汇总阶段。",
             )
         )
     if llm_config_failure:
@@ -122,7 +122,7 @@ def _count(events: List[Dict[str, Any]], span_name: str, event_name: str) -> int
     )
 
 
-def _empty_specialist_outcomes(events: List[Dict[str, Any]]) -> int:
+def _empty_legacy_specialist_outcomes(events: List[Dict[str, Any]]) -> int:
     count = 0
     for event in events:
         if event["span_name"] != "agent.harness" or event["event_name"] != "observation_built":

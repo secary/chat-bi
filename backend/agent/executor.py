@@ -10,7 +10,7 @@ from backend.agent.skill_runtime import SkillContext, run_skill_api
 _UPLOAD_PATH_RE = re.compile(r"/tmp/chatbi-uploads/[A-Za-z0-9._-]+", re.IGNORECASE)
 _FILE_INGESTION_VALUE_OPTIONS = {"--table", "--sample-size", "--question"}
 _FILE_INGESTION_FLAG_OPTIONS = {"--include-rows"}
-_USER_ORIGINAL_MARKER = "【用户原述】"
+_USER_ORIGINAL_MARKER = "【原始用户问题】"
 
 
 def find_skill(skills: List[SkillDoc], name: str) -> Optional[SkillDoc]:
@@ -55,7 +55,7 @@ def latest_user_content(messages: List[Dict[str, str]]) -> str:
 
 
 def latest_user_prompt_for_demo_data_skills(messages: List[Dict[str, str]]) -> str:
-    """Prefer 【用户原述】 so Manager handoff does not pollute DB substring filters."""
+    """Prefer the original user question when a composed prompt is present."""
     content = latest_user_content(messages)
     if not content or _USER_ORIGINAL_MARKER not in content:
         return content

@@ -407,6 +407,7 @@ async def stream_chat_react(
     subagent_react: bool = False,
     specialist_agent_id: Optional[str] = None,
     session_id: Optional[int] = None,
+    user_id: Optional[int] = None,
     initial_last_result: Optional[Dict[str, Any]] = None,
     initial_last_skill_name: Optional[str] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
@@ -463,7 +464,7 @@ async def stream_chat_react(
 
     # Inject sliding window context for long conversation management
     if session_id:
-        conversation_context = build_react_context(session_id, user_text, messages)
+        conversation_context = build_react_context(session_id, user_text, messages, user_id=user_id)
         if conversation_context.strip():
             system_prompt = system_prompt + "\n\n" + conversation_context
 

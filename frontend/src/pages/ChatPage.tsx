@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useChat } from '../hooks/useChat';
 import { AssistantPendingNotice } from '../components/AssistantPendingNotice';
 import { ChatComposerDock } from '../components/ChatComposerDock';
@@ -20,6 +20,7 @@ import { isAdminRole } from '../lib/roles';
 
 export function ChatPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const bottomRef = useRef<HTMLDivElement>(null);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
@@ -34,6 +35,7 @@ export function ChatPage() {
   const inputBusy = loading || assistantPending;
   const showWelcome = shouldShowChatWelcomeView(booting, messages.length);
   const inspectableTraceId = currentTraceId || lastTraceId;
+  const forceHome = new URLSearchParams(location.search).has('home');
 
   useEffect(() => {
     if (sessionId != null) writeLastSessionId(sessionId);
@@ -55,13 +57,37 @@ export function ChatPage() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
     void (async () => {
+      setBooting(true);
+      setSessions([]);
+      setSessionId(null);
       const list = await refreshSessions();
+      if (cancelled) return;
+      if (forceHome) {
+        try {
+          const created = await createSessionApi();
+          if (cancelled) return;
+          setSessionId(created.id);
+          await refreshSessions();
+          if (cancelled) return;
+          navigate('/', { replace: true });
+        } catch (e) {
+          logger.error('create home session', e);
+          if (list.length > 0) {
+            setSessionId(resolveInitialSessionId(list, readLastSessionId()));
+          }
+        }
+        setBooting(false);
+        return;
+      }
       if (list.length === 0) {
         try {
           const created = await createSessionApi();
+          if (cancelled) return;
           setSessionId(created.id);
           await refreshSessions();
+          if (cancelled) return;
         } catch (e) {
           logger.error('create session', e);
         }
@@ -70,7 +96,10 @@ export function ChatPage() {
       }
       setBooting(false);
     })();
-  }, [refreshSessions]);
+    return () => {
+      cancelled = true;
+    };
+  }, [forceHome, navigate, refreshSessions, user?.id]);
 
   useEffect(() => {
     if (!isAdminRole(user?.role)) return;
@@ -126,7 +155,7 @@ export function ChatPage() {
           onClick={() => void newSession()}
           className="rounded-full bg-accent px-3.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
         >
-          新对话
+          新聊天
         </button>
         {isAdminRole(user?.role) ? (
           <label className="flex items-center gap-2 text-xs text-gray-500">

@@ -274,6 +274,7 @@ async def stream_chat_multi_agent(
     skill_db_overrides: Optional[Dict[str, str]] = None,
     memory_block: Optional[str] = None,
     session_id: Optional[int] = None,
+    user_id: Optional[int] = None,
     controlled_intent: Optional[Dict[str, Any]] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """
@@ -496,6 +497,8 @@ async def stream_chat_multi_agent(
                 specialist_agent_id=agent_id,
                 initial_last_result=seeded_result,
                 initial_last_skill_name=seeded_skill_name,
+                session_id=session_id,
+                user_id=user_id,
             ):
                 if _is_aborted(trace_id):
                     log_event(trace_id, "agent.multi", "aborted", level="INFO")

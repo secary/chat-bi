@@ -8,34 +8,6 @@ interface ChatWelcomeHeroProps {
   onSelectSession: (id: number) => void;
 }
 
-const cards = [
-  {
-    eyebrow: '中文问数',
-    title: '多维分析',
-    preview: 'table',
-  },
-  {
-    eyebrow: '经营复盘',
-    title: '管理建议',
-    preview: 'list',
-  },
-  {
-    eyebrow: '快速导入',
-    title: 'Excel/CSV',
-    preview: 'bars',
-  },
-  {
-    eyebrow: '上传表',
-    title: '指标提案',
-    preview: 'proposal',
-  },
-  {
-    eyebrow: '实时洞察',
-    title: '仪表盘',
-    preview: 'dashboard',
-  },
-];
-
 export function ChatWelcomeHero({
   title,
   children,
@@ -54,48 +26,38 @@ export function ChatWelcomeHero({
         <div className="relative mt-8 w-full">{children}</div>
       </div>
 
-      <div className="mt-14 grid w-full grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5">
-        {cards.map((card) => (
-          <div
-            key={card.title}
-            className="rounded-2xl border border-gray-200 bg-white p-4 shadow-[0_16px_42px_rgba(15,23,42,0.06)]"
-          >
-            <div className="text-sm text-gray-400">{card.eyebrow}</div>
-            <div className="mt-1 text-lg font-semibold text-gray-950">{card.title}</div>
-            <CardPreview kind={card.preview} />
-          </div>
-        ))}
-      </div>
-
       <div className="mt-12 w-full">
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-gray-900">最近</h3>
-          <div className="flex gap-1.5 text-xs text-gray-400">
-            <span className="rounded-md border border-gray-200 px-2 py-1">列表</span>
-            <span className="rounded-md border border-gray-200 px-2 py-1">全部</span>
-          </div>
+          <h3 className="text-sm font-semibold text-gray-900">最近会话</h3>
+          <span className="text-xs text-gray-400">{recent.length} 条</span>
         </div>
-        <div className="overflow-hidden border-b border-gray-200">
-          <div className="grid grid-cols-[minmax(0,1fr)_110px_130px] px-1 pb-3 text-xs text-gray-500">
-            <span>标题</span>
-            <span>类型</span>
-            <span>最近访问</span>
-          </div>
+        <div className="overflow-hidden border-y border-gray-200">
           {recent.length ? (
             recent.map((session) => (
               <button
                 key={session.id}
                 type="button"
-                className="grid w-full grid-cols-[minmax(0,1fr)_110px_130px] border-t border-gray-100 px-1 py-3 text-left text-sm transition-colors hover:bg-gray-50"
+                className="grid min-h-16 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-gray-100 px-1 py-3 text-left transition-colors last:border-b-0 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/25"
                 onClick={() => onSelectSession(session.id)}
               >
-                <span className="truncate font-medium text-gray-800">{session.title}</span>
-                <span className="text-gray-500">对话</span>
-                <span className="truncate text-gray-500">{formatDate(session.updated_at)}</span>
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-medium text-gray-900">
+                    {session.title || '新聊天'}
+                  </span>
+                  <span className="mt-1 block truncate text-xs text-gray-500">
+                    对话 · 最近访问 {formatDate(session.updated_at)}
+                  </span>
+                </span>
+                <span className="flex items-center gap-2 pl-3 text-xs text-gray-400">
+                  <span className="hidden sm:inline">{formatRelativeDate(session.updated_at)}</span>
+                  <span aria-hidden="true" className="text-base leading-none text-gray-300">
+                    ›
+                  </span>
+                </span>
               </button>
             ))
           ) : (
-            <div className="border-t border-gray-100 px-1 py-5 text-sm text-gray-400">
+            <div className="px-1 py-8 text-center text-sm text-gray-400">
               暂无最近会话
             </div>
           )}
@@ -105,67 +67,25 @@ export function ChatWelcomeHero({
   );
 }
 
-function CardPreview({ kind }: { kind: string }) {
-  if (kind === 'bars') {
-    return (
-      <div className="mt-5 flex h-24 items-end gap-2 rounded-lg border border-gray-100 bg-gray-50 px-4 pb-3">
-        {[34, 58, 42, 76, 49, 64].map((h, idx) => (
-          <span
-            key={idx}
-            className="w-3 rounded-t bg-emerald-400"
-            style={{ height: `${h}%` }}
-          />
-        ))}
-      </div>
-    );
-  }
-  if (kind === 'dashboard') {
-    return (
-      <div className="mt-5 grid h-24 grid-cols-2 gap-2 rounded-lg border border-gray-100 bg-gray-50 p-3">
-        <div className="rounded-md bg-blue-100" />
-        <div className="rounded-md bg-indigo-100" />
-        <div className="rounded-md bg-sky-100" />
-        <div className="rounded-md bg-emerald-100" />
-      </div>
-    );
-  }
-  if (kind === 'proposal') {
-    return (
-      <div className="mt-5 h-24 rounded-lg border border-gray-100 bg-gray-50 p-3">
-        <div className="mb-2 h-2 w-24 rounded bg-orange-200" />
-        <div className="mb-2 h-2 w-16 rounded bg-gray-200" />
-        <div className="h-12 rounded-md bg-[linear-gradient(135deg,#fed7aa,#fca5a5)]" />
-      </div>
-    );
-  }
-  if (kind === 'list') {
-    return (
-      <div className="mt-5 h-24 rounded-lg border border-gray-100 bg-gray-50 p-3">
-        {[0, 1, 2, 3].map((idx) => (
-          <div key={idx} className="mb-2 flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-accent/60" />
-            <span className="h-2 flex-1 rounded bg-gray-200" />
-          </div>
-        ))}
-      </div>
-    );
-  }
-  return (
-    <div className="mt-5 h-24 rounded-lg border border-gray-100 bg-gray-50 p-3">
-      {[0, 1, 2, 3].map((row) => (
-        <div key={row} className="mb-2 grid grid-cols-4 gap-2">
-          {[0, 1, 2, 3].map((col) => (
-            <span key={col} className="h-2 rounded bg-gray-200" />
-          ))}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function formatDate(value: string | null): string {
   if (!value) return '-';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return String(value).slice(0, 10);
   return date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
+}
+
+function formatRelativeDate(value: string | null): string {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const today = new Date();
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const startOfDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const diffDays = Math.round(
+    (startOfToday.getTime() - startOfDate.getTime()) / (24 * 60 * 60 * 1000),
+  );
+  if (diffDays === 0) return '今天';
+  if (diffDays === 1) return '昨天';
+  if (diffDays > 1 && diffDays < 7) return `${diffDays} 天前`;
+  return formatDate(value);
 }

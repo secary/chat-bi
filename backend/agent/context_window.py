@@ -67,6 +67,7 @@ class ConversationContextBuilder:
         session_id: Optional[int],
         current_query: str,
         all_messages: Optional[List[dict]] = None,
+        user_id: Optional[int] = None,
     ) -> str:
         """
         Build hybrid context for the current query.
@@ -82,8 +83,8 @@ class ConversationContextBuilder:
         """
         parts: List[str] = []
 
-        if session_id:
-            session_summary = self._get_session_summary(session_id)
+        if session_id and user_id is not None:
+            session_summary = self._get_session_summary(user_id, session_id)
             if session_summary:
                 parts.append(f"## 会话摘要\n{session_summary}")
 
@@ -96,7 +97,7 @@ class ConversationContextBuilder:
             if relevant_history:
                 parts.append(f"## 相关历史\n{relevant_history}")
         elif session_id:
-            recent_turns = self._get_recent_turns(session_id)
+            recent_turns = self._get_recent_turns(session_id, user_id=user_id)
             if recent_turns:
                 parts.append(f"## 最近对话\n{recent_turns}")
 
@@ -107,6 +108,7 @@ class ConversationContextBuilder:
         session_id: Optional[int],
         current_query: str,
         all_messages: List[dict],
+        user_id: Optional[int] = None,
     ) -> str:
         """
         Build context specifically for ReAct agent loop.
@@ -114,8 +116,8 @@ class ConversationContextBuilder:
         because it maintains its own working list.
         """
         session_summary = ""
-        if session_id:
-            session_summary = self._get_session_summary(session_id)
+        if session_id and user_id is not None:
+            session_summary = self._get_session_summary(user_id, session_id)
         recent_turns = self._format_recent_turns(all_messages)
 
         parts: List[str] = []
@@ -126,10 +128,10 @@ class ConversationContextBuilder:
 
         return "\n\n".join(parts)
 
-    def _get_session_summary(self, session_id: int) -> str:
+    def _get_session_summary(self, user_id: int, session_id: int) -> str:
         """Get the most recent session summary for this session."""
         try:
-            summaries = list_recent_session_summaries(user_id=0, limit=10)
+            summaries = list_recent_session_summaries(user_id=user_id, limit=10)
             for s in summaries:
                 if s.get("source_session_id") == session_id:
                     content = str(s.get("content") or "")[: self.max_summary_chars]
@@ -139,9 +141,13 @@ class ConversationContextBuilder:
             pass
         return ""
 
-    def _get_recent_turns(self, session_id: int) -> str:
+    def _get_recent_turns(self, session_id: int, user_id: Optional[int] = None) -> str:
         """Get recent conversation turns from DB."""
-        messages = list_messages_for_llm(session_id, self.max_recent_turns * 2)
+        messages = list_messages_for_llm(
+            session_id,
+            self.max_recent_turns * 2,
+            user_id=user_id,
+        )
         return self._format_recent_turns(messages)
 
     def _format_recent_turns(self, messages: List[dict]) -> str:
@@ -226,6 +232,7 @@ def build_manager_context(
     session_id: Optional[int],
     current_query: str,
     messages: List[dict],
+    user_id: Optional[int] = None,
 ) -> str:
     """
     Convenience function to build context for Manager LLM.
@@ -239,13 +246,14 @@ def build_manager_context(
         Hybrid context string for Manager LLM
     """
     builder = ConversationContextBuilder()
-    return builder.build_context(session_id, current_query, messages)
+    return builder.build_context(session_id, current_query, messages, user_id=user_id)
 
 
 def build_react_context(
     session_id: Optional[int],
     current_query: str,
     messages: List[dict],
+    user_id: Optional[int] = None,
 ) -> str:
     """
     Convenience function to build context for ReAct agent.
@@ -259,4 +267,4 @@ def build_react_context(
         Hybrid context string for ReAct agent
     """
     builder = ConversationContextBuilder()
-    return builder.build_context_for_react(session_id, current_query, messages)
+    return builder.build_context_for_react(session_id, current_query, messages, user_id=user_id)

@@ -1,5 +1,5 @@
 from backend.agent import context_window
-from backend.agent.context_window import build_manager_context, build_react_context
+from backend.agent.context_window import build_react_context
 
 
 def test_react_context_uses_current_user_session_summary(monkeypatch):
@@ -27,13 +27,13 @@ def test_react_context_uses_current_user_session_summary(monkeypatch):
     assert "用户经常追问华东区域销售额" in body
 
 
-def test_manager_context_does_not_query_summary_without_user(monkeypatch):
+def test_react_context_does_not_query_summary_without_user(monkeypatch):
     def fail_if_called(*_args, **_kwargs):
         raise AssertionError("summary lookup requires a real user_id")
 
     monkeypatch.setattr(context_window, "list_recent_session_summaries", fail_if_called)
 
-    body = build_manager_context(
+    body = build_react_context(
         11,
         "继续分析",
         [{"role": "user", "content": "继续分析"}],

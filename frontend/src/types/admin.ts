@@ -72,32 +72,6 @@ export interface SkillAuditRow {
   required_context_count: number;
 }
 
-/** 多专线（Multi-Agent）registry 与 PUT /admin/multi-agents 请求体 */
-export interface MultiAgentLineEntry {
-  enabled: boolean;
-  label: string;
-  role_prompt: string;
-  skill_mode: 'dynamic' | 'restricted';
-  skills: string[];
-  blocked_skills: string[];
-}
-
-export interface MultiAgentsRegistryView {
-  max_agents_per_round: number;
-  max_manager_rounds: number;
-  agents: Record<string, MultiAgentLineEntry>;
-}
-
-export interface MultiAgentRuntimeEntry {
-  enabled: boolean;
-}
-
-export interface MultiAgentsRuntimePayload {
-  max_agents_per_round: number;
-  max_manager_rounds: number;
-  agents: Record<string, MultiAgentRuntimeEntry>;
-}
-
 export interface LlmProfilePublic {
   id: number;
   display_name: string | null;

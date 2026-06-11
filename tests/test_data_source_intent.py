@@ -6,7 +6,6 @@ import unittest
 
 from backend.agent.data_source_intent import (
     DataSourceIntent,
-    format_handoff_data_source_line,
     format_intent_context_block,
     resolve_data_source,
 )
@@ -53,13 +52,13 @@ class TestDataSourceIntent(unittest.TestCase):
         ]
         self.assertEqual(resolve_data_source(messages), DataSourceIntent.AMBIGUOUS)
 
-    def test_manager_handoff_user_original(self):
+    def test_composed_prompt_uses_original_user_question(self):
         messages = [
             {
                 "role": "user",
                 "content": (
-                    "【Manager 交办】\n查演示库\n\n"
-                    "【用户原述】\n不考虑上传，从数据库查各区域销售额排行"
+                    "【系统改写】\n查演示库\n\n"
+                    "【原始用户问题】\n不考虑上传，从数据库查各区域销售额排行"
                 ),
             },
         ]
@@ -73,8 +72,6 @@ class TestDataSourceIntent(unittest.TestCase):
         )
         self.assertIn("file-ingestion", upload)
         self.assertIn("x.csv", upload)
-        line = format_handoff_data_source_line(DataSourceIntent.DEMO_DATABASE)
-        self.assertIn("演示业务库", line)
 
 
 if __name__ == "__main__":

@@ -68,8 +68,8 @@ def _resolve_token(args: argparse.Namespace) -> str | None:
 # ── SSE 读取 ──────────────────────────────────────────────────────────────────
 
 
-def _stream_events(url: str, message: str, token: str | None, multi_agents: bool, timeout: int):
-    yield from stream_chat_events(url, message, token, multi_agents, timeout)
+def _stream_events(url: str, message: str, token: str | None, timeout: int):
+    yield from stream_chat_events(url, message, token, timeout)
 
 
 # ── 断言 ──────────────────────────────────────────────────────────────────────
@@ -86,7 +86,7 @@ def _run_case(case: Case, base_url: str, token: str | None, timeout: int):
     errors: list[str] = []
 
     try:
-        for event in _stream_events(url, case.message, token, case.multi_agents, timeout):
+        for event in _stream_events(url, case.message, token, timeout):
             t = event.get("type", "")
             content = event.get("content", "")
             if t == "thinking" and isinstance(content, str):

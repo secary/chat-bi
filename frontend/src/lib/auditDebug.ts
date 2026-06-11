@@ -78,7 +78,7 @@ export function keywordForIssue(issue: HarnessAuditIssue): string {
     MISSING_OBSERVATION: 'observation_built',
     MISSING_FINISH_EVENT: 'finish_emitted',
     REPEATED_SKILL: 'action_executing',
-    EMPTY_SPECIALIST_OUTCOME: 'has_result false',
+    EMPTY_LEGACY_SPECIALIST_OUTCOME: 'has_result false',
     DOWNSTREAM_DATA_MISSING: 'dependency_warning',
     SUMMARY_WITH_UNMET_DEPENDENCY: 'summary_dependency_unmet',
     FACTS_MISSING_FOR_DECISION: 'decision_content_audited',

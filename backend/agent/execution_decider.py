@@ -1,4 +1,4 @@
-"""Harness pre-audit for choosing the chat execution mode."""
+"""Harness pre-audit for single-agent chat execution."""
 
 from __future__ import annotations
 
@@ -7,21 +7,36 @@ from typing import Any, Dict, List, Literal, Optional
 
 from backend.agent.executor import latest_user_content
 from backend.agent.intent_guard import should_skip_skill_for_message
-from backend.agent.multi_agent_intent import (
-    classify_multi_agent_intent,
-    route_sequence_from_intent,
+
+ExecutionMode = Literal["single", "ask", "reject"]
+
+_BUSINESS_DECISION_MARKERS = (
+    "经营建议",
+    "决策建议",
+    "决策意见",
+    "管理建议",
+    "下一步动作",
+    "经营动作",
+    "经营策略",
 )
-
-ExecutionMode = Literal["single", "multi", "ask", "reject"]
-
-_MULTI_INTENT_TYPES = {
-    "period_compare",
-    "query_then_decide",
-    "query_then_viz",
-    "query_then_decide_then_viz",
-    "upload_then_analyze",
-    "upload_then_viz",
-}
+_QUERY_MARKERS = (
+    "查",
+    "查询",
+    "统计",
+    "分析",
+    "排行",
+    "趋势",
+    "销售额",
+    "毛利",
+    "毛利率",
+    "完成率",
+    "留存",
+    "同比",
+    "环比",
+    "数据库",
+    "表",
+)
+_VISUAL_MARKERS = ("图表", "画图", "可视化", "趋势图", "折线图", "柱状图", "饼图", "看板")
 
 
 @dataclass(frozen=True)
@@ -35,7 +50,7 @@ class ExecutionDecision:
 
 
 def decide_execution_mode(messages: List[Dict[str, str]]) -> ExecutionDecision:
-    """Choose a predictable execution mode from user intent and routing signals."""
+    """Choose whether single-agent execution needs clarification first."""
     user_text = latest_user_content(messages)
     if not user_text:
         return ExecutionDecision(
@@ -50,40 +65,19 @@ def decide_execution_mode(messages: List[Dict[str, str]]) -> ExecutionDecision:
         return ExecutionDecision(
             mode="single",
             route_sequence=[],
-            reason="闲聊或解释类问题不需要多专线协作。",
+            reason="闲聊或解释类问题不需要调用业务工具。",
             confidence=0.95,
             risk_flags=[],
         )
 
-    intent = classify_multi_agent_intent(messages)
-    if not intent:
-        return ExecutionDecision(
-            mode="single",
-            route_sequence=[],
-            reason="未命中结构化业务路由，使用单 Agent 直接回答。",
-            confidence=0.72,
-            risk_flags=["intent_unmatched"],
-        )
-
-    routes = route_sequence_from_intent(intent)
-    intent_type = str(intent.get("intent_type") or "")
+    routes = _route_sequence(user_text)
     risk_flags: List[str] = []
     if len(routes) > 1:
         risk_flags.append("composite_goal")
-    if intent_type.startswith("upload_"):
+    if "上传" in user_text or "附件" in user_text:
         risk_flags.append("upload_context")
-    if intent_type == "period_compare":
+    if "同比" in user_text or "环比" in user_text or "相比" in user_text:
         risk_flags.append("cross_period")
-
-    if intent_type == "query_only":
-        return ExecutionDecision(
-            mode="single",
-            route_sequence=routes,
-            reason="纯问数可由单 Agent 闭环，避免多专线额外耗时。",
-            confidence=0.9,
-            risk_flags=risk_flags,
-            intent=intent,
-        )
 
     if routes == ["business_advisor"]:
         return ExecutionDecision(
@@ -92,24 +86,39 @@ def decide_execution_mode(messages: List[Dict[str, str]]) -> ExecutionDecision:
             reason="用户只要求建议但缺少明确事实范围，需要先澄清分析对象或指标。",
             confidence=0.78,
             risk_flags=["decision_without_facts"],
-            intent=intent,
         )
 
-    if intent_type in _MULTI_INTENT_TYPES:
+    if routes:
         return ExecutionDecision(
-            mode="multi",
+            mode="single",
             route_sequence=routes,
-            reason=str(intent.get("reason") or "复合目标需要先取事实再生成二阶产物。"),
-            confidence=0.88 if len(routes) > 1 else 0.82,
+            reason="业务请求由单 Agent 按需调用工具闭环处理。",
+            confidence=0.9 if routes == ["demo_query"] else 0.82,
             risk_flags=risk_flags,
-            intent=intent,
         )
 
     return ExecutionDecision(
         mode="single",
-        route_sequence=routes,
-        reason="路由置信度不足或目标单一，使用单 Agent 执行。",
-        confidence=0.68,
-        risk_flags=risk_flags or ["low_route_confidence"],
-        intent=intent,
+        route_sequence=[],
+        reason="未命中结构化业务路由，使用单 Agent 直接回答。",
+        confidence=0.72,
+        risk_flags=["intent_unmatched"],
     )
+
+
+def _route_sequence(user_text: str) -> List[str]:
+    wants_query = any(marker in user_text for marker in _QUERY_MARKERS)
+    wants_decision = any(marker in user_text for marker in _BUSINESS_DECISION_MARKERS)
+    wants_visual = any(marker in user_text for marker in _VISUAL_MARKERS)
+
+    if wants_query:
+        routes = ["demo_query"]
+        if wants_decision:
+            routes.append("business_advisor")
+        elif wants_visual:
+            routes.append("viz_board")
+        return routes
+
+    if wants_decision:
+        return ["business_advisor"]
+    return []

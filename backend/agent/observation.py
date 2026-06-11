@@ -88,7 +88,7 @@ def summarize_observation(skill_name: str, result: Dict[str, Any]) -> str:
             if where_ex and _where_has_repeated_equality_on_same_column(where_ex):
                 base["empty_result_hint"] = (
                     "WHERE 中对同一列出现多个「=」等值条件时通常互斥，查询恒为空；"
-                    "应改为 IN 或单一条件。若由 Manager 交办枚举维度值引起，可仅用用户原述重试问数。"
+                    "应改为 IN 或单一条件。若由系统改写枚举维度值引起，可仅用原始用户问题重试问数。"
                 )
 
     charts = result.get("charts") or []

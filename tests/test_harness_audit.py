@@ -155,7 +155,7 @@ class HarnessAuditTest(unittest.TestCase):
         codes = {item["code"] for item in report["issues"]}
         self.assertIn("MISSING_FINISH_EVENT", codes)
 
-    def test_build_audit_report_flags_empty_specialist_outcome(self):
+    def test_build_audit_report_flags_empty_legacy_specialist_outcome(self):
         events = [
             {
                 "span_name": "agent.harness",
@@ -194,7 +194,7 @@ class HarnessAuditTest(unittest.TestCase):
         with patch("backend.agent.harness_audit.list_trace_events", return_value=events):
             report = build_audit_report("t4")
         codes = {item["code"] for item in report["issues"]}
-        self.assertIn("EMPTY_SPECIALIST_OUTCOME", codes)
+        self.assertIn("EMPTY_LEGACY_SPECIALIST_OUTCOME", codes)
 
     def test_build_audit_report_includes_llm_config_flow_and_failure(self):
         events = [

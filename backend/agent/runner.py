@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, AsyncGenerator, Dict, List, Optional, Union
+from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from backend.agent.execution_audit import (
     RemediationAction,
@@ -24,7 +24,6 @@ from backend.agent.prompt_builder import (
     build_system_prompt,
     scan_skills_enabled,
 )
-from backend.agent.prompt_subagent import build_system_prompt_for_subagent
 from backend.agent.query_decision import is_query_plus_decision_text
 from backend.agent.react_runner import stream_chat_react
 from backend.agent.react_followup import run_decision_followup
@@ -99,9 +98,8 @@ def _build_steps(
 
 """
 The agent main entrance.
-if multi-agents mode is on, then goes to stream_chat_multi_agent
-otherwise, it goes to stream_chat_react. React(think-do-observe) mode.
-stream_chat_legacy is not in use by default. It is not ReAct mode.
+All chat traffic now runs through the single-agent path. ReAct is the default
+single-agent runtime; legacy plan-and-execute remains available via config.
 """
 
 
@@ -288,48 +286,25 @@ async def stream_chat(
     trace_id: str = "",
     skill_db_overrides: Optional[Dict[str, str]] = None,
     memory_block: Optional[str] = None,
-    multi_agents: Union[bool, str] = "auto",
     session_id: Optional[int] = None,
     user_id: Optional[int] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
-    """Agent entry point: routes to multi-agent, ReAct, or legacy execution mode."""
-    force_multi = multi_agents is True
-    force_single = multi_agents is False or (
-        isinstance(multi_agents, str) and multi_agents == "single"
+    """Agent entry point: always runs single-agent execution."""
+    decision = decide_execution_mode(messages)
+    log_event(
+        trace_id,
+        "agent.harness",
+        "execution_decision_selected",
+        payload={
+            "mode": decision.mode,
+            "reason": decision.reason,
+            "route_sequence": decision.route_sequence,
+            "confidence": decision.confidence,
+            "risk_flags": decision.risk_flags,
+        },
     )
-    decision: Optional[ExecutionDecision] = None
-    if not force_multi and not force_single:
-        decision = decide_execution_mode(messages)
-        log_event(
-            trace_id,
-            "agent.harness",
-            "execution_decision_selected",
-            payload={
-                "mode": decision.mode,
-                "reason": decision.reason,
-                "route_sequence": decision.route_sequence,
-                "confidence": decision.confidence,
-                "risk_flags": decision.risk_flags,
-            },
-        )
-        if decision.mode == "ask":
-            async for event in _stream_ask_for_clarification(decision, trace_id=trace_id):
-                yield event
-            return
-        force_multi = decision.mode == "multi"
-
-    if force_multi:
-        from backend.agent.multi_agent_runner import stream_chat_multi_agent
-
-        async for event in stream_chat_multi_agent(
-            messages,
-            trace_id=trace_id,
-            skill_db_overrides=skill_db_overrides,
-            memory_block=memory_block,
-            session_id=session_id,
-            user_id=user_id,
-            controlled_intent=decision.intent if decision else None,
-        ):
+    if decision.mode == "ask":
+        async for event in _stream_ask_for_clarification(decision, trace_id=trace_id):
             yield event
         return
 
@@ -350,10 +325,7 @@ async def _stream_chat_legacy(
     skill_db_overrides: Optional[Dict[str, str]] = None,
     memory_block: Optional[str] = None,
     skill_docs: Optional[List[SkillDoc]] = None,
-    role_prompt: Optional[str] = None,
     result_sink: Optional[Dict[str, Any]] = None,
-    subagent_mode: bool = False,
-    specialist_agent_id: Optional[str] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """
     Legacy single-shot mode: one LLM call produces a JSON plan, then executes
@@ -374,11 +346,7 @@ async def _stream_chat_legacy(
         yield {"type": "text", "content": small_talk_reply(user_text)}
         yield {"type": "done", "content": None}
         return
-    system_prompt = (
-        build_system_prompt_for_subagent(skills) if subagent_mode else build_system_prompt(skills)
-    )
-    if role_prompt and role_prompt.strip():
-        system_prompt = role_prompt.strip() + "\n\n" + system_prompt
+    system_prompt = build_system_prompt(skills)
     if memory_block and memory_block.strip():
         system_prompt = memory_block.strip() + "\n\n" + system_prompt
 
@@ -452,7 +420,7 @@ async def _stream_chat_legacy(
                 payload={
                     "skill": skill_name,
                     "args": args,
-                    "agent_id": specialist_agent_id or "single",
+                    "agent_id": "single",
                 },
             )
             result = run_script(
@@ -491,57 +459,3 @@ async def _stream_chat_legacy(
     log_event(trace_id, "agent.runner", "completed", payload={"mode": "legacy"})
     _legacy_sink_write(result_sink, previous_result, last_skill_executed)
     yield {"type": "done", "content": None}
-
-
-async def stream_specialist(
-    messages: List[Dict[str, str]],
-    skill_docs: List[SkillDoc],
-    preferred_skill_slugs: Optional[List[str]] = None,
-    role_prompt: Optional[str] = None,
-    trace_id: str = "",
-    skill_db_overrides: Optional[Dict[str, str]] = None,
-    memory_block: Optional[str] = None,
-    result_sink: Optional[Dict[str, Any]] = None,
-    subagent_mode: bool = False,
-    specialist_agent_id: Optional[str] = None,
-    initial_last_result: Optional[Dict[str, Any]] = None,
-    initial_last_skill_name: Optional[str] = None,
-    session_id: Optional[int] = None,
-    user_id: Optional[int] = None,
-) -> AsyncGenerator[Dict[str, Any], None]:
-    """
-    Runs one specialist pass for a single agent in multi-agent mode.
-    Uses a pre-filtered skill list instead of all available skills.
-    Routes to ReAct or legacy mode based on settings.
-    """
-    if settings.agent_react:
-        async for event in stream_chat_react(
-            messages,
-            trace_id=trace_id,
-            skill_db_overrides=skill_db_overrides,
-            memory_block=memory_block,
-            skill_docs=skill_docs,
-            preferred_skill_slugs=preferred_skill_slugs,
-            role_prompt=role_prompt,
-            result_sink=result_sink,
-            subagent_react=subagent_mode,
-            specialist_agent_id=specialist_agent_id,
-            session_id=session_id,
-            user_id=user_id,
-            initial_last_result=initial_last_result,
-            initial_last_skill_name=initial_last_skill_name,
-        ):
-            yield event
-        return
-    async for event in _stream_chat_legacy(
-        messages,
-        trace_id=trace_id,
-        skill_db_overrides=skill_db_overrides,
-        memory_block=memory_block,
-        skill_docs=skill_docs,
-        role_prompt=role_prompt,
-        result_sink=result_sink,
-        subagent_mode=subagent_mode,
-        specialist_agent_id=specialist_agent_id,
-    ):
-        yield event

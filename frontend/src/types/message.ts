@@ -118,7 +118,6 @@ export interface ChatRequest {
   uploads?: UploadedFile[];
   session_id?: number;
   db_connection_id?: number;
-  multi_agents?: boolean | 'auto' | 'single';
 }
 
 export interface UploadedFile {

@@ -19,7 +19,6 @@ def stream_chat_events(
     url: str,
     message: str,
     token: str | None,
-    multi_agents: bool,
     timeout: int,
     history: list[dict] | None = None,
     uploads: list[dict] | None = None,
@@ -29,7 +28,6 @@ def stream_chat_events(
             "message": message,
             "history": history or [],
             "uploads": uploads or [],
-            "multi_agents": multi_agents,
         }
     ).encode()
     headers = {
@@ -132,7 +130,7 @@ def collect_chat(
     errors: list[str] = []
     got_done = False
     try:
-        for event in stream_chat_events(url, message, token, False, timeout, history, uploads):
+        for event in stream_chat_events(url, message, token, timeout, history, uploads):
             t = event.get("type", "")
             content = event.get("content", "")
             if t == "thinking":

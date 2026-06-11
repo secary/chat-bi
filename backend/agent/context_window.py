@@ -111,9 +111,8 @@ class ConversationContextBuilder:
         user_id: Optional[int] = None,
     ) -> str:
         """
-        Build context specifically for ReAct agent loop.
-        Unlike multi-agent manager, ReAct agent needs full message list
-        because it maintains its own working list.
+        Build context specifically for the ReAct agent loop.
+        ReAct needs the full message list because it maintains its own working list.
         """
         session_summary = ""
         if session_id and user_id is not None:
@@ -226,27 +225,6 @@ class ConversationContextBuilder:
         content_lower = content.lower()
         matches = sum(1 for kw in keywords if kw in content_lower)
         return matches >= min(2, len(keywords))
-
-
-def build_manager_context(
-    session_id: Optional[int],
-    current_query: str,
-    messages: List[dict],
-    user_id: Optional[int] = None,
-) -> str:
-    """
-    Convenience function to build context for Manager LLM.
-
-    Args:
-        session_id: The chat session ID (optional)
-        current_query: The current user query
-        messages: All messages in the conversation
-
-    Returns:
-        Hybrid context string for Manager LLM
-    """
-    builder = ConversationContextBuilder()
-    return builder.build_context(session_id, current_query, messages, user_id=user_id)
 
 
 def build_react_context(

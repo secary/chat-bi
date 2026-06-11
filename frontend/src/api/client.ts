@@ -9,8 +9,6 @@ import type {
   LlmSettingsView,
   HarnessAuditReport,
   HarnessAuditCandidate,
-  MultiAgentsRegistryView,
-  MultiAgentsRuntimePayload,
   SessionListApi,
 } from '../types/admin';
 import type { AppUser, AppUserRow } from '../types/auth';
@@ -306,25 +304,12 @@ export async function listSkillAudits(): Promise<{ items: SkillAuditRow[] }> {
   return requestJson<{ items: SkillAuditRow[] }>('/admin/skills/audit');
 }
 
-export async function getMultiAgentsRegistry(): Promise<MultiAgentsRegistryView> {
-  return requestJson<MultiAgentsRegistryView>('/admin/multi-agents');
-}
-
 export async function listHarnessAuditCandidates(): Promise<{ items: HarnessAuditCandidate[] }> {
   return requestJson<{ items: HarnessAuditCandidate[] }>('/admin/harness-audits');
 }
 
 export async function getHarnessAudit(traceId: string): Promise<HarnessAuditReport> {
   return requestJson<HarnessAuditReport>(`/admin/harness-audits/${encodeURIComponent(traceId)}`);
-}
-
-export async function putMultiAgentsRegistry(
-  payload: MultiAgentsRuntimePayload,
-): Promise<MultiAgentsRegistryView> {
-  return requestJson<MultiAgentsRegistryView>('/admin/multi-agents', {
-    method: 'PUT',
-    body: JSON.stringify(payload),
-  });
 }
 
 export async function getSkillFile(slug: string): Promise<{ markdown: string }> {

@@ -99,9 +99,8 @@ def _build_steps(
 
 """
 The agent main entrance.
-if multi-agents mode is on, then goes to stream_chat_multi_agent
-otherwise, it goes to stream_chat_react. React(think-do-observe) mode.
-stream_chat_legacy is not in use by default. It is not ReAct mode.
+All chat traffic now runs through the single-agent path. ReAct is the default
+single-agent runtime; legacy plan-and-execute remains available via config.
 """
 
 
@@ -292,44 +291,24 @@ async def stream_chat(
     session_id: Optional[int] = None,
     user_id: Optional[int] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
-    """Agent entry point: routes to multi-agent, ReAct, or legacy execution mode."""
-    force_multi = multi_agents is True
-    force_single = multi_agents is False or (
-        isinstance(multi_agents, str) and multi_agents == "single"
+    """Agent entry point: always runs single-agent execution."""
+    decision = decide_execution_mode(messages)
+    log_event(
+        trace_id,
+        "agent.harness",
+        "execution_decision_selected",
+        payload={
+            "mode": "single" if decision.mode == "multi" else decision.mode,
+            "requested_multi_agents": multi_agents,
+            "suppressed_mode": "multi" if decision.mode == "multi" else None,
+            "reason": decision.reason,
+            "route_sequence": decision.route_sequence,
+            "confidence": decision.confidence,
+            "risk_flags": decision.risk_flags,
+        },
     )
-    decision: Optional[ExecutionDecision] = None
-    if not force_multi and not force_single:
-        decision = decide_execution_mode(messages)
-        log_event(
-            trace_id,
-            "agent.harness",
-            "execution_decision_selected",
-            payload={
-                "mode": decision.mode,
-                "reason": decision.reason,
-                "route_sequence": decision.route_sequence,
-                "confidence": decision.confidence,
-                "risk_flags": decision.risk_flags,
-            },
-        )
-        if decision.mode == "ask":
-            async for event in _stream_ask_for_clarification(decision, trace_id=trace_id):
-                yield event
-            return
-        force_multi = decision.mode == "multi"
-
-    if force_multi:
-        from backend.agent.multi_agent_runner import stream_chat_multi_agent
-
-        async for event in stream_chat_multi_agent(
-            messages,
-            trace_id=trace_id,
-            skill_db_overrides=skill_db_overrides,
-            memory_block=memory_block,
-            session_id=session_id,
-            user_id=user_id,
-            controlled_intent=decision.intent if decision else None,
-        ):
+    if decision.mode == "ask":
+        async for event in _stream_ask_for_clarification(decision, trace_id=trace_id):
             yield event
         return
 

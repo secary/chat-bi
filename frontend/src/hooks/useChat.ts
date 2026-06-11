@@ -245,7 +245,6 @@ export function useChat(sessionId: number | null, dbConnectionId?: number | null
             uploads,
             session_id: sessionId,
             db_connection_id: effectiveDbConnectionId || undefined,
-            multi_agents: 'auto',
           },
           traceIdToUse,
           { signal: ac.signal },

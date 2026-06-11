@@ -91,18 +91,21 @@ class ExecutionDeciderTest(unittest.TestCase):
 
         asyncio.run(run())
 
-    def test_stream_chat_auto_dispatches_composite_input_to_multi_agent(self) -> None:
+    def test_stream_chat_auto_runs_composite_input_with_single_agent(self) -> None:
         async def run() -> None:
-            captured = {}
-
-            async def fake_multi(*args, **kwargs):
-                captured["controlled_intent"] = kwargs.get("controlled_intent")
-                yield {"type": "text", "content": "multi ok"}
+            async def fake_single(*args, **kwargs):
+                yield {"type": "text", "content": "single ok"}
                 yield {"type": "done", "content": None}
 
-            with patch(
-                "backend.agent.multi_agent_runner.stream_chat_multi_agent",
-                side_effect=fake_multi,
+            with (
+                patch(
+                    "backend.agent.runner._stream_single_with_post_audit",
+                    side_effect=fake_single,
+                ),
+                patch(
+                    "backend.agent.multi_agent_runner.stream_chat_multi_agent",
+                    side_effect=AssertionError("multi-agent should not run"),
+                ),
             ):
                 got = []
                 async for event in stream_chat(
@@ -111,14 +114,13 @@ class ExecutionDeciderTest(unittest.TestCase):
                 ):
                     got.append(event)
 
-            self.assertEqual(got[-2]["content"], "multi ok")
-            self.assertEqual(captured["controlled_intent"]["intent_type"], "query_then_decide")
+            self.assertEqual(got[-2]["content"], "single ok")
 
         import asyncio
 
         asyncio.run(run())
 
-    def test_stream_chat_false_forces_single_agent(self) -> None:
+    def test_stream_chat_multi_agents_true_still_runs_single_agent(self) -> None:
         async def run() -> None:
             async def fake_single(*args, **kwargs):
                 yield {"type": "text", "content": "single ok"}
@@ -136,7 +138,7 @@ class ExecutionDeciderTest(unittest.TestCase):
                 got = []
                 async for event in stream_chat(
                     [{"role": "user", "content": "基于华东近3个月销售和毛利给经营建议"}],
-                    multi_agents=False,
+                    multi_agents=True,
                     trace_id="t-force-single",
                 ):
                     got.append(event)

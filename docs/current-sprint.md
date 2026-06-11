@@ -2,6 +2,7 @@
 
 | 状态 | 优先级 | 事项 | 当前完成度 / 下一步 |
 |---|---|---|---|
+| 已完成 | P0 | 多 Agent 运行时断流第一步 | 已完成 Gap 324：`/chat` 运行时不再按 `multi_agents=auto/true` 分流到多专线，统一走单 Agent + post-audit；前端停止主动发送 `multi_agents` 字段，保留后端请求字段作为临时兼容 |
 | 已完成 | P1 | 记忆 fallback 测试环境隔离 | 已完成 Gap 323：fallback 记忆测试显式开启 `_MEMORY_OFF=False`，覆盖 CI 设置 `CHATBI_MEMORY_DISABLED=1` 时的测试隔离问题 |
 | 已完成 | P1 | 当前会话记忆去重 | 已完成 Gap 319：`/chat` 构建 memory block 时排除当前会话摘要，避免与 context window 的当前会话摘要重复注入 |
 | 已完成 | P1 | 空白新聊天复用 | 已完成 Gap 318：创建或读取会话列表时复用/保留当前用户最新空白“新聊天”，兼容清理旧“新对话”，避免未输入时堆叠多个默认会话 |
@@ -21,6 +22,7 @@
 
 | ID | Gap / 变更 | 验证 |
 |---:|---|---|
+| 324  | 多 Agent 运行时断流第一步：`stream_chat` 保留执行决策日志和澄清分支，但不再导入或调用 `stream_chat_multi_agent`；复合意图、`multi_agents=auto` 与强传 `multi_agents=true` 都统一进入单 Agent + post-audit 路径；前端 `useChat` 不再主动发送 `multi_agents: "auto"`，后端请求字段暂时保留用于兼容旧客户端 | `.venv/bin/python scripts/format_code.py backend/agent/runner.py tests/test_execution_decider.py docs/current-sprint.md`；`PYTHONPATH=. .venv/bin/python -m pytest tests/test_execution_decider.py -q`；`npm run lint`；`git diff --check` |
 | 323  | 记忆 fallback 测试环境隔离：`tests/test_memory_service_fallback.py` 的两个降级行为测试显式将 `memory_service._MEMORY_OFF` 设为 `False`，避免 CI 或外层环境设置 `CHATBI_MEMORY_DISABLED=1` 时被测函数提前 return，导致 fallback 持久化断言误失败 | `.venv/bin/python -m pytest tests/test_memory_service_fallback.py tests/test_memory_service_off.py -q`；`CHATBI_MEMORY_DISABLED=1 .venv/bin/python -m pytest tests/test_memory_service_fallback.py -q`；`.venv/bin/python scripts/format_code.py tests/test_memory_service_fallback.py`；`.venv/bin/python scripts/run_tests.py all -- -q` |
 | 322  | TODO：记忆建议词标题统一；`refresh_memory_after_turn` 的摘要 title 仍来自原始用户问题前 80 字，和会话自动标题规则不一致，可能让 suggested prompts 过长、口语化或被噪声过滤误伤；下一步复用统一标题概括逻辑 | 待实现 |
 | 321  | TODO：记忆质量与污染控制；fallback 摘要、空回答摘要、上传路径/工具说明等低质量内容会参与长期记忆合并，缺少来源、置信度、稳定偏好抽取和污染隔离；下一步为摘要增加质量标记并限制进入长期记忆的条件 | 待实现 |

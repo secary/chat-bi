@@ -111,9 +111,8 @@ class ConversationContextBuilder:
         user_id: Optional[int] = None,
     ) -> str:
         """
-        Build context specifically for ReAct agent loop.
-        Unlike multi-agent manager, ReAct agent needs full message list
-        because it maintains its own working list.
+        Build context specifically for the ReAct agent loop.
+        ReAct needs the full message list because it maintains its own working list.
         """
         session_summary = ""
         if session_id and user_id is not None:

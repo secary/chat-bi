@@ -43,7 +43,6 @@ from backend.agent.prompt_builder import (
     build_react_system_prompt,
     scan_skills_enabled,
 )
-from backend.agent.prompt_subagent import build_react_system_prompt_for_subagent
 from backend.agent.query_decision import is_query_plus_decision_text
 from backend.agent.react_followup import run_decision_followup
 from backend.agent.upload_context import cache_file_data, get_cached_file_data, get_cached_rows
@@ -308,108 +307,15 @@ def _skill_log_payload(
     return payload
 
 
-def _force_subagent_converge_on_policy_reject(
-    policy: Any,
-    *,
-    trace_id: str,
-    specialist_agent_id: Optional[str],
-    result_sink: Optional[Dict[str, Any]],
-    last_result: Optional[Dict[str, Any]],
-    last_skill_name: Optional[str],
-) -> Optional[str]:
-    if not specialist_agent_id or not getattr(policy, "suggested_text", ""):
-        return None
-    suggestion = str(policy.suggested_text).strip()
-    if not suggestion:
-        return None
-    log_event(
-        trace_id,
-        "agent.runner",
-        "completed",
-        payload={
-            "mode": "react_subagent",
-            "action": "forced_converge",
-            "agent_id": specialist_agent_id,
-        },
-    )
-    sync_skill_sink(result_sink, last_result, last_skill_name)
-    return f"本专线停止继续试错。{suggestion}"
-
-
-def _result_signature(result: Optional[Dict[str, Any]]) -> tuple[Any, ...]:
-    if not isinstance(result, dict):
-        return ()
-    data = result.get("data")
-    rows: List[Dict[str, Any]] = []
-    plan_summary: Dict[str, Any] = {}
-    if isinstance(data, dict):
-        raw_rows = data.get("rows")
-        if isinstance(raw_rows, list):
-            rows = [row for row in raw_rows[:3] if isinstance(row, dict)]
-        raw_plan = data.get("plan_summary")
-        if isinstance(raw_plan, dict):
-            plan_summary = raw_plan
-    row_keys = tuple(sorted(str(key) for row in rows for key in row.keys()))
-    row_values = tuple(tuple(sorted((str(k), str(v)) for k, v in row.items())) for row in rows)
-    return (
-        str(result.get("kind") or ""),
-        str(result.get("text") or "")[:240],
-        row_keys,
-        row_values,
-        str(plan_summary.get("metric") or ""),
-        tuple(str(item) for item in plan_summary.get("dimensions", []) or []),
-        str(plan_summary.get("time_filter") or ""),
-    )
-
-
-def _args_signature(args: List[str]) -> tuple[str, ...]:
-    return tuple(str(arg) for arg in args)
-
-
-def _should_stop_repeated_subagent_skill(
-    *,
-    subagent_react: bool,
-    skill_name: str,
-    args: List[str],
-    last_skill_name: Optional[str],
-    last_result: Optional[Dict[str, Any]],
-    repeated_skill_count: int,
-    previous_args_signature: tuple[str, ...],
-    previous_signature: tuple[Any, ...],
-) -> bool:
-    if not subagent_react:
-        return False
-    if skill_name != last_skill_name:
-        return False
-    if not previous_signature:
-        return False
-    current_args_signature = _args_signature(args)
-    if (
-        current_args_signature
-        and current_args_signature == previous_args_signature
-        and repeated_skill_count >= 1
-    ):
-        return True
-    if repeated_skill_count < 2:
-        return False
-    return previous_signature == _result_signature(last_result)
-
-
 async def stream_chat_react(
     messages: List[Dict[str, Any]],
     trace_id: str = "",
     skill_db_overrides: Optional[Dict[str, str]] = None,
     memory_block: Optional[str] = None,
     skill_docs: Optional[List[SkillDoc]] = None,
-    preferred_skill_slugs: Optional[List[str]] = None,
-    role_prompt: Optional[str] = None,
     result_sink: Optional[Dict[str, Any]] = None,
-    subagent_react: bool = False,
-    specialist_agent_id: Optional[str] = None,
     session_id: Optional[int] = None,
     user_id: Optional[int] = None,
-    initial_last_result: Optional[Dict[str, Any]] = None,
-    initial_last_skill_name: Optional[str] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """
     ReAct multi-step agent loop.
@@ -422,10 +328,7 @@ async def stream_chat_react(
         trace_id,
         "agent.runner",
         "started",
-        payload={
-            "message_count": len(messages),
-            "mode": "react_subagent" if subagent_react else "react",
-        },
+        payload={"message_count": len(messages), "mode": "react"},
     )
     skills = skill_docs if skill_docs is not None else scan_skills_enabled(settings.skills_dir)
     allowed_slugs = {d.skill_dir.name for d in skills}
@@ -452,13 +355,7 @@ async def stream_chat_react(
     The skills are the skills that the agent can use.
     The system prompt is the prompt that the agent uses to make a decision.
     """
-    system_prompt = (
-        build_react_system_prompt_for_subagent(skills)
-        if subagent_react
-        else build_react_system_prompt(skills)
-    )
-    if role_prompt and role_prompt.strip():
-        system_prompt = role_prompt.strip() + "\n\n" + system_prompt
+    system_prompt = build_react_system_prompt(skills)
     if memory_block and memory_block.strip():
         system_prompt = memory_block.strip() + "\n\n" + system_prompt
 
@@ -477,20 +374,12 @@ async def stream_chat_react(
         user_text=user_text,
         max_steps=settings.agent_max_steps,
         session_id=session_id,
-        mode="subagent" if subagent_react else "single",
+        mode="single",
     )
-    harness_state.seed_last_result(initial_last_skill_name, initial_last_result)
-    last_skill_name: Optional[str] = (
-        initial_last_skill_name if isinstance(initial_last_result, dict) else None
-    )
-    last_result: Optional[Dict[str, Any]] = (
-        dict(initial_last_result) if isinstance(initial_last_result, dict) else None
-    )
+    last_skill_name: Optional[str] = None
+    last_result: Optional[Dict[str, Any]] = None
     local_executions: List[Dict[str, Any]] = []
     called_skills: list[str] = []
-    last_result_signature: tuple[Any, ...] = _result_signature(last_result)
-    last_skill_args_signature: tuple[str, ...] = ()
-    repeated_skill_count = 0
     last_ingestion_rows: List[Dict[str, Any]] = list(cached_upload_rows)
     last_ingestion_column_labels: Optional[Dict[str, Any]] = None
 
@@ -595,8 +484,6 @@ async def stream_chat_react(
                 harness_state,
                 sorted(allowed_slugs),
                 messages=messages,
-                specialist_agent_id=specialist_agent_id if subagent_react else None,
-                preferred_skills=preferred_skill_slugs,
             )
             if not policy.ok:
                 harness_state.record_rejection(policy.reason)
@@ -695,39 +582,6 @@ async def stream_chat_react(
             )
         if skill_name == "chatbi-chart-recommendation":
             args = _chart_recommendation_args(user_text, args, last_result)
-        if _should_stop_repeated_subagent_skill(
-            subagent_react=subagent_react,
-            skill_name=skill_name,
-            args=args,
-            last_skill_name=last_skill_name,
-            last_result=last_result,
-            repeated_skill_count=repeated_skill_count,
-            previous_args_signature=last_skill_args_signature,
-            previous_signature=last_result_signature,
-        ):
-            log_event(
-                trace_id,
-                "agent.runner",
-                "repeated_skill_converged",
-                payload={
-                    "mode": "react_subagent",
-                    "skill": skill_name,
-                    "agent_id": specialist_agent_id,
-                    "repeat_count": repeated_skill_count + 1,
-                },
-            )
-            yield {
-                "type": "thinking",
-                "content": "连续查询未获得新增信息，已基于当前结果交回路由层。",
-            }
-            merged = _finish_merged(
-                result_sink, plan, last_skill_name, last_result, local_executions
-            )
-            async for event in stream_result_events(last_skill_name or skill_name, plan, merged):
-                yield event
-            sync_skill_sink(result_sink, last_result, last_skill_name)
-            yield {"type": "done", "content": None}
-            return
         if _should_short_circuit_repeated_file_ingestion(
             skill_name,
             args,
@@ -766,8 +620,6 @@ async def stream_chat_react(
             harness_state,
             sorted(allowed_slugs),
             messages=messages,
-            specialist_agent_id=specialist_agent_id if subagent_react else None,
-            preferred_skills=preferred_skill_slugs,
         )
         if not policy.ok:
             harness_state.record_rejection(policy.reason)
@@ -785,18 +637,6 @@ async def stream_chat_react(
                     "content": OBS_HEADER + rejection_observation(validation, policy),
                 }
             )
-            forced_text = _force_subagent_converge_on_policy_reject(
-                policy,
-                trace_id=trace_id,
-                specialist_agent_id=specialist_agent_id if subagent_react else None,
-                result_sink=result_sink,
-                last_result=last_result,
-                last_skill_name=last_skill_name,
-            )
-            if forced_text:
-                yield {"type": "thinking", "content": "前置审计未通过，已收敛为改派建议。"}
-                yield {"type": "text", "content": forced_text}
-                return
             if harness_state.should_stop_after_rejection():
                 break
             yield {"type": "thinking", "content": "正在重新选择更合适的处理方式..."}
@@ -804,24 +644,11 @@ async def stream_chat_react(
         harness_state.record_accept()
         log_harness_authorized(trace_id, harness_state, execution_action)
         skill_doc = find_skill(skills, skill_name)
-        if not skill_doc or (subagent_react and skill_name not in allowed_slugs):
-            available = ", ".join(sorted(allowed_slugs)) if allowed_slugs else "（无）"
-            obs = json.dumps(
-                {
-                    "skill_not_in_line": True,
-                    "requested": skill_name,
-                    "available": sorted(allowed_slugs),
-                    "hint": f"请从本专线可用技能中选择：{available}",
-                },
-                ensure_ascii=False,
-            )
-            working.append({"role": "assistant", "content": assistant_note})
-            working.append({"role": "user", "content": OBS_HEADER + obs})
-            yield {
-                "type": "thinking",
-                "content": f"技能「{skill_name}」不在本专线，请从可用列表重选...",
-            }
-            continue
+        if not skill_doc:
+            sync_skill_sink(result_sink, last_result, last_skill_name)
+            yield {"type": "error", "content": f"未找到技能：{skill_name}"}
+            yield {"type": "done", "content": None}
+            return
 
         yield {"type": "thinking", "content": f"正在执行 Skill「{skill_name}」..."}
         assistant_note = json.dumps(
@@ -837,7 +664,7 @@ async def stream_chat_react(
                 payload=_skill_log_payload(
                     skill_name,
                     skill_doc,
-                    agent_id=specialist_agent_id,
+                    agent_id=None,
                     extra={"args": args},
                 ),
             )
@@ -858,23 +685,14 @@ async def stream_chat_react(
                 payload=_skill_log_payload(
                     skill_name,
                     skill_doc,
-                    agent_id=specialist_agent_id,
+                    agent_id=None,
                     extra=skill_result_log_payload(result),
                 ),
             )
-            previous_skill_name = last_skill_name
             last_skill_name = skill_name
             last_result = result
             harness_state.record_skill(skill_name, result)
             called_skills.append(skill_name)
-            current_signature = _result_signature(result)
-            repeated_skill_count = (
-                repeated_skill_count + 1
-                if skill_name == previous_skill_name and current_signature == last_result_signature
-                else 1
-            )
-            last_result_signature = current_signature
-            last_skill_args_signature = _args_signature(args)
             record_skill_execution(result_sink, skill_name, result, step + 1)
             if result_sink is None:
                 local_executions.append(
@@ -928,7 +746,7 @@ async def stream_chat_react(
                             payload=_skill_log_payload(
                                 skill_name,
                                 auto_doc,
-                                agent_id=specialist_agent_id,
+                                agent_id=None,
                                 extra={
                                     "args": auto_args,
                                     "resumed_after_ingestion": latest_proposal is not None,
@@ -949,7 +767,7 @@ async def stream_chat_react(
                             payload=_skill_log_payload(
                                 skill_name,
                                 auto_doc,
-                                agent_id=specialist_agent_id,
+                                agent_id=None,
                                 extra=skill_result_log_payload(result),
                             ),
                         )
@@ -985,7 +803,7 @@ async def stream_chat_react(
                         harness_state,
                         skill_name=skill_name,
                         audit=audit,
-                        agent_id=specialist_agent_id,
+                        agent_id=None,
                     )
                 yield {
                     "type": "thinking",
@@ -1022,7 +840,7 @@ async def stream_chat_react(
                     harness_state,
                     skill_name=skill_name,
                     audit=audit,
-                    agent_id=specialist_agent_id,
+                    agent_id=None,
                 )
         except Exception as exc:
             log_event(

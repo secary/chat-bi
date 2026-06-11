@@ -24,7 +24,6 @@ from backend.agent.prompt_builder import (
     build_system_prompt,
     scan_skills_enabled,
 )
-from backend.agent.prompt_subagent import build_system_prompt_for_subagent
 from backend.agent.query_decision import is_query_plus_decision_text
 from backend.agent.react_runner import stream_chat_react
 from backend.agent.react_followup import run_decision_followup
@@ -326,10 +325,7 @@ async def _stream_chat_legacy(
     skill_db_overrides: Optional[Dict[str, str]] = None,
     memory_block: Optional[str] = None,
     skill_docs: Optional[List[SkillDoc]] = None,
-    role_prompt: Optional[str] = None,
     result_sink: Optional[Dict[str, Any]] = None,
-    subagent_mode: bool = False,
-    specialist_agent_id: Optional[str] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """
     Legacy single-shot mode: one LLM call produces a JSON plan, then executes
@@ -350,11 +346,7 @@ async def _stream_chat_legacy(
         yield {"type": "text", "content": small_talk_reply(user_text)}
         yield {"type": "done", "content": None}
         return
-    system_prompt = (
-        build_system_prompt_for_subagent(skills) if subagent_mode else build_system_prompt(skills)
-    )
-    if role_prompt and role_prompt.strip():
-        system_prompt = role_prompt.strip() + "\n\n" + system_prompt
+    system_prompt = build_system_prompt(skills)
     if memory_block and memory_block.strip():
         system_prompt = memory_block.strip() + "\n\n" + system_prompt
 
@@ -428,7 +420,7 @@ async def _stream_chat_legacy(
                 payload={
                     "skill": skill_name,
                     "args": args,
-                    "agent_id": specialist_agent_id or "single",
+                    "agent_id": "single",
                 },
             )
             result = run_script(
@@ -467,57 +459,3 @@ async def _stream_chat_legacy(
     log_event(trace_id, "agent.runner", "completed", payload={"mode": "legacy"})
     _legacy_sink_write(result_sink, previous_result, last_skill_executed)
     yield {"type": "done", "content": None}
-
-
-async def stream_specialist(
-    messages: List[Dict[str, str]],
-    skill_docs: List[SkillDoc],
-    preferred_skill_slugs: Optional[List[str]] = None,
-    role_prompt: Optional[str] = None,
-    trace_id: str = "",
-    skill_db_overrides: Optional[Dict[str, str]] = None,
-    memory_block: Optional[str] = None,
-    result_sink: Optional[Dict[str, Any]] = None,
-    subagent_mode: bool = False,
-    specialist_agent_id: Optional[str] = None,
-    initial_last_result: Optional[Dict[str, Any]] = None,
-    initial_last_skill_name: Optional[str] = None,
-    session_id: Optional[int] = None,
-    user_id: Optional[int] = None,
-) -> AsyncGenerator[Dict[str, Any], None]:
-    """
-    Runs one specialist pass for a single agent in multi-agent mode.
-    Uses a pre-filtered skill list instead of all available skills.
-    Routes to ReAct or legacy mode based on settings.
-    """
-    if settings.agent_react:
-        async for event in stream_chat_react(
-            messages,
-            trace_id=trace_id,
-            skill_db_overrides=skill_db_overrides,
-            memory_block=memory_block,
-            skill_docs=skill_docs,
-            preferred_skill_slugs=preferred_skill_slugs,
-            role_prompt=role_prompt,
-            result_sink=result_sink,
-            subagent_react=subagent_mode,
-            specialist_agent_id=specialist_agent_id,
-            session_id=session_id,
-            user_id=user_id,
-            initial_last_result=initial_last_result,
-            initial_last_skill_name=initial_last_skill_name,
-        ):
-            yield event
-        return
-    async for event in _stream_chat_legacy(
-        messages,
-        trace_id=trace_id,
-        skill_db_overrides=skill_db_overrides,
-        memory_block=memory_block,
-        skill_docs=skill_docs,
-        role_prompt=role_prompt,
-        result_sink=result_sink,
-        subagent_mode=subagent_mode,
-        specialist_agent_id=specialist_agent_id,
-    ):
-        yield event

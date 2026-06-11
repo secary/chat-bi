@@ -7,7 +7,6 @@ import re
 from dataclasses import dataclass
 from typing import Any, Dict, List, Literal, Optional
 
-from backend.agent.decision_content_audit import audit_decision_result
 from backend.agent.executor import latest_user_content
 from backend.agent.query_decision import is_query_plus_decision_text
 
@@ -17,8 +16,6 @@ AuditStatus = Literal["ok", "warning", "error"]
 _DECISION_MARKERS = ("经营建议", "决策意见", "管理建议", "下一步动作", "经营动作", "经营策略", "怎么做", "建议")
 _VISUAL_MARKERS = ("图表", "画图", "可视化", "趋势图", "折线图", "柱状图", "饼图", "看板", "dashboard")
 # fmt: on
-_FACT_AGENT_IDS = {"demo_query", "upload_analyst", "period_compare"}
-_DECISION_AGENT_IDS = {"business_advisor"}
 _NUMBER_RE = re.compile(r"(?<![A-Za-z0-9])\d[\d,]*(?:\.\d+)?%?")
 
 
@@ -78,57 +75,6 @@ def audit_single_result_for_remediation(
     return actions
 
 
-def audit_multi_final_synthesis(
-    *,
-    user_question: str,
-    blocks: List[Dict[str, str]],
-    last_result: Optional[Dict[str, Any]],
-    last_skill_name: Optional[str],
-    dependency_warnings: List[str],
-) -> FinalAudit:
-    """Ensure final multi-agent synthesis is grounded in upstream facts."""
-    issues: List[Dict[str, str]] = []
-    fact_blocks = _fact_blocks(blocks)
-    decision_blocks = [
-        block for block in blocks if str(block.get("agent") or "") in _DECISION_AGENT_IDS
-    ]
-
-    if dependency_warnings:
-        issues.append(
-            _issue(
-                "SUMMARY_DEPENDENCY_UNMET",
-                "warning",
-                "部分下游专线声明缺少依赖事实，最终回答需要收束到已有事实。",
-            )
-        )
-
-    if _wants_decision(user_question) and decision_blocks and not fact_blocks:
-        issues.append(
-            _issue(
-                "DECISION_WITHOUT_UPSTREAM_FACTS",
-                "error",
-                "经营建议专线没有可审计的上游事实结果，禁止直接生成建议汇总。",
-            )
-        )
-
-    if isinstance(last_result, dict) and (
-        last_skill_name == "chatbi-decision-advisor"
-        or str(last_result.get("kind") or "") == "decision"
-    ):
-        audit = audit_decision_result(last_result)
-        if audit.get("status") == "error":
-            issues.append(
-                _issue(
-                    "DECISION_CONTENT_AUDIT_ERROR",
-                    "error",
-                    "决策结果缺少 facts 或关键事实，禁止作为最终建议依据。",
-                )
-            )
-
-    fact_ledger = build_fact_ledger(fact_blocks)
-    return FinalAudit(status=_status(issues), issues=issues, fact_ledger=fact_ledger)
-
-
 def audit_summary_against_fact_ledger(
     *,
     summary_text: str,
@@ -185,16 +131,6 @@ def chart_recommendation_args(user_text: str, result: Dict[str, Any]) -> List[st
     return [json.dumps({"question": user_text, "rows": rows}, ensure_ascii=False)]
 
 
-def build_fact_ledger(blocks: List[Dict[str, str]]) -> str:
-    lines: List[str] = []
-    for idx, block in enumerate(blocks, start=1):
-        observation = _clean_observation(str(block.get("observation") or ""))
-        if not observation:
-            continue
-        lines.append(f"- 事实 {idx}: {observation[:600]}")
-    return "\n".join(lines)
-
-
 def _wants_decision(text: str) -> bool:
     return is_query_plus_decision_text(text) or any(marker in text for marker in _DECISION_MARKERS)
 
@@ -241,23 +177,6 @@ def _rows(result: Dict[str, Any]) -> List[Any]:
     return raw_rows if isinstance(raw_rows, list) else []
 
 
-def _fact_blocks(blocks: List[Dict[str, str]]) -> List[Dict[str, str]]:
-    out: List[Dict[str, str]] = []
-    for block in blocks:
-        agent = str(block.get("agent") or "")
-        observation = str(block.get("observation") or "")
-        if agent in _FACT_AGENT_IDS or _looks_like_fact_observation(observation):
-            out.append(block)
-    return out
-
-
-def _looks_like_fact_observation(observation: str) -> bool:
-    return any(
-        marker in observation
-        for marker in ("rows", "查询", "销售额", "毛利", "完成率", "SQL", "已读取", "共返回")
-    )
-
-
 def _looks_like_advice(text: str) -> bool:
     return any(
         marker in text for marker in ("建议", "应当", "优先", "需要", "下一步", "策略", "动作")
@@ -294,10 +213,6 @@ def _is_temporal_number_context(text: str, start: int, end: int) -> bool:
     if "月" in window and any(sep in window for sep in ("-", "—", "至", "到", "、", ",")):
         return True
     return False
-
-
-def _clean_observation(text: str) -> str:
-    return " ".join(text.strip().split())
 
 
 def _issue(code: str, level: str, message: str) -> Dict[str, str]:

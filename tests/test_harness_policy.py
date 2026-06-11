@@ -46,54 +46,12 @@ class HarnessPolicyTest(unittest.TestCase):
         decision = authorize_action(action, state, ["chatbi-chart-recommendation"], messages=[])
         self.assertTrue(decision.ok)
 
-    def test_scoped_skill_rejection_contains_suggestion(self):
-        state = HarnessState(trace_id="t", user_text="分析", max_steps=4)
-        action = validate_harness_action(
-            {"action": "call_skill", "skill": "chatbi-auto-analysis", "skill_args": []}
-        ).action
-        decision = authorize_action(
-            action,
-            state,
-            ["chatbi-semantic-query"],
-            messages=[],
-            specialist_agent_id="demo_query",
-            preferred_skills=["chatbi-semantic-query"],
-        )
-        self.assertFalse(decision.ok)
-        self.assertIn("demo_query 当前不应调取 chatbi-auto-analysis", decision.reason)
-        self.assertIn("改派上传与文件分析专线执行 auto-analysis", decision.suggested_text)
-
-    def test_business_advisor_finish_requires_decision_result(self):
+    def test_finish_action_is_allowed_for_single_agent(self):
         state = HarnessState(trace_id="t", user_text="给建议", max_steps=4)
-        action = validate_harness_action(
-            {"action": "finish", "text": "先给建议", "chart_plan": None, "kpi_cards": []}
-        ).action
-        decision = authorize_action(
-            action,
-            state,
-            ["chatbi-decision-advisor"],
-            messages=[],
-            specialist_agent_id="business_advisor",
-        )
-        self.assertFalse(decision.ok)
-        self.assertIn("未执行 chatbi-decision-advisor 前直接 finish", decision.reason)
-
-    def test_business_advisor_finish_allows_existing_decision_result(self):
-        state = HarnessState(trace_id="t", user_text="给建议", max_steps=4)
-        state.record_skill(
-            "chatbi-decision-advisor",
-            {"kind": "decision", "text": "建议继续深耕华东。"},
-        )
         action = validate_harness_action(
             {"action": "finish", "text": "整理建议", "chart_plan": None, "kpi_cards": []}
         ).action
-        decision = authorize_action(
-            action,
-            state,
-            ["chatbi-decision-advisor"],
-            messages=[],
-            specialist_agent_id="business_advisor",
-        )
+        decision = authorize_action(action, state, ["chatbi-decision-advisor"], messages=[])
         self.assertTrue(decision.ok)
 
 

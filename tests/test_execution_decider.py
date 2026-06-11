@@ -24,12 +24,12 @@ class ExecutionDeciderTest(unittest.TestCase):
         self.assertEqual(decision.route_sequence, ["demo_query"])
         self.assertGreaterEqual(decision.confidence, 0.8)
 
-    def test_query_then_decision_uses_multi_agent(self) -> None:
+    def test_query_then_decision_uses_single_agent_with_composite_goal(self) -> None:
         decision = decide_execution_mode(
             [{"role": "user", "content": "基于华东近3个月销售和毛利给我经营建议"}]
         )
 
-        self.assertEqual(decision.mode, "multi")
+        self.assertEqual(decision.mode, "single")
         self.assertEqual(decision.route_sequence, ["demo_query", "business_advisor"])
         self.assertIn("composite_goal", decision.risk_flags)
 
@@ -52,7 +52,7 @@ class ExecutionDeciderTest(unittest.TestCase):
             [{"role": "user", "content": "查华东销售额，建议用柱状图还是折线图"}]
         )
 
-        self.assertEqual(decision.mode, "multi")
+        self.assertEqual(decision.mode, "single")
         self.assertEqual(decision.route_sequence, ["demo_query", "viz_board"])
 
     def test_stream_chat_empty_message_asks_for_question(self) -> None:
@@ -97,15 +97,9 @@ class ExecutionDeciderTest(unittest.TestCase):
                 yield {"type": "text", "content": "single ok"}
                 yield {"type": "done", "content": None}
 
-            with (
-                patch(
-                    "backend.agent.runner._stream_single_with_post_audit",
-                    side_effect=fake_single,
-                ),
-                patch(
-                    "backend.agent.multi_agent_runner.stream_chat_multi_agent",
-                    side_effect=AssertionError("multi-agent should not run"),
-                ),
+            with patch(
+                "backend.agent.runner._stream_single_with_post_audit",
+                side_effect=fake_single,
             ):
                 got = []
                 async for event in stream_chat(
@@ -120,25 +114,18 @@ class ExecutionDeciderTest(unittest.TestCase):
 
         asyncio.run(run())
 
-    def test_stream_chat_multi_agents_true_still_runs_single_agent(self) -> None:
+    def test_stream_chat_composite_input_runs_single_agent(self) -> None:
         async def run() -> None:
             async def fake_single(*args, **kwargs):
                 yield {"type": "text", "content": "single ok"}
                 yield {"type": "done", "content": None}
 
-            with (
-                patch(
-                    "backend.agent.runner._stream_single_with_post_audit", side_effect=fake_single
-                ),
-                patch(
-                    "backend.agent.multi_agent_runner.stream_chat_multi_agent",
-                    side_effect=AssertionError("multi-agent should not run"),
-                ),
+            with patch(
+                "backend.agent.runner._stream_single_with_post_audit", side_effect=fake_single
             ):
                 got = []
                 async for event in stream_chat(
                     [{"role": "user", "content": "基于华东近3个月销售和毛利给经营建议"}],
-                    multi_agents=True,
                     trace_id="t-force-single",
                 ):
                     got.append(event)
@@ -230,7 +217,6 @@ class ExecutionDeciderTest(unittest.TestCase):
                 got = []
                 async for event in stream_chat(
                     [{"role": "user", "content": "查华东销售额并给经营建议"}],
-                    multi_agents="single",
                     trace_id="t-post-audit",
                 ):
                     got.append(event)

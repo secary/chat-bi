@@ -25,7 +25,6 @@ class Case:
     expect_text: list[str] = field(default_factory=list)
     expect_no_text: list[str] = field(default_factory=list)
     expect_chart: bool = False
-    multi_agents: bool = False
     upload_file: str | None = None
     steps: list[CaseStep] = field(default_factory=list)
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, AsyncGenerator, Dict, List, Optional, Union
+from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from backend.agent.execution_audit import (
     RemediationAction,
@@ -287,7 +287,6 @@ async def stream_chat(
     trace_id: str = "",
     skill_db_overrides: Optional[Dict[str, str]] = None,
     memory_block: Optional[str] = None,
-    multi_agents: Union[bool, str] = "auto",
     session_id: Optional[int] = None,
     user_id: Optional[int] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
@@ -298,9 +297,7 @@ async def stream_chat(
         "agent.harness",
         "execution_decision_selected",
         payload={
-            "mode": "single" if decision.mode == "multi" else decision.mode,
-            "requested_multi_agents": multi_agents,
-            "suppressed_mode": "multi" if decision.mode == "multi" else None,
+            "mode": decision.mode,
             "reason": decision.reason,
             "route_sequence": decision.route_sequence,
             "confidence": decision.confidence,

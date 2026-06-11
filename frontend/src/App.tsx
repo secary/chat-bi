@@ -24,7 +24,6 @@ export default function App() {
               <Route path="/dashboard" element={<Navigate to="/" replace />} />
               <Route path="/audits" element={<HarnessAuditPage />} />
               <Route path="/harness-audits" element={<Navigate to="/audits" replace />} />
-              <Route path="/multi-agents" element={<Navigate to="/audits" replace />} />
               <Route path="/skills" element={<SkillAdminPage />} />
               <Route path="/data-sources" element={<DataSourcesPage />} />
               <Route path="/llm" element={<LlmConfigPage />} />

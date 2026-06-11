@@ -71,8 +71,8 @@ uv sync
 |------|----------|
 | `foundation` | 环境加载、HTTP 工具、协议、Observation、测试框架自检 |
 | `skills` | Skill 确定性脚本、输出契约、安全边界 |
-| `agent` | Legacy/ReAct runner、多专线、上下文、断连与复合意图 |
-| `admin` | 管理接口、技能注册、多 Agent 配置、数据库目标 |
+| `agent` | Legacy/ReAct runner、上下文、断连与复合意图 |
+| `admin` | 管理接口、技能注册、数据库目标 |
 | `auth-memory` | 鉴权、token、免登录、记忆开关 |
 | `dashboard` | Dashboard 聚合和图表渲染 |
 | `data-sources` | 外部库 SQL、数据库概览、文件导入 |
@@ -129,15 +129,12 @@ uv sync
 - `test_agent_runner_contract.py::*`：Legacy 模式一次计划一次脚本，小聊天跳过 planner 和 skill。
 - `test_agent_workflow.py::*`：复合“查询 + 建议”拆成 semantic-query → decision-advisor；普通查询保持单步；prompt 包含数据库概览触发规则。
 - `test_chat_route_disconnect.py::*`：前端断连状态一旦出现保持生效。
-- `test_multi_agent_registry.py::*`：按 slug 顺序过滤已启用 Skill。
-- `test_multi_agent_manager.py::*`：Manager 规划 JSON 调用、子任务 cap、依赖拓扑与环检测、子 agent 提示词不包含未授予技能。
 - `test_query_advice_dimension_flow.py::*`：从查询结果首列推断建议关注维度。
 - `test_react_runner.py::*`：ReAct 两轮调用、无 skill finish、寒暄短路、可视化优先 Skill 保图表、查询+建议自动补跑 decision-advisor、模型收尾 JSON 异常时回退最后一次 Skill 结果。
 - `test_upload_context.py::*`：历史上传文件路径注入上下文，纯数据库问题不注入。
 
 ### Admin / Auth / Memory
 
-- `test_admin_multi_agents.py::*`：多 Agent 管理默认值、保存回读、非法 Skill/agent/空配置拒绝、registry 原子写。
 - `test_app_llm_saved.py::*`：`saved_settings_apply` 与活跃档案判定。
 - `test_chatbi_llm_fallback.py::*`：`chatbi_acompletion` 在连接失败后尝试下一档参数。
 - `test_db_mysql_targets.py::*`：app/admin 目标库配置路由正确。

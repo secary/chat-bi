@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import re
 from time import perf_counter
-from typing import Any, AsyncGenerator, Dict, List, Literal, Optional, Union
+from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -38,7 +38,6 @@ class ChatRequest(BaseModel):
     uploads: List[dict] = Field(default_factory=list)
     session_id: Optional[int] = None
     db_connection_id: Optional[int] = None
-    multi_agents: Union[bool, Literal["auto", "single"]] = "auto"
 
 
 @router.post("/abort")
@@ -225,7 +224,6 @@ async def chat(
             "history_count": len(req.history),
             "session_id": req.session_id,
             "upload_count": len(req.uploads),
-            "multi_agents": req.multi_agents,
         },
     )
 
@@ -244,7 +242,6 @@ async def chat(
                 trace_id=trace_id,
                 skill_db_overrides=skill_db,
                 memory_block=memory_block or None,
-                multi_agents=req.multi_agents,
                 session_id=persist_sid,
                 user_id=int(user["id"]),
             ):

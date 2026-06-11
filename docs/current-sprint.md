@@ -2,6 +2,7 @@
 
 | 状态 | 优先级 | 事项 | 当前完成度 / 下一步 |
 |---|---|---|---|
+| 已完成 | P0 | 多 Agent 物理剔除第二步 | 已完成 Gap 325：删除多专线运行时模块、registry、后台管理 API/页面和专属测试；`/chat` 请求与 E2E payload 不再声明或发送 `multi_agents` |
 | 已完成 | P0 | 多 Agent 运行时断流第一步 | 已完成 Gap 324：`/chat` 运行时不再按 `multi_agents=auto/true` 分流到多专线，统一走单 Agent + post-audit；前端停止主动发送 `multi_agents` 字段，保留后端请求字段作为临时兼容 |
 | 已完成 | P1 | 记忆 fallback 测试环境隔离 | 已完成 Gap 323：fallback 记忆测试显式开启 `_MEMORY_OFF=False`，覆盖 CI 设置 `CHATBI_MEMORY_DISABLED=1` 时的测试隔离问题 |
 | 已完成 | P1 | 当前会话记忆去重 | 已完成 Gap 319：`/chat` 构建 memory block 时排除当前会话摘要，避免与 context window 的当前会话摘要重复注入 |
@@ -22,6 +23,7 @@
 
 | ID | Gap / 变更 | 验证 |
 |---:|---|---|
+| 325  | 多 Agent 物理剔除第二步：删除 `backend/agent/multi_agent_*`、`backend/routes/admin_multi_agents_route.py`、`skills/_agents/registry.yaml`、前端 `MultiAgentsAdminPage` / `multiAgentsRegistryUi` 和对应测试；`backend/main.py` 不再注册 `/admin/multi-agents`；`ChatRequest`、`stream_chat`、前端类型和 E2E payload 移除 `multi_agents`；`execution_decider` 改为单 Agent 澄清/风险标记，不再依赖多专线 intent 分类 | `.venv/bin/python scripts/format_code.py backend/agent/execution_decider.py backend/agent/runner.py backend/routes/chat_route.py backend/main.py scripts/e2e_cases.py scripts/e2e_smoke.py scripts/e2e_runner.py scripts/run_tests.py tests/test_execution_decider.py docs/current-sprint.md docs/testing.md docs/help/audits.md AGENTS.md`；`PYTHONPATH=. .venv/bin/python -m pytest tests/test_execution_decider.py tests/test_e2e_smoke_script.py tests/test_run_tests_script.py -q`；`PYTHONPATH=. .venv/bin/python scripts/run_tests.py agent -- -q`；`PYTHONPATH=. .venv/bin/python scripts/run_tests.py admin -- -q`；`npm run lint`；`npm run test`；`git diff --check` |
 | 324  | 多 Agent 运行时断流第一步：`stream_chat` 保留执行决策日志和澄清分支，但不再导入或调用 `stream_chat_multi_agent`；复合意图、`multi_agents=auto` 与强传 `multi_agents=true` 都统一进入单 Agent + post-audit 路径；前端 `useChat` 不再主动发送 `multi_agents: "auto"`，后端请求字段暂时保留用于兼容旧客户端 | `.venv/bin/python scripts/format_code.py backend/agent/runner.py tests/test_execution_decider.py docs/current-sprint.md`；`PYTHONPATH=. .venv/bin/python -m pytest tests/test_execution_decider.py -q`；`npm run lint`；`git diff --check` |
 | 323  | 记忆 fallback 测试环境隔离：`tests/test_memory_service_fallback.py` 的两个降级行为测试显式将 `memory_service._MEMORY_OFF` 设为 `False`，避免 CI 或外层环境设置 `CHATBI_MEMORY_DISABLED=1` 时被测函数提前 return，导致 fallback 持久化断言误失败 | `.venv/bin/python -m pytest tests/test_memory_service_fallback.py tests/test_memory_service_off.py -q`；`CHATBI_MEMORY_DISABLED=1 .venv/bin/python -m pytest tests/test_memory_service_fallback.py -q`；`.venv/bin/python scripts/format_code.py tests/test_memory_service_fallback.py`；`.venv/bin/python scripts/run_tests.py all -- -q` |
 | 322  | TODO：记忆建议词标题统一；`refresh_memory_after_turn` 的摘要 title 仍来自原始用户问题前 80 字，和会话自动标题规则不一致，可能让 suggested prompts 过长、口语化或被噪声过滤误伤；下一步复用统一标题概括逻辑 | 待实现 |

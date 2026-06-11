@@ -11,6 +11,7 @@ def test_refresh_memory_persists_fallback_summary_when_summary_llm_fails(monkeyp
     async def fail_llm(*_args, **_kwargs):
         raise RuntimeError("llm unavailable")
 
+    monkeypatch.setattr(memory_service, "_MEMORY_OFF", False)
     monkeypatch.setattr(memory_service, "_llm_text", fail_llm)
     monkeypatch.setattr(
         memory_service,
@@ -71,6 +72,7 @@ def test_refresh_memory_keeps_session_summary_when_long_term_llm_fails(monkeypat
             return "用户关注区域销售额对比，并希望保留毛利率口径。"
         raise RuntimeError("merge failed")
 
+    monkeypatch.setattr(memory_service, "_MEMORY_OFF", False)
     monkeypatch.setattr(memory_service, "_llm_text", mixed_llm)
     monkeypatch.setattr(
         memory_service,

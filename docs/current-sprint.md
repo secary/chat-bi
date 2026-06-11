@@ -2,6 +2,7 @@
 
 | 状态 | 优先级 | 事项 | 当前完成度 / 下一步 |
 |---|---|---|---|
+| 已完成 | P1 | 记忆 fallback 测试环境隔离 | 已完成 Gap 323：fallback 记忆测试显式开启 `_MEMORY_OFF=False`，覆盖 CI 设置 `CHATBI_MEMORY_DISABLED=1` 时的测试隔离问题 |
 | 已完成 | P1 | 当前会话记忆去重 | 已完成 Gap 319：`/chat` 构建 memory block 时排除当前会话摘要，避免与 context window 的当前会话摘要重复注入 |
 | 已完成 | P1 | 空白新聊天复用 | 已完成 Gap 318：创建或读取会话列表时复用/保留当前用户最新空白“新聊天”，兼容清理旧“新对话”，避免未输入时堆叠多个默认会话 |
 | 已完成 | P2 | 左上角品牌区返回首页 | 已完成 Gap 317：侧边栏 logo + 品牌名改为可点击入口，点击后创建空会话并回到对话欢迎页 |
@@ -20,6 +21,7 @@
 
 | ID | Gap / 变更 | 验证 |
 |---:|---|---|
+| 323  | 记忆 fallback 测试环境隔离：`tests/test_memory_service_fallback.py` 的两个降级行为测试显式将 `memory_service._MEMORY_OFF` 设为 `False`，避免 CI 或外层环境设置 `CHATBI_MEMORY_DISABLED=1` 时被测函数提前 return，导致 fallback 持久化断言误失败 | `.venv/bin/python -m pytest tests/test_memory_service_fallback.py tests/test_memory_service_off.py -q`；`CHATBI_MEMORY_DISABLED=1 .venv/bin/python -m pytest tests/test_memory_service_fallback.py -q`；`.venv/bin/python scripts/format_code.py tests/test_memory_service_fallback.py`；`.venv/bin/python scripts/run_tests.py all -- -q` |
 | 322  | TODO：记忆建议词标题统一；`refresh_memory_after_turn` 的摘要 title 仍来自原始用户问题前 80 字，和会话自动标题规则不一致，可能让 suggested prompts 过长、口语化或被噪声过滤误伤；下一步复用统一标题概括逻辑 | 待实现 |
 | 321  | TODO：记忆质量与污染控制；fallback 摘要、空回答摘要、上传路径/工具说明等低质量内容会参与长期记忆合并，缺少来源、置信度、稳定偏好抽取和污染隔离；下一步为摘要增加质量标记并限制进入长期记忆的条件 | 待实现 |
 | 320  | TODO：删除会话同步处理记忆；`DELETE /sessions/{id}` 目前只删除会话记录，已生成的 `session_summary` 仍保留在 `app_user_memory` 并可能被 `format_memory_for_prompt` 当作近期记忆注入；下一步删除或失效对应摘要，并补权限与回归测试 | 待实现 |

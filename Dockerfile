@@ -1,4 +1,4 @@
-FROM m.daocloud.io/docker.io/library/node:22-bookworm-slim AS frontend-deps
+FROM m.daocloud.io/docker.io/library/node:26-bookworm-slim AS frontend-deps
 
 WORKDIR /app
 
